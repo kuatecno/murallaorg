@@ -1,0 +1,27 @@
+// Audit Trail Model - Add to main schema.prisma
+
+model AuditTrail {
+  id          String   @id @default(cuid())
+  tableName   String   // The table that was modified
+  recordId    String   // The ID of the record that was modified
+  operation   AuditOperation // CREATE, UPDATE, DELETE
+  beforeData  Json?    // JSON snapshot before change
+  afterData   Json?    // JSON snapshot after change
+  userId      String?  // User who made the change
+  user        User?    @relation(fields: [userId], references: [id])
+  timestamp   DateTime @default(now())
+  ipAddress   String?
+  userAgent   String?
+  
+  @@map("audit_trail")
+  @@index([tableName, recordId])
+  @@index([userId])
+  @@index([timestamp])
+}
+
+enum AuditOperation {
+  CREATE
+  UPDATE
+  DELETE
+  RESTORE
+}

@@ -1,0 +1,749 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Role {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  permissions String[]
+  tenantId    String?  // For future multi-tenant support
+  isDeleted   Boolean  @default(false)
+  deletedAt   DateTime?
+  deletedBy   String?
+  createdBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  users       User[]
+
+  @@map("roles")
+}
+
+model Project {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  tenantId    String?  // For future multi-tenant support
+  isDeleted   Boolean  @default(false)
+  deletedAt   DateTime?
+  deletedBy   String?
+  createdBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  tasks       Task[]
+
+  @@map("projects")
+}
+
+model Task {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  status      TaskStatus @default(PENDING)
+  projectId   String
+  project     Project @relation(fields: [projectId], references: [id])
+  assigneeId  String?
+  assignee    User? @relation(fields: [assigneeId], references: [id])
+  tenantId    String?  // For future multi-tenant support
+  isDeleted   Boolean  @default(false)
+  deletedAt   DateTime?
+  deletedBy   String?
+  createdBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("tasks")
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  DONE
+}
+
+enum DocumentType {
+  WIKI
+  SOP
+  PLAYBOOK
+  TEMPLATE
+}
+
+enum DocumentStatus {
+  DRAFT
+  REVIEW
+  PUBLISHED
+  ARCHIVED
+}
+
+model Document {
+  id            String             @id @default(cuid())
+  title         String
+  content       String             @db.Text // Support large markdown content
+  slug          String             @unique // URL-friendly identifier
+  summary       String?            // Brief description
+  type          DocumentType
+  status        DocumentStatus     @default(DRAFT)
+  tags          String[]           // Array of tags for categorization
+  parentId      String?            // For hierarchical organization
+  parent        Document?          @relation("DocumentHierarchy", fields: [parentId], references: [id])
+  children      Document[]         @relation("DocumentHierarchy")
+  authorId      String
+  author        User               @relation(fields: [authorId], references: [id])
+  revisions     DocumentRevision[] // Revision history
+  tenantId      String?            // For future multi-tenant support
+  isDeleted     Boolean            @default(false)
+  deletedAt     DateTime?
+  deletedBy     String?
+  createdBy     String?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  publishedAt   DateTime?          // When document was published
+  viewCount     Int                @default(0) // Track popularity
+  lastViewedAt  DateTime?          // Last time document was accessed
+
+  @@map("documents")
+}
+
+model DocumentRevision {
+  id          String   @id @default(cuid())
+  documentId  String
+  document    Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  version     Int      // Version number (1, 2, 3, etc.)
+  title       String   // Title at this revision
+  content     String   @db.Text // Content at this revision
+  summary     String?  // Summary at this revision
+  changeLog   String?  // Description of changes made
+  authorId    String   // Who made this revision
+  author      User     @relation(fields: [authorId], references: [id])
+  tenantId    String?  // For future multi-tenant support
+  createdAt   DateTime @default(now())
+
+  @@unique([documentId, version])
+  @@map("document_revisions")
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  price       Float
+  stock       Int      @default(0)
+  category    String?
+  tenantId    String?  // For future multi-tenant support
+  isDeleted   Boolean  @default(false)
+  deletedAt   DateTime?
+  deletedBy   String?
+  createdBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  sales       Sale[]
+
+  @@map("products")
+}
+
+model Sale {
+  id        String   @id @default(cuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id])
+  quantity  Int
+  total     Float
+  soldBy    String
+  seller    User     @relation(fields: [soldBy], references: [id])
+  tenantId  String?  // For future multi-tenant support
+  isDeleted Boolean  @default(false)
+  deletedAt DateTime?
+  deletedBy String?
+  createdBy String?
+  createdAt DateTime @default(now())
+
+  @@map("sales")
+}
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+  TRANSFER
+}
+
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  MERCADO_PAGO
+  BANK_TRANSFER
+  CASH
+  CREDIT_CARD
+  DEBIT_CARD
+  CHECK
+  OTHER
+}
+
+model BankAccount {
+  id            String   @id @default(cuid())
+  name          String
+  accountNumber String?
+  bankName      String?
+  accountType   String?  // checking, savings, etc.
+  currency      String   @default("ARS")
+  currentBalance Float   @default(0)
+  isActive      Boolean  @default(true)
+  tenantId      String?  // For future multi-tenant support
+  isDeleted     Boolean  @default(false)
+  deletedAt     DateTime?
+  deletedBy     String?
+  createdBy     String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  transactions  Transaction[]
+  balanceHistory BankBalance[]
+
+  @@map("bank_accounts")
+}
+
+model TransactionCategory {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  icon        String?
+  color       String?
+  description String?
+  isActive    Boolean  @default(true)
+  tenantId    String?  // For future multi-tenant support
+  isDeleted   Boolean  @default(false)
+  deletedAt   DateTime?
+  deletedBy   String?
+  createdBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  transactions Transaction[]
+
+  @@map("transaction_categories")
+}
+
+model Transaction {
+  id              String              @id @default(cuid())
+  description     String
+  amount          Float
+  type            TransactionType
+  status          TransactionStatus   @default(COMPLETED)
+  paymentMethod   PaymentMethod       @default(MERCADO_PAGO)
+  reference       String?             @unique
+  externalId      String?             // Mercado Pago payment ID
+  
+  // Related entities
+  accountId       String
+  account         BankAccount         @relation(fields: [accountId], references: [id])
+  categoryId      String?
+  category        TransactionCategory? @relation(fields: [categoryId], references: [id])
+  
+  // Additional metadata
+  customerName    String?
+  supplierName    String?
+  employeeName    String?
+  projectName     String?
+  items           Json?               // Array of items involved
+  notes           String?
+  receiptUrl      String?
+  
+  // Mercado Pago specific
+  mpPaymentId     String?             // Mercado Pago payment ID
+  mpStatus        String?             // Mercado Pago status
+  mpPaymentType   String?             // credit_card, debit_card, etc.
+  
+  // Audit fields
+  tenantId        String?             // For future multi-tenant support
+  isDeleted       Boolean             @default(false)
+  deletedAt       DateTime?
+  deletedBy       String?
+  createdBy       String?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  
+  creator         User?               @relation(fields: [createdBy], references: [id])
+  
+  // Staff Finances Relations
+  payrollId       String?
+  payroll         Payroll?            @relation(fields: [payrollId], references: [id])
+  expenseReimbursement EmployeeExpense?
+
+  @@map("transactions")
+  @@index([accountId])
+  @@index([categoryId])
+  @@index([type])
+  @@index([status])
+  @@index([createdAt])
+  @@index([reference])
+  @@index([mpPaymentId])
+}
+
+model BankBalance {
+  id              String      @id @default(cuid())
+  accountId       String
+  account         BankAccount @relation(fields: [accountId], references: [id])
+  balanceDate     DateTime    @unique
+  openingBalance  Float       @default(0)
+  closingBalance  Float       @default(0)
+  totalIncome     Float       @default(0)
+  totalExpenses   Float       @default(0)
+  transactionCount Int        @default(0)
+  tenantId        String?     // For future multi-tenant support
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@map("bank_balances")
+  @@index([accountId])
+  @@index([balanceDate])
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  username  String   @unique
+  firstName String
+  lastName  String
+  password  String
+  isActive  Boolean  @default(true)
+  roleId    String
+  role      Role     @relation(fields: [roleId], references: [id])
+  tenantId  String?  // For future multi-tenant support
+  tasks     Task[]
+  documents Document[]
+  documentRevisions DocumentRevision[]
+  sales     Sale[]
+  transactions Transaction[]
+  auditTrails AuditTrail[]
+  notificationTemplatesCreated NotificationTemplate[] @relation("NotificationTemplateCreator")
+  notificationRulesCreated NotificationRule[] @relation("NotificationRuleCreator")
+  notifications Notification[] @relation("NotificationRecipient")
+  magicTokens MagicToken[]
+  
+  // Staff Finances Relations
+  payrollsApproved Payroll[] @relation("PayrollApprover")
+  payrollsProcessed Payroll[] @relation("PayrollProcessor")
+  payrollEntries PayrollEntry[] @relation("PayrollEmployee")
+  salaryAdjustments SalaryAdjustment[] @relation("SalaryAdjustmentEmployee")
+  salaryAdjustmentsApproved SalaryAdjustment[] @relation("SalaryAdjustmentApprover")
+  employeeExpenses EmployeeExpense[] @relation("EmployeeExpenseEmployee")
+  expenseReviews EmployeeExpense[] @relation("ExpenseReviewer")
+  
+  // PTO / Time-Off Relations
+  ptoRequests PTORequest[] @relation("PTOEmployee")
+  ptoApprovals PTORequest[] @relation("PTOApprover")
+  ptoBalances PTOBalance[] @relation("PTOBalanceEmployee")
+  isDeleted Boolean  @default(false)
+  deletedAt DateTime?
+  deletedBy String?
+  createdBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("users")
+}
+
+model MagicToken {
+  id        String   @id @default(cuid())
+  userId    String
+  purpose   String   // 'magic' | 'reset'
+  tokenHash String   // hashed for security
+  expiresAt DateTime
+  tenantId  String?  // For future multi-tenant support
+  isDeleted Boolean  @default(false)
+  deletedAt DateTime?
+  deletedBy String?
+  createdBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@map("magic_tokens")
+  @@index([tokenHash])
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model AuditTrail {
+  id          String   @id @default(cuid())
+  tableName   String   // The table that was modified
+  recordId    String   // The ID of the record that was modified
+  operation   AuditOperation // CREATE, UPDATE, DELETE
+  beforeData  Json?    // JSON snapshot before change
+  afterData  Json?    // JSON snapshot after change
+  userId      String?  // User who made the change
+  user        User?    @relation(fields: [userId], references: [id])
+  tenantId    String?  // For future multi-tenant support
+  timestamp   DateTime @default(now())
+  ipAddress   String?
+  userAgent   String?
+  
+  @@map("audit_trail")
+  @@index([tableName, recordId])
+  @@index([userId])
+  @@index([timestamp])
+}
+
+enum AuditOperation {
+  CREATE
+  UPDATE
+  DELETE
+  RESTORE
+}
+
+enum NotificationType {
+  EMAIL
+  PUSH
+  IN_APP
+  SMS
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+  CANCELLED
+}
+
+enum RuleTrigger {
+  TASK_CREATED
+  TASK_UPDATED
+  TASK_COMPLETED
+  DOCUMENT_CREATED
+  DOCUMENT_UPDATED
+  USER_REGISTERED
+  PROJECT_CREATED
+  DEADLINE_APPROACHING
+  STOCK_LOW
+  CUSTOM
+}
+
+model NotificationTemplate {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  type        NotificationType
+  subject     String?  // For email notifications
+  content     String   @db.Text // Template content with variables
+  variables   String[] // Available template variables
+  isActive    Boolean  @default(true)
+  createdBy   String
+  creator     User     @relation("NotificationTemplateCreator", fields: [createdBy], references: [id])
+  rules       NotificationRule[]
+  notifications Notification[]
+  tenantId    String?  // For future multi-tenant support
+  isDeleted   Boolean  @default(false)
+  deletedAt   DateTime?
+  deletedBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("notification_templates")
+}
+
+model NotificationRule {
+  id          String      @id @default(cuid())
+  name        String
+  description String?
+  trigger     RuleTrigger
+  conditions  Json        // JSON conditions for rule evaluation
+  isActive    Boolean     @default(true)
+  templateId  String
+  template    NotificationTemplate @relation(fields: [templateId], references: [id])
+  recipients  Json        // JSON array of recipient rules
+  delay       Int?        // Delay in minutes before sending
+  createdBy   String
+  creator     User        @relation("NotificationRuleCreator", fields: [createdBy], references: [id])
+  notifications Notification[]
+  tenantId    String?     // For future multi-tenant support
+  isDeleted   Boolean     @default(false)
+  deletedAt   DateTime?
+  deletedBy   String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@map("notification_rules")
+}
+
+model Notification {
+  id          String             @id @default(cuid())
+  type        NotificationType
+  status      NotificationStatus @default(PENDING)
+  subject     String?
+  content     String             @db.Text
+  recipientId String
+  recipient   User               @relation("NotificationRecipient", fields: [recipientId], references: [id])
+  templateId  String?
+  template    NotificationTemplate? @relation(fields: [templateId], references: [id])
+  ruleId      String?
+  rule        NotificationRule?  @relation(fields: [ruleId], references: [id])
+  entityType  String?            // Related entity type (Task, Document, etc.)
+  entityId    String?            // Related entity ID
+  metadata    Json?              // Additional notification data
+  scheduledAt DateTime?          // When to send the notification
+  sentAt      DateTime?          // When notification was sent
+  failedAt    DateTime?          // When notification failed
+  errorMessage String?           // Error details if failed
+  readAt      DateTime?          // When recipient read the notification
+  tenantId    String?            // For future multi-tenant support
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  @@map("notifications")
+  @@index([recipientId, status])
+  @@index([scheduledAt])
+  @@index([entityType, entityId])
+}
+
+// Staff Finances Models
+model Payroll {
+  id              String   @id @default(cuid())
+  runDate         DateTime
+  payPeriodStart  DateTime
+  payPeriodEnd    DateTime
+  status          PayrollStatus @default(DRAFT)
+  totalGrossPay   Decimal  @db.Decimal(12, 2)
+  totalDeductions Decimal  @db.Decimal(12, 2)
+  totalNetPay     Decimal  @db.Decimal(12, 2)
+  notes           String?
+  approvedBy      String?
+  approver        User?    @relation("PayrollApprover", fields: [approvedBy], references: [id])
+  approvedAt      DateTime?
+  processedBy     String?
+  processor       User?    @relation("PayrollProcessor", fields: [processedBy], references: [id])
+  processedAt     DateTime?
+  tenantId        String?  // For future multi-tenant support
+  
+  // Relations
+  payrollEntries  PayrollEntry[]
+  transactions    Transaction[] // Link to bank transactions
+  
+  isDeleted       Boolean  @default(false)
+  deletedAt       DateTime?
+  deletedBy       String?
+  createdBy       String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("payrolls")
+  @@index([runDate])
+  @@index([status])
+  @@index([payPeriodStart, payPeriodEnd])
+}
+
+model PayrollEntry {
+  id              String   @id @default(cuid())
+  payrollId       String
+  payroll         Payroll  @relation(fields: [payrollId], references: [id])
+  employeeId      String
+  employee        User     @relation("PayrollEmployee", fields: [employeeId], references: [id])
+  
+  // Salary Information
+  baseSalary      Decimal  @db.Decimal(10, 2)
+  hoursWorked     Decimal? @db.Decimal(5, 2)
+  overtimeHours   Decimal? @db.Decimal(5, 2)
+  bonusAmount     Decimal? @db.Decimal(10, 2)
+  allowances      Decimal? @db.Decimal(10, 2)
+  
+  // Calculations
+  grossPay        Decimal  @db.Decimal(10, 2)
+  taxDeductions   Decimal  @db.Decimal(10, 2)
+  socialSecurity  Decimal  @db.Decimal(10, 2)
+  otherDeductions Decimal? @db.Decimal(10, 2)
+  netPay          Decimal  @db.Decimal(10, 2)
+  
+  // Metadata
+  notes           String?
+  tenantId        String?  // For future multi-tenant support
+  
+  isDeleted       Boolean  @default(false)
+  deletedAt       DateTime?
+  deletedBy       String?
+  createdBy       String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("payroll_entries")
+  @@index([payrollId])
+  @@index([employeeId])
+  @@unique([payrollId, employeeId])
+}
+
+model SalaryAdjustment {
+  id              String   @id @default(cuid())
+  employeeId      String
+  employee        User     @relation("SalaryAdjustmentEmployee", fields: [employeeId], references: [id])
+  
+  // Adjustment Details
+  adjustmentType  SalaryAdjustmentType
+  previousAmount  Decimal  @db.Decimal(10, 2)
+  newAmount       Decimal  @db.Decimal(10, 2)
+  effectiveDate   DateTime
+  reason          String
+  notes           String?
+  
+  // Approval
+  approvedBy      String?
+  approver        User?    @relation("SalaryAdjustmentApprover", fields: [approvedBy], references: [id])
+  approvedAt      DateTime?
+  
+  tenantId        String?  // For future multi-tenant support
+  
+  isDeleted       Boolean  @default(false)
+  deletedAt       DateTime?
+  deletedBy       String?
+  createdBy       String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("salary_adjustments")
+  @@index([employeeId])
+  @@index([effectiveDate])
+  @@index([adjustmentType])
+}
+
+model EmployeeExpense {
+  id              String   @id @default(cuid())
+  employeeId      String
+  employee        User     @relation("EmployeeExpenseEmployee", fields: [employeeId], references: [id])
+  
+  // Expense Details
+  description     String
+  amount          Decimal  @db.Decimal(10, 2)
+  category        String   // Travel, Meals, Office Supplies, etc.
+  expenseDate     DateTime
+  receiptUrl      String?  // Link to receipt image/document
+  
+  // Reimbursement
+  status          ExpenseStatus @default(PENDING)
+  submittedAt     DateTime?
+  reviewedBy      String?
+  reviewer        User?    @relation("ExpenseReviewer", fields: [reviewedBy], references: [id])
+  reviewedAt      DateTime?
+  reimbursedAt    DateTime?
+  reimbursementTransactionId String? @unique
+  reimbursementTransaction   Transaction? @relation(fields: [reimbursementTransactionId], references: [id])
+  
+  notes           String?
+  tenantId        String?  // For future multi-tenant support
+  
+  isDeleted       Boolean  @default(false)
+  deletedAt       DateTime?
+  deletedBy       String?
+  createdBy       String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("employee_expenses")
+  @@index([employeeId])
+  @@index([status])
+  @@index([expenseDate])
+  @@index([category])
+}
+
+// PTO / Time-Off Models
+
+model PTORequest {
+  id            String     @id @default(cuid())
+  employeeId    String
+  employee      User       @relation("PTOEmployee", fields: [employeeId], references: [id])
+
+  startDate     DateTime
+  endDate       DateTime
+  totalDays     Decimal    @db.Decimal(5,2)
+  status        PTOStatus  @default(DRAFT)
+  reason        String?
+
+  // Approval Workflow
+  submittedAt   DateTime?
+  approvedBy    String?
+  approver      User?      @relation("PTOApprover", fields: [approvedBy], references: [id])
+  approvedAt    DateTime?
+  rejectedAt    DateTime?
+  cancelledAt   DateTime?
+
+  // Metadata
+  tenantId      String?
+  isDeleted     Boolean    @default(false)
+  deletedAt     DateTime?
+  deletedBy     String?
+  createdBy     String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  @@map("pto_requests")
+  @@index([employeeId])
+  @@index([status])
+  @@index([startDate, endDate])
+}
+
+model PTOBalance {
+  id            String   @id @default(cuid())
+  employeeId    String   @unique
+  employee      User     @relation("PTOBalanceEmployee", fields: [employeeId], references: [id])
+  year          Int
+  totalDays     Decimal  @db.Decimal(5,2)
+  usedDays      Decimal  @db.Decimal(5,2) @default(0)
+  carryOverDays Decimal  @db.Decimal(5,2) @default(0)
+
+  tenantId      String?
+  isDeleted     Boolean @default(false)
+  deletedAt     DateTime?
+  deletedBy     String?
+  createdBy     String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("pto_balances")
+  @@unique([employeeId, year])
+  @@index([year])
+}
+
+enum PTOStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+// Enums for Staff Finances
+enum PayrollStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  PROCESSED
+  CANCELLED
+}
+
+enum SalaryAdjustmentType {
+  SALARY_INCREASE
+  SALARY_DECREASE
+  BONUS
+  ALLOWANCE_CHANGE
+  PROMOTION
+  DEMOTION
+  ANNUAL_REVIEW
+}
+
+enum ExpenseStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  REIMBURSED
+  CANCELLED
+}

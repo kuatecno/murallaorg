@@ -1,0 +1,22 @@
+{
+  "name": "muralla-org-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Muralla Org - Digital Command Center for Teams",
+  "scripts": {
+    "dev": "pnpm --filter muralla-backend dev",
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "lint": "pnpm -r lint",
+    "bootstrap": "pnpm --filter muralla-backend bootstrap",
+    "reset-db": "pnpm --filter muralla-backend reset-db"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "packageManager": "pnpm@8.15.0"
+}

@@ -1,0 +1,74 @@
+# Multi-stage build for production optimization
+FROM node:20-alpine AS base
+
+# Enable pnpm via corepack (no network fetch)
+RUN corepack enable && corepack prepare pnpm@8.15.5 --activate
+
+# Set working directory
+WORKDIR /app
+
+# Copy workspace configuration
+COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
+
+# Copy common package
+COPY packages/common ./packages/common
+
+# Copy backend package
+COPY muralla-backend ./muralla-backend
+
+# Install dependencies
+RUN pnpm install --frozen-lockfile
+
+# Build common package
+RUN pnpm --filter @muralla/common build
+
+# Generate Prisma client
+RUN pnpm --filter muralla-backend exec prisma generate
+
+# Build backend
+RUN pnpm --filter muralla-backend build
+
+# Production stage
+FROM node:20-alpine AS production
+
+# Enable pnpm via corepack (no network fetch)
+RUN corepack enable && corepack prepare pnpm@8.15.5 --activate
+
+# Create app user for security
+RUN addgroup -g 1001 -S nodejs
+RUN adduser -S nestjs -u 1001
+
+# Set working directory
+WORKDIR /app
+
+# Copy workspace configuration
+COPY --chown=nestjs:nodejs pnpm-workspace.yaml package.json pnpm-lock.yaml ./
+
+# Copy built common package
+COPY --from=base --chown=nestjs:nodejs /app/packages/common/dist ./packages/common/dist
+COPY --from=base --chown=nestjs:nodejs /app/packages/common/package.json ./packages/common/
+
+# Copy backend files
+COPY --from=base --chown=nestjs:nodejs /app/muralla-backend/dist ./muralla-backend/dist
+COPY --from=base --chown=nestjs:nodejs /app/muralla-backend/package.json ./muralla-backend/
+COPY --from=base --chown=nestjs:nodejs /app/muralla-backend/prisma ./muralla-backend/prisma
+COPY --from=base --chown=nestjs:nodejs /app/node_modules ./node_modules
+
+# Install only production dependencies
+RUN pnpm install --prod --frozen-lockfile
+
+# Generate Prisma client for production
+RUN pnpm --filter muralla-backend exec prisma generate
+
+# Switch to non-root user
+USER nestjs
+
+# Expose port
+EXPOSE 3000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:3000/healthz', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"
+
+# Start the application
+CMD ["node", "muralla-backend/dist/main.js"]

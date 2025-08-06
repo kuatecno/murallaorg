@@ -1,0 +1,4 @@
+packages:
+  - 'muralla-backend'
+  - 'packages/*'
+  - 'apps/*'

@@ -1,0 +1,77 @@
+
+> muralla-org-monorepo@1.0.0 build /Users/kavi/Muralla Org 2.0/Muralla-4.0
+> pnpm -r build "--pretty" "false"
+
+Scope: 2 of 3 workspace projects
+muralla-backend build$ tsc -p . "--pretty" "false"
+packages/common build$ tsc "--pretty" "false"
+packages/common build: Done
+muralla-backend build: src/app.module.ts(64,9): error TS2353: Object literal may only specify known properties, and 'storage' does not exist in type 'ThrottlerOptions'.
+muralla-backend build: src/auth/auth.service.ts(70,37): error TS2339: Property 'sendDirect' does not exist on type 'NotificationsService'.
+muralla-backend build: src/auth/auth.service.ts(115,29): error TS2339: Property 'role' does not exist on type '{ id: string; email: string; username: string; firstName: string; lastName: string; password: string; isActive: boolean; roleId: string; tenantId: string; isDeleted: boolean; deletedAt: Date; deletedBy: string; createdBy: string; createdAt: Date; updatedAt: Date; }'.
+muralla-backend build: src/auth/auth.service.ts(153,37): error TS2339: Property 'sendDirect' does not exist on type 'NotificationsService'.
+muralla-backend build: src/cli/seed.ts(301,36): error TS2322: Type '{ title: string; content: string; type: "WIKI"; authorId: string; createdBy: string; } | { title: string; content: string; type: "SOP"; authorId: string; createdBy: string; }' is not assignable to type '(Without<DocumentCreateInput, DocumentUncheckedCreateInput> & DocumentUncheckedCreateInput) | (Without<...> & DocumentCreateInput)'.
+muralla-backend build:   Type '{ title: string; content: string; type: "WIKI"; authorId: string; createdBy: string; }' is not assignable to type '(Without<DocumentCreateInput, DocumentUncheckedCreateInput> & DocumentUncheckedCreateInput) | (Without<...> & DocumentCreateInput)'.
+muralla-backend build:     Type '{ title: string; content: string; type: "WIKI"; authorId: string; createdBy: string; }' is not assignable to type 'Without<DocumentUncheckedCreateInput, DocumentCreateInput> & DocumentCreateInput'.
+muralla-backend build:       Type '{ title: string; content: string; type: "WIKI"; authorId: string; createdBy: string; }' is not assignable to type 'Without<DocumentUncheckedCreateInput, DocumentCreateInput>'.
+muralla-backend build:         Types of property 'authorId' are incompatible.
+muralla-backend build:           Type 'string' is not assignable to type 'never'.
+muralla-backend build: src/cli/seed.ts(347,39): error TS2322: Type '{ description: string; amount: number; type: "EXPENSE"; category: string; createdBy: string; } | { description: string; amount: number; type: "INCOME"; category: string; createdBy: string; }' is not assignable to type '(Without<TransactionCreateInput, TransactionUncheckedCreateInput> & TransactionUncheckedCreateInput) | (Without<...> & TransactionCreateInput)'.
+muralla-backend build:   Type '{ description: string; amount: number; type: "EXPENSE"; category: string; createdBy: string; }' is not assignable to type '(Without<TransactionCreateInput, TransactionUncheckedCreateInput> & TransactionUncheckedCreateInput) | (Without<...> & TransactionCreateInput)'.
+muralla-backend build:     Type '{ description: string; amount: number; type: "EXPENSE"; category: string; createdBy: string; }' is not assignable to type 'Without<TransactionUncheckedCreateInput, TransactionCreateInput> & TransactionCreateInput'.
+muralla-backend build:       Type '{ description: string; amount: number; type: "EXPENSE"; category: string; createdBy: string; }' is not assignable to type 'Without<TransactionUncheckedCreateInput, TransactionCreateInput>'.
+muralla-backend build:         Types of property 'createdBy' are incompatible.
+muralla-backend build:           Type 'string' is not assignable to type 'never'.
+muralla-backend build: src/common/logger.module.ts(53,23): error TS2339: Property 'user' does not exist on type 'IncomingMessage'.
+muralla-backend build: src/common/logger.module.ts(54,25): error TS2339: Property 'user' does not exist on type 'IncomingMessage'.
+muralla-backend build: src/finance/finance.controller.ts(52,30): error TS2345: Argument of type '"employee"' is not assignable to parameter of type 'RoleType'.
+muralla-backend build: src/finance/finance.service.ts(24,9): error TS2322: Type '"CREATE"' is not assignable to type 'AuditOperation'.
+muralla-backend build: src/finance/finance.service.ts(71,7): error TS2322: Type '{ createdBy: string; id?: string; description: string; amount: number; type: $Enums.TransactionType; status?: $Enums.TransactionStatus; ... 23 more ...; expenseReimbursement?: Prisma.EmployeeExpenseCreateNestedOneWithoutReimbursementTransactionInput; }' is not assignable to type '(Without<TransactionCreateInput, TransactionUncheckedCreateInput> & TransactionUncheckedCreateInput) | (Without<...> & TransactionCreateInput)'.
+muralla-backend build:   Type '{ createdBy: string; id?: string; description: string; amount: number; type: $Enums.TransactionType; status?: $Enums.TransactionStatus; ... 23 more ...; expenseReimbursement?: Prisma.EmployeeExpenseCreateNestedOneWithoutReimbursementTransactionInput; }' is not assignable to type 'Without<TransactionUncheckedCreateInput, TransactionCreateInput> & TransactionCreateInput'.
+muralla-backend build:     Type '{ createdBy: string; id?: string; description: string; amount: number; type: $Enums.TransactionType; status?: $Enums.TransactionStatus; ... 23 more ...; expenseReimbursement?: Prisma.EmployeeExpenseCreateNestedOneWithoutReimbursementTransactionInput; }' is not assignable to type 'Without<TransactionUncheckedCreateInput, TransactionCreateInput>'.
+muralla-backend build:       Types of property 'createdBy' are incompatible.
+muralla-backend build:         Type 'string' is not assignable to type 'never'.
+muralla-backend build: src/finance/finance.service.ts(86,9): error TS2322: Type '"CREATE"' is not assignable to type 'AuditOperation'.
+muralla-backend build: src/finance/finance.service.ts(176,9): error TS2322: Type '"UPDATE"' is not assignable to type 'AuditOperation'.
+muralla-backend build: src/finance/finance.service.ts(205,9): error TS2322: Type '"DELETE"' is not assignable to type 'AuditOperation'.
+muralla-backend build: src/finance/finance.service.ts(225,9): error TS2322: Type '"CREATE"' is not assignable to type 'AuditOperation'.
+muralla-backend build: src/finance/finance.service.ts(372,7): error TS2322: Type '{ name: string; }' is not assignable to type 'BankAccountWhereUniqueInput'.
+muralla-backend build:   Type '{ name: string; }' is not assignable to type '{ id: string; } & { id?: string; AND?: BankAccountWhereInput | BankAccountWhereInput[]; OR?: BankAccountWhereInput[]; ... 16 more ...; balanceHistory?: BankBalanceListRelationFilter; }'.
+muralla-backend build:     Property 'id' is missing in type '{ name: string; }' but required in type '{ id: string; }'.
+muralla-backend build: src/finance/mercado-pago.service.ts(14,33): error TS2322: Type 'boolean' is not assignable to type 'string'.
+muralla-backend build: src/finance/mercado-pago.service.ts(136,48): error TS2322: Type '{ items: { title: string; quantity: number; unit_price: number; currency_id: string; }[]; external_reference: string; notification_url: string; back_urls: { success: string; failure: string; pending: string; }; auto_return: string; }' is not assignable to type 'PreferenceRequest'.
+muralla-backend build:   Types of property 'items' are incompatible.
+muralla-backend build:     Type '{ title: string; quantity: number; unit_price: number; currency_id: string; }[]' is not assignable to type 'Items[]'.
+muralla-backend build:       Property 'id' is missing in type '{ title: string; quantity: number; unit_price: number; currency_id: string; }' but required in type 'Items'.
+muralla-backend build: src/knowledge/knowledge.controller.ts(57,7): error TS2322: Type 'DocumentStatus' is not assignable to type '"DRAFT" | "PUBLISHED" | "ARCHIVED"'.
+muralla-backend build:   Type '"REVIEW"' is not assignable to type '"DRAFT" | "PUBLISHED" | "ARCHIVED"'.
+muralla-backend build: src/knowledge/knowledge.service.ts(3,24): error TS2459: Module '"../common/audit.service"' declares 'AuditOperation' locally, but it is not exported.
+muralla-backend build: src/modules/finance/controllers/bank.controller.ts(104,19): error TS2345: Argument of type '"finance_manager"' is not assignable to parameter of type 'RoleType'.
+muralla-backend build: src/modules/finance/controllers/bank.controller.ts(171,19): error TS2345: Argument of type '"finance_manager"' is not assignable to parameter of type 'RoleType'.
+muralla-backend build: src/modules/finance/controllers/bank.controller.ts(185,19): error TS2345: Argument of type '"finance_manager"' is not assignable to parameter of type 'RoleType'.
+muralla-backend build: src/modules/finance/controllers/bank.controller.ts(231,19): error TS2345: Argument of type '"finance_manager"' is not assignable to parameter of type 'RoleType'.
+muralla-backend build: src/modules/finance/controllers/bank.controller.ts(271,19): error TS2345: Argument of type '"finance_manager"' is not assignable to parameter of type 'RoleType'.
+muralla-backend build: src/modules/finance/controllers/payroll.controller.ts(96,19): error TS2345: Argument of type '"finance_manager"' is not assignable to parameter of type 'RoleType'.
+muralla-backend build: src/modules/finance/controllers/payroll.controller.ts(130,19): error TS2345: Argument of type '"finance_manager"' is not assignable to parameter of type 'RoleType'.
+muralla-backend build: src/modules/finance/controllers/payroll.controller.ts(147,19): error TS2345: Argument of type '"finance_manager"' is not assignable to parameter of type 'RoleType'.
+muralla-backend build: src/modules/finance/controllers/payroll.controller.ts(189,19): error TS2345: Argument of type '"finance_manager"' is not assignable to parameter of type 'RoleType'.
+muralla-backend build: src/modules/finance/controllers/payroll.controller.ts(214,19): error TS2345: Argument of type '"finance_manager"' is not assignable to parameter of type 'RoleType'.
+muralla-backend build: src/modules/finance/controllers/payroll.controller.ts(243,19): error TS2345: Argument of type '"finance_manager"' is not assignable to parameter of type 'RoleType'.
+muralla-backend build: src/modules/finance/controllers/staff-finance.controller.ts(135,19): error TS2345: Argument of type '"finance_manager"' is not assignable to parameter of type 'RoleType'.
+muralla-backend build: src/modules/finance/controllers/staff-finance.controller.ts(185,19): error TS2345: Argument of type '"finance_manager"' is not assignable to parameter of type 'RoleType'.
+muralla-backend build: src/modules/finance/controllers/staff-finance.controller.ts(243,19): error TS2345: Argument of type '"finance_manager"' is not assignable to parameter of type 'RoleType'.
+muralla-backend build: src/modules/finance/controllers/staff-finance.controller.ts(274,19): error TS2345: Argument of type '"finance_manager"' is not assignable to parameter of type 'RoleType'.
+muralla-backend build: src/modules/finance/controllers/staff-finance.controller.ts(338,19): error TS2345: Argument of type '"finance_manager"' is not assignable to parameter of type 'RoleType'.
+muralla-backend build: src/modules/finance/controllers/staff-finance.controller.ts(369,19): error TS2345: Argument of type '"finance_manager"' is not assignable to parameter of type 'RoleType'.
+muralla-backend build: src/modules/finance/controllers/staff-finance.controller.ts(398,19): error TS2345: Argument of type '"finance_manager"' is not assignable to parameter of type 'RoleType'.
+muralla-backend build: src/modules/finance/controllers/staff-finance.controller.ts(426,19): error TS2345: Argument of type '"finance_manager"' is not assignable to parameter of type 'RoleType'.
+muralla-backend build: src/notifications/notifications.service.ts(281,11): error TS2353: Object literal may only specify known properties, and 'createdBy' does not exist in type '(Without<NotificationCreateInput, NotificationUncheckedCreateInput> & NotificationUncheckedCreateInput) | (Without<...> & NotificationCreateInput)'.
+muralla-backend build: src/notifications/notifications.service.ts(348,17): error TS2353: Object literal may only specify known properties, and 'createdBy' does not exist in type '(Without<NotificationCreateInput, NotificationUncheckedCreateInput> & NotificationUncheckedCreateInput) | (Without<...> & NotificationCreateInput)'.
+muralla-backend build: src/pto/pto.controller.ts(23,10): error TS2345: Argument of type '"employee"' is not assignable to parameter of type 'RoleType'.
+muralla-backend build: src/pto/pto.controller.ts(31,10): error TS2345: Argument of type '"employee"' is not assignable to parameter of type 'RoleType'.
+muralla-backend build: src/pto/pto.controller.ts(47,10): error TS2345: Argument of type '"hr_manager"' is not assignable to parameter of type 'RoleType'.
+muralla-backend build: Failed
+/Users/kavi/Muralla Org 2.0/Muralla-4.0/muralla-backend:
+ ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  muralla-org-2.0@1.0.0 build: `tsc -p . "--pretty" "false"`
+Exit status 2
+ ELIFECYCLE  Command failed with exit code 1.

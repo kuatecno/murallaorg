@@ -3,7 +3,8 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Plus, Trash2, Save } from 'lucide-react'
+import { Plus, Trash2, Save } from 'lucide-react'
+import TopNavigation from '@/components/layout/TopNavigation'
 
 interface InvoiceItem {
   id: string
@@ -118,19 +119,15 @@ export default function CreateInvoicePage() {
   const { netAmount, taxAmount, totalAmount } = calculateTotals()
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-4xl mx-auto">
-        <div className="mb-6">
-          <Link
-            href="/invoices"
-            className="inline-flex items-center text-blue-600 hover:text-blue-800 mb-4"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Invoices
-          </Link>
-          <h1 className="text-3xl font-bold text-gray-900">Create New Invoice</h1>
-          <p className="text-gray-600 mt-2">Create a new tax document</p>
-        </div>
+    <>
+      <TopNavigation
+        title="Create New Invoice"
+        subtitle="Create a new tax document"
+        showBackButton={true}
+        backHref="/invoices"
+      />
+      <div className="min-h-screen bg-gray-50 p-6">
+        <div className="max-w-4xl mx-auto">
 
         {error && (
           <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
@@ -347,7 +344,8 @@ export default function CreateInvoicePage() {
             </button>
           </div>
         </form>
+        </div>
       </div>
-    </div>
+    </>
   )
 }

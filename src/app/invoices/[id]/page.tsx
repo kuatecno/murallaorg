@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Download, CheckCircle, XCircle, Clock, Edit, Trash2 } from 'lucide-react'
+import { Download, CheckCircle, XCircle, Clock, Edit, Trash2 } from 'lucide-react'
+import TopNavigation from '@/components/layout/TopNavigation'
 
 interface InvoiceItem {
   id: string
@@ -149,54 +150,49 @@ export default function InvoiceDetailPage() {
 
   if (error || !invoice) {
     return (
-      <div className="min-h-screen bg-gray-50 p-6">
-        <div className="max-w-4xl mx-auto">
-          <Link
-            href="/invoices"
-            className="inline-flex items-center text-blue-600 hover:text-blue-800 mb-6"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Invoices
-          </Link>
-          <div className="bg-white rounded-lg shadow p-12 text-center">
-            <div className="mx-auto h-24 w-24 text-red-400 mb-4">
-              <XCircle className="h-full w-full" />
+      <>
+        <TopNavigation
+          title="Invoice Not Found"
+          subtitle="The requested invoice could not be loaded"
+          showBackButton={true}
+          backHref="/invoices"
+        />
+        <div className="min-h-screen bg-gray-50 p-6">
+          <div className="max-w-4xl mx-auto">
+            <div className="bg-white rounded-lg shadow p-12 text-center">
+              <div className="mx-auto h-24 w-24 text-red-400 mb-4">
+                <XCircle className="h-full w-full" />
+              </div>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">
+                {error || 'Invoice not found'}
+              </h3>
+              <p className="text-gray-500">The requested invoice could not be loaded.</p>
             </div>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
-              {error || 'Invoice not found'}
-            </h3>
-            <p className="text-gray-500">The requested invoice could not be loaded.</p>
           </div>
         </div>
-      </div>
+      </>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-4xl mx-auto">
-        <div className="mb-6">
-          <Link
-            href="/invoices"
-            className="inline-flex items-center text-blue-600 hover:text-blue-800 mb-4"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Invoices
-          </Link>
-          <div className="flex justify-between items-start">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">
-                Invoice {invoice.folio || `#${invoice.id.slice(-8)}`}
-              </h1>
-              <p className="text-gray-600 mt-2">{invoice.type}</p>
-            </div>
-            <div className="flex items-center space-x-4">
-              <span className={`inline-flex items-center space-x-2 px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(invoice.status)}`}>
+    <>
+      <TopNavigation
+        title={`Invoice ${invoice.folio || `#${invoice.id.slice(-8)}`}`}
+        subtitle={invoice.type}
+        showBackButton={true}
+        backHref="/invoices"
+      />
+      <div className="min-h-screen bg-gray-50 p-6">
+        <div className="max-w-4xl mx-auto">
+          <div className="mb-6">
+            <div className="flex justify-end items-start">
+              <div className="flex items-center space-x-4">
+                <span className={`inline-flex items-center space-x-2 px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(invoice.status)}`}>
                 {getStatusIcon(invoice.status)}
                 <span className="capitalize">{invoice.status}</span>
-              </span>
-              <div className="flex space-x-2">
-                <button
+                </span>
+                <div className="flex space-x-2">
+                  <button
                   onClick={handleDownloadPDF}
                   className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors"
                 >
@@ -213,20 +209,20 @@ export default function InvoiceDetailPage() {
                     <span>{actionLoading === 'approve' ? 'Approving...' : 'Approve'}</span>
                   </button>
                 )}
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        {error && (
-          <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
-            <p className="text-red-700">{error}</p>
-          </div>
-        )}
+          {error && (
+            <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
+              <p className="text-red-700">{error}</p>
+            </div>
+          )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          {/* Emitter Information */}
-          <div className="bg-white rounded-lg shadow p-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            {/* Emitter Information */}
+            <div className="bg-white rounded-lg shadow p-6">
             <h2 className="text-lg font-medium text-gray-900 mb-4">From</h2>
             <div className="space-y-2">
               <p className="font-medium text-gray-900">{invoice.emitterName || 'N/A'}</p>
@@ -329,7 +325,8 @@ export default function InvoiceDetailPage() {
             </div>
           </div>
         </div>
+        </div>
       </div>
-    </div>
+    </>
   )
 }

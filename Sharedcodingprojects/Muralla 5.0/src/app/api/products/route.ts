@@ -24,11 +24,28 @@ interface ProductParams {
  */
 export async function GET(request: NextRequest) {
   try {
-    // For now, we'll use a mock tenant ID until auth is properly set up
-    // In production, this would come from the authenticated user
-    const tenantId = 'demo-tenant-id';
-
     const { searchParams } = new URL(request.url);
+
+    // Get tenant from query parameter or use first available tenant
+    // TODO: Replace with authenticated user's tenant when auth is implemented
+    let tenantId = searchParams.get('tenantId');
+
+    if (!tenantId) {
+      // Find the first available tenant
+      const firstTenant = await prisma.tenant.findFirst({
+        where: { isActive: true },
+        select: { id: true, name: true, slug: true }
+      });
+
+      if (!firstTenant) {
+        return NextResponse.json(
+          { error: 'No active tenant found. Please contact administrator.' },
+          { status: 404 }
+        );
+      }
+
+      tenantId = firstTenant.id;
+    }
 
     const params: ProductParams = {
       page: parseInt(searchParams.get('page') || '1'),
@@ -199,10 +216,27 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    // For now, we'll use a mock tenant ID
-    const tenantId = 'demo-tenant-id';
-
+    // Get tenant from request body or use first available tenant
+    // TODO: Replace with authenticated user's tenant when auth is implemented
     const body = await request.json();
+    let tenantId = body.tenantId;
+
+    if (!tenantId) {
+      // Find the first available tenant
+      const firstTenant = await prisma.tenant.findFirst({
+        where: { isActive: true },
+        select: { id: true, name: true, slug: true }
+      });
+
+      if (!firstTenant) {
+        return NextResponse.json(
+          { error: 'No active tenant found. Please contact administrator.' },
+          { status: 404 }
+        );
+      }
+
+      tenantId = firstTenant.id;
+    }
 
     // Validate required fields
     const requiredFields = ['sku', 'name', 'unitPrice'];

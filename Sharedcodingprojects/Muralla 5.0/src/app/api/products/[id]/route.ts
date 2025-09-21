@@ -18,9 +18,29 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // For now, we'll use a mock tenant ID
-    const tenantId = 'demo-tenant-id';
     const { id: productId } = await params;
+
+    // Get tenant from query parameter or use first available tenant
+    // TODO: Replace with authenticated user's tenant when auth is implemented
+    const { searchParams } = new URL(request.url);
+    let tenantId = searchParams.get('tenantId');
+
+    if (!tenantId) {
+      // Find the first available tenant
+      const firstTenant = await prisma.tenant.findFirst({
+        where: { isActive: true },
+        select: { id: true, name: true, slug: true }
+      });
+
+      if (!firstTenant) {
+        return NextResponse.json(
+          { error: 'No active tenant found. Please contact administrator.' },
+          { status: 404 }
+        );
+      }
+
+      tenantId = firstTenant.id;
+    }
 
     if (!productId) {
       return NextResponse.json(
@@ -205,8 +225,27 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // For now, we'll use a mock tenant ID
-    const tenantId = 'demo-tenant-id';
+    // Get tenant from query parameter or use first available tenant
+    // TODO: Replace with authenticated user's tenant when auth is implemented
+    const { searchParams } = new URL(request.url);
+    let tenantId = searchParams.get('tenantId');
+
+    if (!tenantId) {
+      // Find the first available tenant
+      const firstTenant = await prisma.tenant.findFirst({
+        where: { isActive: true },
+        select: { id: true, name: true, slug: true }
+      });
+
+      if (!firstTenant) {
+        return NextResponse.json(
+          { error: 'No active tenant found. Please contact administrator.' },
+          { status: 404 }
+        );
+      }
+
+      tenantId = firstTenant.id;
+    }
     const { id: productId } = await params;
 
     if (!productId) {
@@ -401,8 +440,27 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // For now, we'll use a mock tenant ID
-    const tenantId = 'demo-tenant-id';
+    // Get tenant from query parameter or use first available tenant
+    // TODO: Replace with authenticated user's tenant when auth is implemented
+    const { searchParams } = new URL(request.url);
+    let tenantId = searchParams.get('tenantId');
+
+    if (!tenantId) {
+      // Find the first available tenant
+      const firstTenant = await prisma.tenant.findFirst({
+        where: { isActive: true },
+        select: { id: true, name: true, slug: true }
+      });
+
+      if (!firstTenant) {
+        return NextResponse.json(
+          { error: 'No active tenant found. Please contact administrator.' },
+          { status: 404 }
+        );
+      }
+
+      tenantId = firstTenant.id;
+    }
     const { id: productId } = await params;
 
     if (!productId) {

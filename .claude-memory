@@ -1,0 +1,15 @@
+# Claude Memory - Project Guidelines
+
+## CRITICAL: Always Ask Before Assuming
+- NEVER assume credentials, emails, usernames, or configuration values
+- ALWAYS ask the user before setting git config or authentication details
+- NEVER create or guess email addresses
+
+## Project Details
+- GitHub account: kuatecno
+- Email: dev@kua.cl
+- Repository: https://github.com/kuatecno/murallaorg.git
+
+## Established Facts
+- User corrected me for assuming too much about git configuration
+- User wants to be asked before any credential/config changes are made

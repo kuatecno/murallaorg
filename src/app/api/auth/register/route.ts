@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user already exists
-    const existingUser = await prisma.user.findFirst({
+    const existingUser = await prisma.staff.findFirst({
       where: {
         OR: [
           { email },
@@ -35,16 +35,30 @@ export async function POST(request: NextRequest) {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 12)
 
+    // Ensure default tenant exists
+    let tenant = await prisma.tenant.findUnique({
+      where: { slug: 'default' }
+    })
+
+    if (!tenant) {
+      tenant = await prisma.tenant.create({
+        data: {
+          name: 'Default Organization',
+          slug: 'default'
+        }
+      })
+    }
+
     // Create user
-    const user = await prisma.user.create({
+    const user = await prisma.staff.create({
       data: {
         email,
         username,
         password: hashedPassword,
         firstName: username,
         lastName: '',
-        role: 'USER',
-        tenantId: 'default-tenant'
+        role: 'EMPLOYEE',
+        tenantId: tenant.id
       }
     })
 

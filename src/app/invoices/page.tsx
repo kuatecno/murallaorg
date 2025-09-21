@@ -37,9 +37,8 @@ export default function InvoicesPage() {
           id: doc.id,
           folio: doc.folio.toString(),
           type: doc.tipoDocumentoNombre,
-          receiverName: 'Muralla Café',
+          emitterName: doc.razonSocialEmisor,
           totalAmount: doc.montos.total,
-          status: 'issued',
           issuedAt: doc.fechaEmision,
           createdAt: doc.fechaRecepcionOF || doc.fechaEmision
         }))
@@ -51,7 +50,7 @@ export default function InvoicesPage() {
       }
     } catch (err) {
       console.error('Error fetching invoices:', err)
-      setError('Failed to load invoices from OpenFactura')
+      setError('Failed to load received documents from OpenFactura')
     } finally {
       setLoading(false)
     }
@@ -61,7 +60,7 @@ export default function InvoicesPage() {
     return (
       <div className="min-h-screen bg-gray-50 p-6">
         <div className="max-w-7xl mx-auto">
-          <h1 className="text-2xl font-bold mb-4">Loading invoices...</h1>
+          <h1 className="text-2xl font-bold mb-4">Loading documents...</h1>
           <div className="animate-pulse">
             <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
             <div className="space-y-4">
@@ -120,6 +119,9 @@ export default function InvoicesPage() {
                       Folio
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Emitter
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Type
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -137,10 +139,13 @@ export default function InvoicesPage() {
                         {invoice.folio}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {invoice.emitterName}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {invoice.type}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        ${invoice.totalAmount.toLocaleString('es-CL')}
+                        ${invoice.totalAmount?.toLocaleString('es-CL') || '0'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {invoice.issuedAt}

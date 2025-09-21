@@ -1,4 +1,3 @@
-- Remember to use the shared-state system to talk to other agents working on this project simultaneously.
 - Always push backend (main branch) and frontend (frontend branch) together
 
 # CRITICAL: Deployment Status Verification Protocol

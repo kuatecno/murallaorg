@@ -4,6 +4,8 @@
 
 The Muralla 5.0 invoicing system provides a comprehensive API for managing Chilean tax documents including FACTURA, BOLETA, NOTA_CREDITO, NOTA_DEBITO, and GUIA_DESPACHO. The system is designed to comply with Chilean SII (Servicio de Impuestos Internos) requirements.
 
+✅ **GitHub Auto-Deployment:** Enabled and configured for `main` branch.
+
 ## Base URL
 
 **Production:** `https://muralla-5-0.vercel.app`

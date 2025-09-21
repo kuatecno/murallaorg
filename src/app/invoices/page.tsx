@@ -19,17 +19,53 @@ export default function InvoicesPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [filters, setFilters] = useState({
+    type: '',
+    status: '',
+    startDate: '',
+    endDate: '',
+    search: ''
+  })
+  const [stats, setStats] = useState({
+    total: 0,
+    issued: 0,
+    draft: 0,
+    rejected: 0
+  })
 
   useEffect(() => {
     fetchInvoices()
   }, [])
 
-  const fetchInvoices = async () => {
+  const fetchInvoices = async (useFilters = false) => {
     try {
-      const response = await fetch('/api/invoices')
+      setLoading(true)
+      setError('')
+
+      const params = new URLSearchParams()
+      if (useFilters) {
+        if (filters.type) params.append('type', filters.type)
+        if (filters.status) params.append('status', filters.status)
+        if (filters.startDate) params.append('dateFrom', filters.startDate)
+        if (filters.endDate) params.append('dateTo', filters.endDate)
+        if (filters.search) params.append('search', filters.search)
+      }
+
+      const url = `/api/invoices${params.toString() ? '?' + params.toString() : ''}`
+      const response = await fetch(url)
+
       if (response.ok) {
         const data = await response.json()
-        setInvoices(data.invoices || [])
+        setInvoices(data.data || [])
+
+        // Calculate stats from the current data
+        const invoiceList = data.data || []
+        setStats({
+          total: invoiceList.length,
+          issued: invoiceList.filter((inv: Invoice) => inv.status.toLowerCase() === 'issued').length,
+          draft: invoiceList.filter((inv: Invoice) => inv.status.toLowerCase() === 'draft').length,
+          rejected: invoiceList.filter((inv: Invoice) => inv.status.toLowerCase() === 'rejected').length,
+        })
       } else {
         throw new Error('Failed to fetch invoices')
       }
@@ -95,13 +131,120 @@ export default function InvoicesPage() {
             <h1 className="text-3xl font-bold text-gray-900">Invoices</h1>
             <p className="text-gray-600 mt-2">Manage your tax documents and invoices</p>
           </div>
-          <Link
-            href="/invoices/create"
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors"
-          >
-            <Plus className="h-5 w-5" />
-            <span>Create Invoice</span>
-          </Link>
+          <div className="flex gap-3">
+            <button
+              onClick={() => fetchInvoices()}
+              className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors"
+            >
+              🔄 Refresh
+            </button>
+            <Link
+              href="/invoices/create"
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors"
+            >
+              <Plus className="h-5 w-5" />
+              <span>Create Invoice</span>
+            </Link>
+          </div>
+        </div>
+
+        {/* KPI Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+          <div className="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-lg p-6">
+            <div className="text-sm font-medium text-blue-600 mb-2">Total Documents</div>
+            <div className="text-3xl font-bold text-blue-700">{stats.total}</div>
+          </div>
+          <div className="bg-gradient-to-br from-green-50 to-green-100 border border-green-200 rounded-lg p-6">
+            <div className="text-sm font-medium text-green-600 mb-2">Issued</div>
+            <div className="text-3xl font-bold text-green-700">{stats.issued}</div>
+          </div>
+          <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 border border-yellow-200 rounded-lg p-6">
+            <div className="text-sm font-medium text-yellow-600 mb-2">Draft</div>
+            <div className="text-3xl font-bold text-yellow-700">{stats.draft}</div>
+          </div>
+          <div className="bg-gradient-to-br from-red-50 to-red-100 border border-red-200 rounded-lg p-6">
+            <div className="text-sm font-medium text-red-600 mb-2">Rejected</div>
+            <div className="text-3xl font-bold text-red-700">{stats.rejected}</div>
+          </div>
+        </div>
+
+        {/* Filters */}
+        <div className="bg-white rounded-lg shadow p-6 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
+              <select
+                value={filters.type}
+                onChange={e => setFilters({...filters, type: e.target.value})}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">All Types</option>
+                <option value="BOLETA">Boleta</option>
+                <option value="FACTURA">Factura</option>
+                <option value="NOTA_CREDITO">Nota de Crédito</option>
+                <option value="NOTA_DEBITO">Nota de Débito</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+              <select
+                value={filters.status}
+                onChange={e => setFilters({...filters, status: e.target.value})}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">All Status</option>
+                <option value="DRAFT">Draft</option>
+                <option value="ISSUED">Issued</option>
+                <option value="CANCELLED">Cancelled</option>
+                <option value="REJECTED">Rejected</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">From Date</label>
+              <input
+                type="date"
+                value={filters.startDate}
+                onChange={e => setFilters({...filters, startDate: e.target.value})}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">To Date</label>
+              <input
+                type="date"
+                value={filters.endDate}
+                onChange={e => setFilters({...filters, endDate: e.target.value})}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Search (Folio/RUT/Name)</label>
+              <input
+                type="text"
+                value={filters.search}
+                onChange={e => setFilters({...filters, search: e.target.value})}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="e.g., 12345 or 11.111.111-1"
+              />
+            </div>
+          </div>
+          <div className="mt-4 flex gap-3">
+            <button
+              onClick={() => fetchInvoices(true)}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
+            >
+              Apply Filters
+            </button>
+            <button
+              onClick={() => {
+                setFilters({ type: '', status: '', startDate: '', endDate: '', search: '' });
+                fetchInvoices(false);
+              }}
+              className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition-colors"
+            >
+              Reset
+            </button>
+          </div>
         </div>
 
         {error && (

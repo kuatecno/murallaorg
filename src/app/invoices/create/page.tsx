@@ -103,7 +103,7 @@ export default function CreateInvoicePage() {
 
       if (response.ok) {
         const result = await response.json()
-        router.push(`/invoices/${result.invoice.id}`)
+        router.push(`/invoices/${result.data.id}`)
       } else {
         const errorData = await response.json()
         setError(errorData.error || 'Failed to create invoice')

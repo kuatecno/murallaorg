@@ -52,7 +52,7 @@ export default function InvoiceDetailPage() {
       const response = await fetch(`/api/invoices/${id}`)
       if (response.ok) {
         const data = await response.json()
-        setInvoice(data.invoice)
+        setInvoice(data.data)
       } else if (response.status === 404) {
         setError('Invoice not found')
       } else {
@@ -77,7 +77,7 @@ export default function InvoiceDetailPage() {
 
       if (response.ok) {
         const data = await response.json()
-        setInvoice(data.invoice)
+        setInvoice(data.data)
       } else {
         throw new Error('Failed to approve invoice')
       }

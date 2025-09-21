@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 interface User {
   id: string;
@@ -76,6 +77,10 @@ export default function DashboardPage() {
                 Dashboard
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <Link href="/invoices" className="bg-indigo-50 p-6 rounded-lg hover:bg-indigo-100 transition-colors cursor-pointer">
+                  <h4 className="text-lg font-semibold text-indigo-900">Invoices</h4>
+                  <p className="text-indigo-700 mt-2">Create and manage tax documents</p>
+                </Link>
                 <div className="bg-blue-50 p-6 rounded-lg">
                   <h4 className="text-lg font-semibold text-blue-900">Products</h4>
                   <p className="text-blue-700 mt-2">Manage your inventory</p>

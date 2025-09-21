@@ -6,7 +6,7 @@ The Muralla 5.0 invoicing system provides a comprehensive API for managing Chile
 
 ## Base URL
 
-**Production:** `https://muralla-5-0-mpgrzjpq4-vicente-tirados-projects.vercel.app`
+**Production:** `https://muralla-5-0.vercel.app`
 
 ## Authentication
 
@@ -403,7 +403,7 @@ All endpoints return consistent error responses:
 ### Create a test invoice
 
 ```bash
-curl -X POST https://muralla-5-0-mpgrzjpq4-vicente-tirados-projects.vercel.app/api/invoices \
+curl -X POST https://muralla-5-0.vercel.app/api/invoices \
   -H "Content-Type: application/json" \
   -d '{
     "type": "FACTURA",
@@ -422,7 +422,7 @@ curl -X POST https://muralla-5-0-mpgrzjpq4-vicente-tirados-projects.vercel.app/a
 ### List invoices
 
 ```bash
-curl https://muralla-5-0-mpgrzjpq4-vicente-tirados-projects.vercel.app/api/invoices
+curl https://muralla-5-0.vercel.app/api/invoices
 ```
 
 ## Future Enhancements

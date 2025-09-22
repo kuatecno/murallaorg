@@ -100,21 +100,20 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         additionalTaxes: detailedData?.totals?.additionalTaxes || fullDocument?.Encabezado?.Totales?.ImptoReten || []
       },
 
-      // Line items (from database with enhanced details)
-      items: invoice.items.map(item => ({
+      // Line items (from database - basic fields only)
+      items: invoice.items.map((item, index) => ({
         id: item.id,
-        lineNumber: item.lineNumber || 0,
+        lineNumber: index + 1, // Generate line number from index
         productName: item.productName,
-        description: item.description,
+        description: item.productName, // Use productName as description since that's what we have
         quantity: item.quantity,
         unitPrice: Number(item.unitPrice),
         totalPrice: Number(item.totalPrice),
-        unitOfMeasure: item.unitOfMeasure,
-        productCode: item.productCode,
-        exemptAmount: item.exemptAmount ? Number(item.exemptAmount) : 0,
-        discount: item.discount ? Number(item.discount) : 0,
-        // Additional details from rawItem if available
-        rawItem: item.rawItem
+        unitOfMeasure: '', // Not available in current schema
+        productCode: '', // Not available in current schema
+        exemptAmount: 0, // Not available in current schema
+        discount: 0, // Not available in current schema
+        rawItem: null // Not available in current schema
       })),
 
       // OpenFactura reception info

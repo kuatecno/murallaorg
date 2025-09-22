@@ -5,8 +5,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 
-const OPENFACTURA_API_URL = 'https://dev-api.haulmer.com/v2/dte/document/received';
-const OPENFACTURA_API_KEY = '928e15a2d14d4a6292345f04960f4bd3';
+const OPENFACTURA_API_URL = 'https://api.haulmer.com/v2/dte/document/received';
+const OPENFACTURA_API_KEY = process.env.OPENFACTURA_API_KEY;
 const COMPANY_RUT = '78188363'; // Your company RUT without dots and dash
 
 interface FilterOperator {
@@ -62,6 +62,17 @@ interface OpenFacturaResponse {
  */
 export async function POST(request: NextRequest) {
   try {
+    if (!OPENFACTURA_API_KEY) {
+      return NextResponse.json(
+        {
+          error: 'Configuration error',
+          details: 'OPENFACTURA_API_KEY environment variable is not set',
+          success: false
+        },
+        { status: 500 }
+      );
+    }
+
     const body = await request.json();
 
     // Build the request payload for OpenFactura

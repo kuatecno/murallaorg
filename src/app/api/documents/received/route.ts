@@ -90,6 +90,15 @@ export async function POST(request: NextRequest) {
       payload.RUTEmisor = { eq: body.rutEmisor };
     }
 
+    // Default to last 90 days if no date filter is provided
+    const hasDateFilter = payload.FchEmis || payload.FchRecepOF || payload.FchRecepSII;
+    if (!hasDateFilter) {
+      const ninetyDaysAgo = new Date();
+      ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+      const formattedDate = ninetyDaysAgo.toISOString().split('T')[0]; // YYYY-MM-DD
+      payload.FchEmis = { gte: formattedDate };
+    }
+
     // Advanced filter operators support
     if (body.filters) {
       Object.keys(body.filters).forEach(filterKey => {

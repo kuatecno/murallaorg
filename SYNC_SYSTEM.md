@@ -9,6 +9,8 @@ This system automatically imports received tax documents from OpenFactura into y
 - **Manual Sync**: Trigger immediate sync via UI button
 - **Auto Sync**: Daily automatic sync at midnight (00:00 UTC)
 - **Smart Import**: Handles duplicates and updates existing records
+- **Line Item Extraction**: Fetches detailed product/service line items from documents
+- **Complete Document Data**: Extracts emitter/receiver details, addresses, business info
 - **Sync Status**: Real-time sync status and last sync information
 - **Performance**: Local database queries instead of external API calls
 
@@ -103,8 +105,9 @@ Called automatically by Vercel Cron daily at midnight.
 
 ## Data Mapping
 
-OpenFactura documents are mapped to the `TaxDocument` model:
+OpenFactura documents are mapped to the `TaxDocument` model with enhanced detail extraction:
 
+### Basic Document Fields
 | OpenFactura Field | TaxDocument Field | Notes |
 |------------------|-------------------|-------|
 | `RUTEmisor` + `DV` | `emitterRUT` | Combined format |
@@ -113,7 +116,25 @@ OpenFactura documents are mapped to the `TaxDocument` model:
 | `Folio` | `folio` | Document number |
 | `MntTotal` | `totalAmount` | Total amount |
 | `FchEmis` | `issuedAt` | Issue date |
-| All fields | `rawResponse` | Full JSON stored |
+| All fields | `rawResponse` | Enhanced JSON with details |
+
+### Enhanced Detail Extraction (from JSON endpoint)
+| Source | Target | Content |
+|--------|--------|---------|
+| `Encabezado.Emisor` | `rawResponse.detailedData.emitter` | Complete business details |
+| `Encabezado.Receptor` | `rawResponse.detailedData.receiver` | Receiver information |
+| `Encabezado.Totales` | `rawResponse.detailedData.totals` | Detailed amount breakdown |
+| `Detalle[]` | `TaxDocumentItem` table | Line items stored separately |
+| `Detalle[]` | `rawResponse.detailedData.lineItems` | Full item details in JSON |
+
+### Line Items Mapping
+| JSON Field | TaxDocumentItem Field | Notes |
+|------------|----------------------|-------|
+| `NmbItem` or `DscItem` | `productName` | Product/service name |
+| `QtyItem` | `quantity` | Quantity |
+| `PrcItem` | `unitPrice` | Unit price |
+| `MontoItem` | `totalPrice` | Line total |
+| Full item | Stored in `rawResponse` | Complete item data preserved |
 
 ## Document Types Mapping
 

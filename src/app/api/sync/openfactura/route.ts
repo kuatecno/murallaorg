@@ -9,6 +9,7 @@ import { TaxDocumentType, TaxDocumentStatus } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 
 const OPENFACTURA_API_URL = 'https://api.haulmer.com/v2/dte/document/received';
+const OPENFACTURA_DETAIL_URL = 'https://api.haulmer.com/v2/dte/document';
 const OPENFACTURA_API_KEY = process.env.OPENFACTURA_API_KEY;
 const COMPANY_RUT = '78188363';
 
@@ -223,6 +224,146 @@ async function fetchOpenFacturaPage(options: FetchOptions = {}): Promise<OpenFac
   return response.json();
 }
 
+async function fetchDocumentDetails(rut: string, type: number, folio: number): Promise<any> {
+  if (!OPENFACTURA_API_KEY) {
+    throw new Error('OPENFACTURA_API_KEY not configured');
+  }
+
+  const detailUrl = `${OPENFACTURA_DETAIL_URL}/${rut}/${type}/${folio}/json`;
+
+  console.log(`Fetching document details: ${detailUrl}`);
+
+  try {
+    const response = await fetch(detailUrl, {
+      method: 'GET',
+      headers: {
+        'apikey': OPENFACTURA_API_KEY,
+      },
+    });
+
+    if (!response.ok) {
+      console.warn(`Failed to fetch details for ${rut}/${type}/${folio}: ${response.status}`);
+      return null; // Return null if details can't be fetched, don't fail the sync
+    }
+
+    const details = await response.json();
+    return details;
+  } catch (error) {
+    console.warn(`Error fetching document details for ${rut}/${type}/${folio}:`, error);
+    return null; // Don't fail the sync if details can't be fetched
+  }
+}
+
+function extractLineItemsFromDetails(details: any): any[] {
+  if (!details || !details.json) {
+    return [];
+  }
+
+  try {
+    const document = details.json;
+
+    // Line items are typically in Detalle array
+    if (document.Detalle && Array.isArray(document.Detalle)) {
+      return document.Detalle.map((item: any, index: number) => ({
+        lineNumber: index + 1,
+        productName: item.NmbItem || item.DscItem || `Item ${index + 1}`,
+        description: item.DscItem || item.NmbItem || '',
+        quantity: item.QtyItem || item.CdgItem?.VlrCodigo || 1,
+        unitPrice: item.PrcItem || 0,
+        totalPrice: item.MontoItem || (item.PrcItem * item.QtyItem) || 0,
+        unitOfMeasure: item.UnmdItem || '',
+        productCode: item.CdgItem?.VlrCodigo || '',
+        exemptAmount: item.MontoExe || 0,
+        discount: item.DescuentoMonto || 0,
+        rawItem: item // Store complete item data
+      }));
+    }
+
+    // Alternative structure - some documents might have items in different places
+    if (document.Encabezado?.Detalle && Array.isArray(document.Encabezado.Detalle)) {
+      return document.Encabezado.Detalle.map((item: any, index: number) => ({
+        lineNumber: index + 1,
+        productName: item.NmbItem || item.DscItem || `Item ${index + 1}`,
+        description: item.DscItem || item.NmbItem || '',
+        quantity: item.QtyItem || 1,
+        unitPrice: item.PrcItem || 0,
+        totalPrice: item.MontoItem || 0,
+        rawItem: item
+      }));
+    }
+
+    return [];
+  } catch (error) {
+    console.warn('Error extracting line items:', error);
+    return [];
+  }
+}
+
+function enhanceDocumentWithDetails(doc: OpenFacturaDocument, details: any): any {
+  const enhanced = createEnhancedDocumentData(doc);
+
+  if (!details) {
+    return enhanced;
+  }
+
+  try {
+    // Add detailed information from the JSON response
+    enhanced.detailedData = {
+      // Document header information
+      header: details.json?.Encabezado || null,
+
+      // Complete JSON structure
+      fullDocument: details.json || null,
+
+      // Line items extracted
+      lineItems: extractLineItemsFromDetails(details),
+
+      // Additional document info
+      documentInfo: {
+        folio: details.folio,
+        receptionDateSII: details.FchRecepSII,
+        receptionDateOF: details.FchRecepOF,
+        status: details.status || null
+      },
+
+      // Emitter details
+      emitter: details.json?.Encabezado?.Emisor ? {
+        rut: details.json.Encabezado.Emisor.RUTEmisor,
+        businessName: details.json.Encabezado.Emisor.RznSoc,
+        businessLine: details.json.Encabezado.Emisor.GiroEmis,
+        email: details.json.Encabezado.Emisor.CorreoEmisor,
+        address: details.json.Encabezado.Emisor.DirOrigen,
+        commune: details.json.Encabezado.Emisor.CmnaOrigen,
+        economicActivity: details.json.Encabezado.Emisor.Acteco
+      } : null,
+
+      // Receiver details
+      receiver: details.json?.Encabezado?.Receptor ? {
+        rut: details.json.Encabezado.Receptor.RUTRecep,
+        businessName: details.json.Encabezado.Receptor.RznSocRecep,
+        businessLine: details.json.Encabezado.Receptor.GiroRecep,
+        contact: details.json.Encabezado.Receptor.Contacto,
+        address: details.json.Encabezado.Receptor.DirRecep,
+        commune: details.json.Encabezado.Receptor.CmnaRecep
+      } : null,
+
+      // Enhanced totals
+      totals: details.json?.Encabezado?.Totales ? {
+        netAmount: details.json.Encabezado.Totales.MntNeto || 0,
+        exemptAmount: details.json.Encabezado.Totales.MntExe || 0,
+        taxAmount: details.json.Encabezado.Totales.IVA || 0,
+        totalAmount: details.json.Encabezado.Totales.MntTotal || 0,
+        additionalTaxes: details.json.Encabezado.Totales.ImptoReten || []
+      } : null
+    };
+
+    return enhanced;
+  } catch (error) {
+    console.warn('Error enhancing document with details:', error);
+    return enhanced;
+  }
+}
+
 async function chunkDateRange(fromDate: string, toDate: string, maxDaysPerChunk: number = 90): Promise<{ from: string, to: string }[]> {
   const chunks: { from: string, to: string }[] = [];
   const start = new Date(fromDate);
@@ -357,6 +498,20 @@ export async function POST(request: NextRequest) {
               }
             });
 
+            // Fetch detailed document information including line items
+            console.log(`Fetching details for document ${uniqueId}`);
+            const documentDetails = await fetchDocumentDetails(
+              `${doc.RUTEmisor}-${doc.DV}`,
+              doc.TipoDTE,
+              doc.Folio
+            );
+
+            // Small delay to be respectful to the API (250ms between detail requests)
+            await new Promise(resolve => setTimeout(resolve, 250));
+
+            // Create enhanced document data with details
+            const enhancedDocData = enhanceDocumentWithDetails(doc, documentDetails);
+
             const documentData = {
               type: mapDocumentType(doc.TipoDTE),
               folio: doc.Folio.toString(),
@@ -371,24 +526,58 @@ export async function POST(request: NextRequest) {
               currency: 'CLP',
               issuedAt: new Date(doc.FchEmis),
               status: 'ISSUED' as TaxDocumentStatus, // All received documents are issued
-              rawResponse: createEnhancedDocumentData(doc) as any,
+              rawResponse: enhancedDocData as any,
               tenantId: tenant.id
             };
 
+            // Extract line items for database storage
+            const lineItems = enhancedDocData.detailedData?.lineItems || [];
+
             if (existingDoc) {
-              // Update existing document
-              await prisma.taxDocument.update({
-                where: { id: existingDoc.id },
-                data: {
-                  ...documentData,
-                  updatedAt: new Date()
+              // Update existing document and replace line items
+              await prisma.$transaction(async (tx) => {
+                // Update document
+                await tx.taxDocument.update({
+                  where: { id: existingDoc.id },
+                  data: {
+                    ...documentData,
+                    updatedAt: new Date()
+                  }
+                });
+
+                // Delete existing line items
+                await tx.taxDocumentItem.deleteMany({
+                  where: { taxDocumentId: existingDoc.id }
+                });
+
+                // Create new line items
+                if (lineItems.length > 0) {
+                  await tx.taxDocumentItem.createMany({
+                    data: lineItems.map((item: any) => ({
+                      taxDocumentId: existingDoc.id,
+                      productName: item.productName || 'Unknown Product',
+                      quantity: item.quantity || 1,
+                      unitPrice: new Decimal(item.unitPrice || 0),
+                      totalPrice: new Decimal(item.totalPrice || 0)
+                    }))
+                  });
                 }
               });
               syncStats.updatedDocuments++;
             } else {
-              // Create new document
-              await prisma.taxDocument.create({
-                data: documentData
+              // Create new document with line items
+              const newDocument = await prisma.taxDocument.create({
+                data: {
+                  ...documentData,
+                  items: lineItems.length > 0 ? {
+                    create: lineItems.map((item: any) => ({
+                      productName: item.productName || 'Unknown Product',
+                      quantity: item.quantity || 1,
+                      unitPrice: new Decimal(item.unitPrice || 0),
+                      totalPrice: new Decimal(item.totalPrice || 0)
+                    }))
+                  } : undefined
+                }
               });
               syncStats.newDocuments++;
             }

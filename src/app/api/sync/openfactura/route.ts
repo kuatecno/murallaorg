@@ -45,7 +45,7 @@ function mapDocumentType(tipoDTE: number): TaxDocumentType {
     case 33:
       return 'FACTURA';
     case 34:
-      return 'FACTURA_EXENTA';
+      return 'FACTURA'; // Factura Exenta maps to FACTURA
     case 39:
       return 'BOLETA';
     case 56:

@@ -469,17 +469,46 @@ export default function InvoicesPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <div className="flex items-center justify-end space-x-2">
-                          <button
-                            onClick={() => window.open(`/api/invoices/${invoice.id}/document?format=pdf`, '_blank')}
-                            className="text-blue-600 hover:text-blue-900 p-1 rounded transition-colors"
-                            title="View OpenFactura document"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </button>
+                          <div className="relative group">
+                            <button
+                              onClick={() => window.open(`/api/invoices/${invoice.id}/document?format=pdf`, '_blank')}
+                              className="text-blue-600 hover:text-blue-900 p-1 rounded transition-colors"
+                              title="View OpenFactura PDF"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </button>
+                            {/* Dropdown for other formats */}
+                            <div className="absolute right-0 top-full mt-1 w-36 bg-white border border-gray-200 rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10">
+                              <button
+                                onClick={() => window.open(`/api/invoices/${invoice.id}/document?format=json`, '_blank')}
+                                className="block w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                              >
+                                View JSON
+                              </button>
+                              <button
+                                onClick={() => window.open(`/api/invoices/${invoice.id}/document?format=xml`, '_blank')}
+                                className="block w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                              >
+                                View XML
+                              </button>
+                              <button
+                                onClick={() => window.open(`/api/invoices/${invoice.id}/document?format=status`, '_blank')}
+                                className="block w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                              >
+                                View Status
+                              </button>
+                              <button
+                                onClick={() => window.open(`/api/invoices/${invoice.id}/document?format=cedible`, '_blank')}
+                                className="block w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                              >
+                                Cedible PDF
+                              </button>
+                            </div>
+                          </div>
                           <button
                             onClick={() => window.open(`/api/invoices/${invoice.id}/pdf`, '_blank')}
                             className="text-green-600 hover:text-green-900 p-1 rounded transition-colors"
-                            title="Download PDF"
+                            title="Download local PDF"
                           >
                             <Download className="h-4 w-4" />
                           </button>

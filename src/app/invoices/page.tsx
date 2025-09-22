@@ -27,6 +27,14 @@ export default function InvoicesPage() {
     toDate: '',
     chunkSize: 90
   })
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 50, // Show more documents by default
+    totalCount: 0,
+    totalPages: 0,
+    hasNextPage: false,
+    hasPrevPage: false
+  })
   const [filters, setFilters] = useState({
     type: '',
     status: '',
@@ -43,7 +51,7 @@ export default function InvoicesPage() {
   const [syncStatus, setSyncStatus] = useState<any>(null)
 
   useEffect(() => {
-    fetchInvoices()
+    fetchInvoices(false, 1)
     fetchSyncStatus()
   }, [])
 
@@ -94,7 +102,7 @@ export default function InvoicesPage() {
 
       if (response.ok) {
         // Refresh data after successful sync
-        await fetchInvoices()
+        await fetchInvoices(false, pagination.page)
         await fetchSyncStatus()
         console.log('Sync completed:', result)
       } else {
@@ -108,12 +116,17 @@ export default function InvoicesPage() {
     }
   }
 
-  const fetchInvoices = async (useFilters = false) => {
+  const fetchInvoices = async (useFilters = false, page = 1) => {
     try {
       setLoading(true)
       setError('')
 
       const params = new URLSearchParams()
+
+      // Add pagination params
+      params.append('page', page.toString())
+      params.append('limit', pagination.limit.toString())
+
       if (useFilters) {
         if (filters.type) params.append('type', filters.type)
         if (filters.status) params.append('status', filters.status)
@@ -122,17 +135,22 @@ export default function InvoicesPage() {
         if (filters.search) params.append('search', filters.search)
       }
 
-      const url = `/api/invoices${params.toString() ? '?' + params.toString() : ''}`
+      const url = `/api/invoices?${params.toString()}`
       const response = await fetch(url)
 
       if (response.ok) {
         const data = await response.json()
         setInvoices(data.data || [])
 
-        // Calculate stats from the current data
+        // Update pagination state
+        if (data.pagination) {
+          setPagination(data.pagination)
+        }
+
+        // Calculate stats from the current data (these are page-specific stats)
         const invoiceList = data.data || []
         setStats({
-          total: invoiceList.length,
+          total: data.pagination?.totalCount || invoiceList.length,
           issued: invoiceList.filter((inv: Invoice) => inv.status.toLowerCase() === 'approved').length,
           draft: invoiceList.filter((inv: Invoice) => inv.status.toLowerCase() === 'draft').length,
           rejected: invoiceList.filter((inv: Invoice) => inv.status.toLowerCase() === 'rejected').length,
@@ -227,7 +245,7 @@ export default function InvoicesPage() {
               </button>
             </div>
             <button
-              onClick={() => fetchInvoices()}
+              onClick={() => fetchInvoices(false, pagination.page)}
               className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors"
             >
               🔄 Refresh
@@ -348,7 +366,10 @@ export default function InvoicesPage() {
           </div>
           <div className="mt-4 flex gap-3">
             <button
-              onClick={() => fetchInvoices(true)}
+              onClick={() => {
+                setPagination(prev => ({ ...prev, page: 1 }))
+                fetchInvoices(true, 1)
+              }}
               className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
             >
               Apply Filters
@@ -356,7 +377,8 @@ export default function InvoicesPage() {
             <button
               onClick={() => {
                 setFilters({ type: '', status: '', startDate: '', endDate: '', search: '' });
-                fetchInvoices(false);
+                setPagination(prev => ({ ...prev, page: 1 }))
+                fetchInvoices(false, 1);
               }}
               className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition-colors"
             >
@@ -467,6 +489,103 @@ export default function InvoicesPage() {
                   ))}
                 </tbody>
               </table>
+
+              {/* Pagination Controls */}
+              {pagination.totalPages > 1 && (
+                <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200">
+                  <div className="flex items-center text-sm text-gray-700">
+                    <span>
+                      Showing {((pagination.page - 1) * pagination.limit) + 1} to{' '}
+                      {Math.min(pagination.page * pagination.limit, pagination.totalCount)} of{' '}
+                      {pagination.totalCount} documents
+                    </span>
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    {/* Page Size Selector */}
+                    <div className="flex items-center space-x-2 mr-4">
+                      <span className="text-sm text-gray-700">Show:</span>
+                      <select
+                        value={pagination.limit}
+                        onChange={(e) => {
+                          const newLimit = parseInt(e.target.value)
+                          setPagination(prev => ({ ...prev, limit: newLimit, page: 1 }))
+                          fetchInvoices(true, 1)
+                        }}
+                        className="px-2 py-1 border border-gray-300 rounded text-sm"
+                      >
+                        <option value={20}>20</option>
+                        <option value={50}>50</option>
+                        <option value={100}>100</option>
+                        <option value={pagination.totalCount}>All ({pagination.totalCount})</option>
+                      </select>
+                    </div>
+
+                    {/* Previous Button */}
+                    <button
+                      onClick={() => {
+                        if (pagination.hasPrevPage) {
+                          const newPage = pagination.page - 1
+                          setPagination(prev => ({ ...prev, page: newPage }))
+                          fetchInvoices(true, newPage)
+                        }
+                      }}
+                      disabled={!pagination.hasPrevPage}
+                      className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Previous
+                    </button>
+
+                    {/* Page Numbers */}
+                    <div className="flex items-center space-x-1">
+                      {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
+                        let pageNum
+                        if (pagination.totalPages <= 5) {
+                          pageNum = i + 1
+                        } else if (pagination.page <= 3) {
+                          pageNum = i + 1
+                        } else if (pagination.page >= pagination.totalPages - 2) {
+                          pageNum = pagination.totalPages - 4 + i
+                        } else {
+                          pageNum = pagination.page - 2 + i
+                        }
+
+                        return (
+                          <button
+                            key={pageNum}
+                            onClick={() => {
+                              setPagination(prev => ({ ...prev, page: pageNum }))
+                              fetchInvoices(true, pageNum)
+                            }}
+                            className={`px-3 py-1 text-sm border rounded ${
+                              pageNum === pagination.page
+                                ? 'bg-blue-600 text-white border-blue-600'
+                                : 'border-gray-300 hover:bg-gray-50'
+                            }`}
+                          >
+                            {pageNum}
+                          </button>
+                        )
+                      })}
+                    </div>
+
+                    {/* Next Button */}
+                    <button
+                      onClick={() => {
+                        if (pagination.hasNextPage) {
+                          const newPage = pagination.page + 1
+                          setPagination(prev => ({ ...prev, page: newPage }))
+                          fetchInvoices(true, newPage)
+                        }
+                      }}
+                      disabled={!pagination.hasNextPage}
+                      className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

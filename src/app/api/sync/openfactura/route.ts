@@ -300,7 +300,7 @@ function extractLineItemsFromDetails(details: any): any[] {
 }
 
 function enhanceDocumentWithDetails(doc: OpenFacturaDocument, details: any): any {
-  const enhanced = createEnhancedDocumentData(doc) as any;
+  const enhanced: any = createEnhancedDocumentData(doc);
 
   if (!details) {
     return enhanced;

@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { TaxDocumentType, TaxDocumentStatus } from '@prisma/client';
+import { Decimal } from '@prisma/client/runtime/library';
 
 const OPENFACTURA_API_URL = 'https://api.haulmer.com/v2/dte/document/received';
 const OPENFACTURA_API_KEY = process.env.OPENFACTURA_API_KEY;
@@ -151,12 +152,12 @@ export async function POST(request: NextRequest) {
               emitterName: doc.RznSoc,
               receiverRUT: tenant.rut || '',
               receiverName: tenant.name,
-              netAmount: doc.MntNeto,
-              taxAmount: doc.IVA,
-              totalAmount: doc.MntTotal,
+              netAmount: new Decimal(doc.MntNeto || 0),
+              taxAmount: new Decimal(doc.IVA || 0),
+              totalAmount: new Decimal(doc.MntTotal || 0),
               currency: 'CLP',
               issuedAt: new Date(doc.FchEmis),
-              status: 'APPROVED' as TaxDocumentStatus, // All received documents are approved
+              status: 'ISSUED' as TaxDocumentStatus, // All received documents are issued
               rawResponse: doc as any,
               tenantId: tenant.id
             };

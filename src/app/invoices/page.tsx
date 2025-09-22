@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Plus, Eye, Download, CheckCircle, XCircle, Clock, RefreshCw } from 'lucide-react'
+import { Plus, Eye, Download, CheckCircle, XCircle, Clock, RefreshCw, Settings, X } from 'lucide-react'
 
 interface Invoice {
   id: string
@@ -20,6 +20,13 @@ export default function InvoicesPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [syncing, setSyncing] = useState(false)
+  const [showSyncConfig, setShowSyncConfig] = useState(false)
+  const [syncConfig, setSyncConfig] = useState({
+    months: 3,
+    fromDate: '',
+    toDate: '',
+    chunkSize: 90
+  })
   const [filters, setFilters] = useState({
     type: '',
     status: '',
@@ -52,14 +59,35 @@ export default function InvoicesPage() {
     }
   }
 
-  const handleManualSync = async () => {
+  const handleManualSync = async (customConfig?: any) => {
     try {
       setSyncing(true)
+
+      // Use custom config or default sync config
+      const config = customConfig || syncConfig
+
+      // Build query parameters or request body
+      const syncParams: any = {}
+
+      if (config.months > 0) {
+        syncParams.months = config.months
+      } else if (config.fromDate && config.toDate) {
+        syncParams.fromDate = config.fromDate
+        syncParams.toDate = config.toDate
+      }
+
+      if (config.chunkSize && config.chunkSize !== 90) {
+        syncParams.chunkSize = config.chunkSize
+      }
+
+      console.log('Starting sync with config:', syncParams)
+
       const response = await fetch('/api/sync/openfactura', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-        }
+        },
+        body: Object.keys(syncParams).length > 0 ? JSON.stringify(syncParams) : undefined
       })
 
       const result = await response.json()
@@ -180,14 +208,24 @@ export default function InvoicesPage() {
             <p className="text-gray-600 mt-2">Manage your received invoices and tax documents</p>
           </div>
           <div className="flex gap-3">
-            <button
-              onClick={handleManualSync}
-              disabled={syncing}
-              className="bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors"
-            >
-              <RefreshCw className={`h-5 w-5 ${syncing ? 'animate-spin' : ''}`} />
-              <span>{syncing ? 'Syncing...' : 'Sync Now'}</span>
-            </button>
+            <div className="flex space-x-2">
+              <button
+                onClick={() => handleManualSync()}
+                disabled={syncing}
+                className="bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors"
+              >
+                <RefreshCw className={`h-5 w-5 ${syncing ? 'animate-spin' : ''}`} />
+                <span>{syncing ? 'Syncing...' : 'Quick Sync'}</span>
+              </button>
+              <button
+                onClick={() => setShowSyncConfig(true)}
+                disabled={syncing}
+                className="bg-purple-600 hover:bg-purple-700 disabled:bg-purple-400 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors"
+              >
+                <Settings className="h-5 w-5" />
+                <span>Advanced Sync</span>
+              </button>
+            </div>
             <button
               onClick={() => fetchInvoices()}
               className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors"
@@ -433,6 +471,139 @@ export default function InvoicesPage() {
           )}
         </div>
       </div>
+
+      {/* Sync Configuration Modal */}
+      {showSyncConfig && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div className="flex justify-between items-center p-6 border-b">
+              <h3 className="text-lg font-semibold text-gray-900">Advanced Sync Configuration</h3>
+              <button
+                onClick={() => setShowSyncConfig(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Sync Period
+                </label>
+                <div className="space-y-3">
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      name="syncMethod"
+                      checked={syncConfig.months > 0}
+                      onChange={() => setSyncConfig(prev => ({ ...prev, months: 3, fromDate: '', toDate: '' }))}
+                      className="mr-2"
+                    />
+                    <span>Last </span>
+                    <input
+                      type="number"
+                      min="1"
+                      max="12"
+                      value={syncConfig.months}
+                      onChange={(e) => setSyncConfig(prev => ({ ...prev, months: parseInt(e.target.value) || 1 }))}
+                      className="mx-2 w-16 px-2 py-1 border border-gray-300 rounded text-center"
+                    />
+                    <span> months</span>
+                  </label>
+
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      name="syncMethod"
+                      checked={syncConfig.fromDate !== '' || syncConfig.toDate !== ''}
+                      onChange={() => setSyncConfig(prev => ({ ...prev, months: 0 }))}
+                      className="mr-2"
+                    />
+                    <span>Custom date range</span>
+                  </label>
+
+                  {(syncConfig.fromDate !== '' || syncConfig.toDate !== '' || syncConfig.months === 0) && (
+                    <div className="ml-6 space-y-2">
+                      <div>
+                        <label className="block text-xs text-gray-600">From Date</label>
+                        <input
+                          type="date"
+                          value={syncConfig.fromDate}
+                          onChange={(e) => setSyncConfig(prev => ({ ...prev, fromDate: e.target.value, months: 0 }))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-600">To Date</label>
+                        <input
+                          type="date"
+                          value={syncConfig.toDate}
+                          onChange={(e) => setSyncConfig(prev => ({ ...prev, toDate: e.target.value, months: 0 }))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  API Call Chunk Size (days per request)
+                </label>
+                <select
+                  value={syncConfig.chunkSize}
+                  onChange={(e) => setSyncConfig(prev => ({ ...prev, chunkSize: parseInt(e.target.value) }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                >
+                  <option value={30}>30 days (faster, more API calls)</option>
+                  <option value={60}>60 days (balanced)</option>
+                  <option value={90}>90 days (default)</option>
+                  <option value={120}>120 days (slower, fewer API calls)</option>
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  Smaller chunks = faster processing but more API calls
+                </p>
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+                <h4 className="text-sm font-medium text-blue-900 mb-1">Sync Preview</h4>
+                <p className="text-xs text-blue-700">
+                  {syncConfig.months > 0
+                    ? `Will sync documents from the last ${syncConfig.months} month${syncConfig.months > 1 ? 's' : ''}`
+                    : syncConfig.fromDate && syncConfig.toDate
+                    ? `Will sync documents from ${syncConfig.fromDate} to ${syncConfig.toDate}`
+                    : 'Please configure date range'
+                  }
+                </p>
+                <p className="text-xs text-blue-600 mt-1">
+                  API requests will be made in {syncConfig.chunkSize}-day chunks
+                </p>
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-3 p-6 border-t">
+              <button
+                onClick={() => setShowSyncConfig(false)}
+                className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  handleManualSync(syncConfig)
+                  setShowSyncConfig(false)
+                }}
+                disabled={syncing || (syncConfig.months === 0 && (!syncConfig.fromDate || !syncConfig.toDate))}
+                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-400 text-white rounded-md transition-colors"
+              >
+                Start Advanced Sync
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

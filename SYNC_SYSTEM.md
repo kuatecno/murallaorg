@@ -18,7 +18,22 @@ This system automatically imports received tax documents from OpenFactura into y
 ```
 POST /api/sync/openfactura
 ```
-Triggers immediate sync of OpenFactura documents.
+Triggers immediate sync of OpenFactura documents with configurable parameters.
+
+**Request Body (optional):**
+```json
+{
+  "months": 3,              // Sync last N months (alternative to date range)
+  "fromDate": "2024-01-01", // Start date (YYYY-MM-DD format)
+  "toDate": "2024-12-31",   // End date (YYYY-MM-DD format)
+  "chunkSize": 90           // Days per API call (30-120, default: 90)
+}
+```
+
+**Query Parameters (alternative):**
+```
+POST /api/sync/openfactura?months=6&chunkSize=60
+```
 
 **Response:**
 ```json
@@ -26,14 +41,20 @@ Triggers immediate sync of OpenFactura documents.
   "success": true,
   "message": "OpenFactura sync completed successfully",
   "stats": {
-    "totalDocuments": 30,
-    "newDocuments": 5,
-    "updatedDocuments": 2,
-    "skippedDocuments": 23,
+    "totalDocuments": 150,
+    "newDocuments": 25,
+    "updatedDocuments": 5,
+    "skippedDocuments": 120,
     "errors": 0,
-    "pages": 1,
+    "pages": 8,
+    "chunks": 4,
     "startTime": "2025-01-15T12:00:00Z",
-    "endTime": "2025-01-15T12:00:05Z"
+    "endTime": "2025-01-15T12:03:45Z",
+    "dateRange": {
+      "from": "2024-01-01",
+      "to": "2024-12-31",
+      "totalDays": 365
+    }
   }
 }
 ```
@@ -134,10 +155,35 @@ The system uses Vercel Cron Jobs for 24h auto-sync:
 
 ### Manual Sync via UI
 
+#### Quick Sync (Default)
 1. Go to `/invoices` page
-2. Click "Sync Now" button
+2. Click "Quick Sync" button (syncs last 3 months)
 3. Wait for sync to complete
 4. Data automatically refreshes
+
+#### Advanced Sync (Configurable)
+1. Go to `/invoices` page
+2. Click "Advanced Sync" button
+3. Configure sync parameters:
+   - **Last N Months**: Sync recent data (1-12 months)
+   - **Custom Date Range**: Specific from/to dates
+   - **Chunk Size**: API call frequency (30-120 days per request)
+4. Review sync preview
+5. Click "Start Advanced Sync"
+6. Monitor progress and completion
+
+#### Sync Configuration Options
+
+**Time Periods:**
+- Last 1-12 months (convenient for recent data)
+- Custom date range (up to years of historical data)
+- Automatic chunking for large periods
+
+**Performance Tuning:**
+- 30 days/chunk: Faster processing, more API calls
+- 60 days/chunk: Balanced approach
+- 90 days/chunk: Default, good for most cases
+- 120 days/chunk: Fewer API calls, slower processing
 
 ### Check Sync Status
 

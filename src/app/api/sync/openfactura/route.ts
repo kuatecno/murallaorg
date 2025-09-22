@@ -158,16 +158,49 @@ function getDocumentTypeName(tipoDTE: number): string {
   }
 }
 
-async function fetchOpenFacturaPage(page: number = 1): Promise<OpenFacturaResponse> {
+interface FetchOptions {
+  page?: number;
+  fromDate?: string; // YYYY-MM-DD format
+  toDate?: string; // YYYY-MM-DD format
+  maxDays?: number; // Maximum days to query (default 90)
+}
+
+async function fetchOpenFacturaPage(options: FetchOptions = {}): Promise<OpenFacturaResponse> {
   if (!OPENFACTURA_API_KEY) {
     throw new Error('OPENFACTURA_API_KEY not configured');
   }
 
+  const {
+    page = 1,
+    fromDate,
+    toDate,
+    maxDays = 90
+  } = options;
+
+  // Calculate date range
+  let startDate: string;
+  let endDate: string;
+
+  if (fromDate && toDate) {
+    startDate = fromDate;
+    endDate = toDate;
+  } else if (fromDate) {
+    startDate = fromDate;
+    // If only fromDate provided, limit to maxDays from that date
+    const from = new Date(fromDate);
+    const to = new Date(from.getTime() + maxDays * 24 * 60 * 60 * 1000);
+    endDate = to.toISOString().split('T')[0];
+  } else {
+    // Default: last maxDays
+    endDate = new Date().toISOString().split('T')[0];
+    startDate = new Date(Date.now() - maxDays * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  }
+
   const payload = {
     Page: page.toString(),
-    // Get documents from last 90 days by default
     FchEmis: {
-      gte: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+      gte: startDate,
+      lte: endDate
     }
   };
 
@@ -190,9 +223,68 @@ async function fetchOpenFacturaPage(page: number = 1): Promise<OpenFacturaRespon
   return response.json();
 }
 
+async function chunkDateRange(fromDate: string, toDate: string, maxDaysPerChunk: number = 90): Promise<{ from: string, to: string }[]> {
+  const chunks: { from: string, to: string }[] = [];
+  const start = new Date(fromDate);
+  const end = new Date(toDate);
+
+  let current = new Date(start);
+
+  while (current < end) {
+    const chunkEnd = new Date(current.getTime() + maxDaysPerChunk * 24 * 60 * 60 * 1000);
+    const actualEnd = chunkEnd > end ? end : chunkEnd;
+
+    chunks.push({
+      from: current.toISOString().split('T')[0],
+      to: actualEnd.toISOString().split('T')[0]
+    });
+
+    current = new Date(actualEnd.getTime() + 24 * 60 * 60 * 1000); // Start next chunk from next day
+  }
+
+  return chunks;
+}
+
 export async function POST(request: NextRequest) {
   try {
-    console.log('Starting OpenFactura sync...');
+    // Parse query parameters and request body
+    const url = new URL(request.url);
+    const requestBody = request.body ? await request.json().catch(() => ({})) : {};
+
+    const syncOptions = {
+      fromDate: url.searchParams.get('fromDate') || requestBody.fromDate,
+      toDate: url.searchParams.get('toDate') || requestBody.toDate,
+      maxDays: parseInt(url.searchParams.get('maxDays') || requestBody.maxDays || '90'),
+      chunkSize: parseInt(url.searchParams.get('chunkSize') || requestBody.chunkSize || '90'), // Days per API call
+      months: parseInt(url.searchParams.get('months') || requestBody.months || '0') // Alternative to fromDate
+    };
+
+    console.log('Starting OpenFactura sync with options:', syncOptions);
+
+    // Calculate date range based on options
+    let finalFromDate: string;
+    let finalToDate: string;
+
+    if (syncOptions.months > 0) {
+      // Sync last N months
+      const now = new Date();
+      finalToDate = now.toISOString().split('T')[0];
+      const monthsAgo = new Date(now);
+      monthsAgo.setMonth(monthsAgo.getMonth() - syncOptions.months);
+      finalFromDate = monthsAgo.toISOString().split('T')[0];
+    } else if (syncOptions.fromDate && syncOptions.toDate) {
+      finalFromDate = syncOptions.fromDate;
+      finalToDate = syncOptions.toDate;
+    } else if (syncOptions.fromDate) {
+      finalFromDate = syncOptions.fromDate;
+      finalToDate = new Date().toISOString().split('T')[0];
+    } else {
+      // Default: last 90 days
+      const now = new Date();
+      finalToDate = now.toISOString().split('T')[0];
+      const defaultDays = syncOptions.maxDays;
+      finalFromDate = new Date(now.getTime() - defaultDays * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    }
 
     // Get tenant (for now use first active tenant)
     const tenant = await prisma.tenant.findFirst({
@@ -207,6 +299,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Calculate total date range and chunking strategy
+    const totalDays = Math.ceil((new Date(finalToDate).getTime() - new Date(finalFromDate).getTime()) / (24 * 60 * 60 * 1000));
+    const chunks = await chunkDateRange(finalFromDate, finalToDate, syncOptions.chunkSize);
+
+    console.log(`Syncing ${totalDays} days from ${finalFromDate} to ${finalToDate} in ${chunks.length} chunks`);
+
     let syncStats = {
       totalDocuments: 0,
       newDocuments: 0,
@@ -215,15 +313,30 @@ export async function POST(request: NextRequest) {
       errors: 0,
       startTime: new Date(),
       endTime: null as Date | null,
-      pages: 0
+      pages: 0,
+      chunks: chunks.length,
+      dateRange: {
+        from: finalFromDate,
+        to: finalToDate,
+        totalDays: totalDays
+      }
     };
 
-    let currentPage = 1;
-    let hasMorePages = true;
+    // Process each date chunk
+    for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex++) {
+      const chunk = chunks[chunkIndex];
+      console.log(`Processing chunk ${chunkIndex + 1}/${chunks.length}: ${chunk.from} to ${chunk.to}`);
 
-    while (hasMorePages) {
-      try {
-        const pageData = await fetchOpenFacturaPage(currentPage);
+      let currentPage = 1;
+      let hasMorePages = true;
+
+      while (hasMorePages) {
+        try {
+          const pageData = await fetchOpenFacturaPage({
+            page: currentPage,
+            fromDate: chunk.from,
+            toDate: chunk.to
+          });
         syncStats.pages++;
         syncStats.totalDocuments += pageData.data.length;
 
@@ -286,19 +399,26 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        // Check if there are more pages
-        hasMorePages = currentPage < pageData.last_page;
-        currentPage++;
+          // Check if there are more pages
+          hasMorePages = currentPage < pageData.last_page;
+          currentPage++;
 
-        // Add small delay between pages to be respectful to the API
-        if (hasMorePages) {
-          await new Promise(resolve => setTimeout(resolve, 500));
+          // Add small delay between pages to be respectful to the API
+          if (hasMorePages) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
+
+        } catch (pageError) {
+          console.error(`Error fetching page ${currentPage}:`, pageError);
+          syncStats.errors++;
+          hasMorePages = false;
         }
+      }
 
-      } catch (pageError) {
-        console.error(`Error fetching page ${currentPage}:`, pageError);
-        syncStats.errors++;
-        hasMorePages = false;
+      // Add delay between chunks to be respectful to the API
+      if (chunkIndex < chunks.length - 1) {
+        console.log(`Chunk ${chunkIndex + 1} completed. Waiting before next chunk...`);
+        await new Promise(resolve => setTimeout(resolve, 1000));
       }
     }
 

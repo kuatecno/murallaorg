@@ -480,6 +480,12 @@ export default function InvoicesPage() {
                             {/* Dropdown for other formats */}
                             <div className="absolute right-0 top-full mt-1 w-36 bg-white border border-gray-200 rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10">
                               <button
+                                onClick={() => window.open(`/invoices/${invoice.id}/preview`, '_blank')}
+                                className="block w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 border-b border-gray-100"
+                              >
+                                Web Preview
+                              </button>
+                              <button
                                 onClick={() => window.open(`/api/invoices/${invoice.id}/document?format=json`, '_blank')}
                                 className="block w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100"
                               >

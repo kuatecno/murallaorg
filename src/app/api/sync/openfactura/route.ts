@@ -13,25 +13,45 @@ const OPENFACTURA_API_KEY = process.env.OPENFACTURA_API_KEY;
 const COMPANY_RUT = '78188363';
 
 interface OpenFacturaDocument {
+  // Basic document info
   RUTEmisor: number;
   DV: string;
   RznSoc: string;
   TipoDTE: number;
   Folio: number;
-  FchEmis: string;
-  FchRecepSII: string;
-  FchRecepOF: string;
-  MntExe: number;
-  MntNeto: number;
-  IVA: number;
-  MntTotal: number;
-  Acuses: Array<{
+
+  // Dates
+  FchEmis: string; // Issue date
+  FchRecepSII?: string; // SII reception date
+  FchRecepOF?: string; // OpenFactura reception date
+
+  // Amounts
+  MntExe?: number; // Exempt amount
+  MntNeto?: number; // Net amount
+  IVA?: number; // Tax amount
+  MntTotal: number; // Total amount
+
+  // Payment and transaction info
+  FmaPago?: string; // Payment method
+  TpoTranCompra?: number; // Purchase transaction type
+
+  // Document acknowledgments
+  Acuses?: Array<{
     codEvento: string;
     fechaEvento: string;
     estado: string;
+    descripcion?: string;
   }>;
-  FmaPago: string;
-  TpoTranCompra: number;
+
+  // Additional possible fields (some documents may have these)
+  GlosaDte?: string; // Document description
+  Observaciones?: string; // Observations
+  MontoExe?: number; // Alternative exempt amount field
+  MontoNF?: number; // Non-taxable amount
+  ValorDR?: number; // Discount/surcharge value
+  TipoDespacho?: number; // Dispatch type
+  IndTraslado?: number; // Transfer indicator
+  [key: string]: any; // Allow additional unknown fields
 }
 
 interface OpenFacturaResponse {
@@ -55,6 +75,86 @@ function mapDocumentType(tipoDTE: number): TaxDocumentType {
       return 'NOTA_CREDITO';
     default:
       return 'FACTURA';
+  }
+}
+
+function createEnhancedDocumentData(doc: OpenFacturaDocument) {
+  return {
+    // Original document data
+    ...doc,
+
+    // Enhanced metadata extraction
+    metadata: {
+      // Document classification
+      documentTypeName: getDocumentTypeName(doc.TipoDTE),
+      isExempt: doc.TipoDTE === 34,
+      hasExemptAmount: (doc.MntExe || doc.MontoExe || 0) > 0,
+
+      // Amounts breakdown
+      amounts: {
+        total: doc.MntTotal,
+        net: doc.MntNeto || 0,
+        tax: doc.IVA || 0,
+        exempt: doc.MntExe || doc.MontoExe || 0,
+        nonTaxable: doc.MontoNF || 0,
+        discountSurcharge: doc.ValorDR || 0
+      },
+
+      // Dates processing
+      dates: {
+        issued: doc.FchEmis,
+        receivedSII: doc.FchRecepSII,
+        receivedOF: doc.FchRecepOF,
+        issuedTimestamp: new Date(doc.FchEmis).getTime(),
+        receivedSIITimestamp: doc.FchRecepSII ? new Date(doc.FchRecepSII).getTime() : null,
+        receivedOFTimestamp: doc.FchRecepOF ? new Date(doc.FchRecepOF).getTime() : null
+      },
+
+      // Business logic
+      business: {
+        paymentMethod: doc.FmaPago,
+        purchaseTransactionType: doc.TpoTranCompra,
+        dispatchType: doc.TipoDespacho,
+        transferIndicator: doc.IndTraslado,
+        hasObservations: !!(doc.Observaciones || doc.GlosaDte),
+        observationText: doc.Observaciones || doc.GlosaDte || null
+      },
+
+      // Acknowledgments processing
+      acknowledgments: {
+        count: doc.Acuses?.length || 0,
+        events: doc.Acuses?.map(acuse => ({
+          code: acuse.codEvento,
+          date: acuse.fechaEvento,
+          status: acuse.estado,
+          description: acuse.descripcion,
+          timestamp: new Date(acuse.fechaEvento).getTime()
+        })) || [],
+        lastEvent: doc.Acuses?.length ? doc.Acuses[doc.Acuses.length - 1] : null
+      },
+
+      // Validation flags
+      validation: {
+        hasRequiredFields: !!(doc.RUTEmisor && doc.Folio && doc.TipoDTE && doc.MntTotal),
+        hasSIIReception: !!doc.FchRecepSII,
+        hasPaymentInfo: !!doc.FmaPago,
+        isComplete: !!(doc.RUTEmisor && doc.Folio && doc.TipoDTE && doc.MntTotal && doc.FchRecepSII)
+      }
+    }
+  };
+}
+
+function getDocumentTypeName(tipoDTE: number): string {
+  switch (tipoDTE) {
+    case 33: return 'Factura Electrónica';
+    case 34: return 'Factura No Afecta o Exenta Electrónica';
+    case 39: return 'Boleta Electrónica';
+    case 41: return 'Boleta No Afecta o Exenta Electrónica';
+    case 46: return 'Factura de Compra Electrónica';
+    case 52: return 'Guía de Despacho Electrónica';
+    case 56: return 'Nota de Débito Electrónica';
+    case 61: return 'Nota de Crédito Electrónica';
+    default: return `Documento Tipo ${tipoDTE}`;
   }
 }
 
@@ -158,7 +258,7 @@ export async function POST(request: NextRequest) {
               currency: 'CLP',
               issuedAt: new Date(doc.FchEmis),
               status: 'ISSUED' as TaxDocumentStatus, // All received documents are issued
-              rawResponse: doc as any,
+              rawResponse: createEnhancedDocumentData(doc) as any,
               tenantId: tenant.id
             };
 

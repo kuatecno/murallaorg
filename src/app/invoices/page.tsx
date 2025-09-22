@@ -498,10 +498,10 @@ export default function InvoicesPage() {
                                 View Status
                               </button>
                               <button
-                                onClick={() => window.open(`/api/invoices/${invoice.id}/document?format=cedible`, '_blank')}
+                                onClick={() => window.open(`/api/invoices/${invoice.id}/document?format=pdf`, '_blank')}
                                 className="block w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100"
                               >
-                                Cedible PDF
+                                PDF
                               </button>
                             </div>
                           </div>

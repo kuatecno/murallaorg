@@ -151,7 +151,7 @@ export default function InvoicesPage() {
         const invoiceList = data.data || []
         setStats({
           total: data.pagination?.totalCount || invoiceList.length,
-          issued: invoiceList.filter((inv: Invoice) => inv.status.toLowerCase() === 'approved').length,
+          issued: invoiceList.filter((inv: Invoice) => inv.status.toLowerCase() === 'issued').length,
           draft: invoiceList.filter((inv: Invoice) => inv.status.toLowerCase() === 'draft').length,
           rejected: invoiceList.filter((inv: Invoice) => inv.status.toLowerCase() === 'rejected').length,
         })
@@ -168,7 +168,7 @@ export default function InvoicesPage() {
 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
-      case 'approved': return 'text-green-600 bg-green-100'
+      case 'issued': return 'text-green-600 bg-green-100'
       case 'draft': return 'text-yellow-600 bg-yellow-100'
       case 'cancelled': return 'text-red-600 bg-red-100'
       case 'rejected': return 'text-red-600 bg-red-100'
@@ -178,7 +178,7 @@ export default function InvoicesPage() {
 
   const getStatusIcon = (status: string) => {
     switch (status.toLowerCase()) {
-      case 'approved': return <CheckCircle className="h-4 w-4" />
+      case 'issued': return <CheckCircle className="h-4 w-4" />
       case 'cancelled': case 'rejected': return <XCircle className="h-4 w-4" />
       default: return <Clock className="h-4 w-4" />
     }
@@ -291,7 +291,7 @@ export default function InvoicesPage() {
             <div className="text-3xl font-bold text-blue-700">{stats.total}</div>
           </div>
           <div className="bg-gradient-to-br from-green-50 to-green-100 border border-green-200 rounded-lg p-6">
-            <div className="text-sm font-medium text-green-600 mb-2">Approved</div>
+            <div className="text-sm font-medium text-green-600 mb-2">Issued</div>
             <div className="text-3xl font-bold text-green-700">{stats.issued}</div>
           </div>
           <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 border border-yellow-200 rounded-lg p-6">
@@ -330,7 +330,7 @@ export default function InvoicesPage() {
               >
                 <option value="">All Status</option>
                 <option value="DRAFT">Draft</option>
-                <option value="APPROVED">Approved</option>
+                <option value="ISSUED">Issued</option>
                 <option value="CANCELLED">Cancelled</option>
                 <option value="REJECTED">Rejected</option>
               </select>

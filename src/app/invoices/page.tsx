@@ -469,13 +469,13 @@ export default function InvoicesPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <div className="flex items-center justify-end space-x-2">
-                          <Link
-                            href={`/invoices/${invoice.id}`}
+                          <button
+                            onClick={() => window.open(`/api/invoices/${invoice.id}/document?format=pdf`, '_blank')}
                             className="text-blue-600 hover:text-blue-900 p-1 rounded transition-colors"
-                            title="View document"
+                            title="View OpenFactura document"
                           >
                             <Eye className="h-4 w-4" />
-                          </Link>
+                          </button>
                           <button
                             onClick={() => window.open(`/api/invoices/${invoice.id}/pdf`, '_blank')}
                             className="text-green-600 hover:text-green-900 p-1 rounded transition-colors"

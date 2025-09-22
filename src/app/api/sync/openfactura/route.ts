@@ -265,10 +265,10 @@ function extractLineItemsFromDetails(details: any): any[] {
     // Line items are typically in Detalle array
     if (document.Detalle && Array.isArray(document.Detalle)) {
       return document.Detalle.map((item: any, index: number) => ({
-        lineNumber: index + 1,
-        productName: item.NmbItem || item.DscItem || `Item ${index + 1}`,
+        lineNumber: item.NroLinDet || (index + 1),
+        productName: item.DscItem || item.NmbItem || `Item ${index + 1}`,
         description: item.DscItem || item.NmbItem || '',
-        quantity: item.QtyItem || item.CdgItem?.VlrCodigo || 1,
+        quantity: item.QtyItem || 1,
         unitPrice: item.PrcItem || 0,
         totalPrice: item.MontoItem || (item.PrcItem * item.QtyItem) || 0,
         unitOfMeasure: item.UnmdItem || '',

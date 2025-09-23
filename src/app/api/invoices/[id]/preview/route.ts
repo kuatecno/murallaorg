@@ -47,7 +47,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     // Extract detailed data from rawResponse
     const rawData = invoice.rawResponse as any;
     const detailedData = rawData?.detailedData;
-    const fullDocument = detailedData?.fullDocument;
+    const fullDocument = detailedData?.fullDocument || rawData?.json;
 
     // Format the response for web preview
     const previewData = {
@@ -81,13 +81,13 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
       // Receiver information (enhanced with OpenFactura data)
       receiver: {
-        rut: invoice.receiverRUT,
-        name: invoice.receiverName,
+        rut: fullDocument?.Encabezado?.Receptor?.RUTRecep || invoice.receiverRUT,
+        name: fullDocument?.Encabezado?.Receptor?.RznSocRecep || invoice.receiverName,
         // Enhanced data from OpenFactura
-        businessLine: detailedData?.receiver?.businessLine || fullDocument?.Encabezado?.Receptor?.GiroRecep,
-        contact: detailedData?.receiver?.contact || fullDocument?.Encabezado?.Receptor?.Contacto,
-        address: detailedData?.receiver?.address || fullDocument?.Encabezado?.Receptor?.DirRecep,
-        commune: detailedData?.receiver?.commune || fullDocument?.Encabezado?.Receptor?.CmnaRecep
+        businessLine: fullDocument?.Encabezado?.Receptor?.GiroRecep || detailedData?.receiver?.businessLine,
+        contact: fullDocument?.Encabezado?.Receptor?.Contacto || fullDocument?.Encabezado?.Receptor?.CorreoRecep || detailedData?.receiver?.contact,
+        address: fullDocument?.Encabezado?.Receptor?.DirRecep || detailedData?.receiver?.address,
+        commune: fullDocument?.Encabezado?.Receptor?.CmnaRecep || detailedData?.receiver?.commune
       },
 
       // Financial totals
@@ -100,21 +100,43 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         additionalTaxes: detailedData?.totals?.additionalTaxes || fullDocument?.Encabezado?.Totales?.ImptoReten || []
       },
 
-      // Line items (from database - basic fields only)
-      items: invoice.items.map((item, index) => ({
-        id: item.id,
-        lineNumber: index + 1, // Generate line number from index
-        productName: item.productName,
-        description: item.productName, // Use productName as description since that's what we have
-        quantity: item.quantity,
-        unitPrice: Number(item.unitPrice),
-        totalPrice: Number(item.totalPrice),
-        unitOfMeasure: '', // Not available in current schema
-        productCode: '', // Not available in current schema
-        exemptAmount: 0, // Not available in current schema
-        discount: 0, // Not available in current schema
-        rawItem: null // Not available in current schema
-      })),
+      // Line items (extract from JSON if available, fallback to database)
+      items: (() => {
+        // Try to get line items from the stored JSON first
+        const jsonLineItems = fullDocument?.Detalle || rawData?.json?.Detalle;
+        if (jsonLineItems && Array.isArray(jsonLineItems)) {
+          return jsonLineItems.map((item: any, index: number) => ({
+            id: `line-${index}`,
+            lineNumber: item.NroLinDet || (index + 1),
+            productName: item.DscItem || item.NmbItem || `Item ${index + 1}`,
+            description: item.DscItem || item.NmbItem || '',
+            quantity: item.QtyItem || 1,
+            unitPrice: item.PrcItem || 0,
+            totalPrice: item.MontoItem || 0,
+            unitOfMeasure: item.UnmdItem || '',
+            productCode: item.CdgItem?.VlrCodigo || '',
+            exemptAmount: item.MontoExe || 0,
+            discount: item.DescuentoMonto || 0,
+            rawItem: item
+          }));
+        }
+
+        // Fallback to database items if no JSON line items
+        return invoice.items.map((item, index) => ({
+          id: item.id,
+          lineNumber: index + 1,
+          productName: item.productName,
+          description: item.productName,
+          quantity: item.quantity,
+          unitPrice: Number(item.unitPrice),
+          totalPrice: Number(item.totalPrice),
+          unitOfMeasure: '',
+          productCode: '',
+          exemptAmount: 0,
+          discount: 0,
+          rawItem: null
+        }));
+      })(),
 
       // OpenFactura reception info
       reception: {

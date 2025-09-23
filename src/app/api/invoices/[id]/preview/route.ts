@@ -47,7 +47,24 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     // Extract detailed data from rawResponse
     const rawData = invoice.rawResponse as any;
     const detailedData = rawData?.detailedData;
-    const fullDocument = detailedData?.fullDocument || rawData?.json;
+    let fullDocument = detailedData?.fullDocument || rawData?.json;
+
+    // If no stored JSON data, fetch it directly from OpenFactura API
+    if (!fullDocument && process.env.OPENFACTURA_API_KEY) {
+      try {
+        const detailUrl = `https://api.haulmer.com/v2/dte/document/${invoice.emitterRUT}/${invoice.documentCode}/${invoice.folio}/json`;
+        const response = await fetch(detailUrl, {
+          headers: { 'apikey': process.env.OPENFACTURA_API_KEY }
+        });
+
+        if (response.ok) {
+          const apiData = await response.json();
+          fullDocument = apiData.json;
+        }
+      } catch (error) {
+        console.warn('Failed to fetch document details from OpenFactura:', error);
+      }
+    }
 
     // Format the response for web preview
     const previewData = {

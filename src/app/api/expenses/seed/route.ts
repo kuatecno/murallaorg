@@ -28,9 +28,9 @@ const DEFAULT_STATUSES = [
 ];
 
 const DEFAULT_PAYMENT_ACCOUNTS = [
-  { name: 'Cuenta Corriente Principal', type: 'BANK_ACCOUNT', bank: 'Banco Estado', currency: 'CLP' },
-  { name: 'Tarjeta Crédito Empresa', type: 'CREDIT_CARD', bank: 'Banco de Chile', currency: 'CLP' },
-  { name: 'Caja Chica', type: 'CASH', currency: 'CLP' }
+  { name: 'Cuenta Corriente Principal', type: 'BANK_ACCOUNT' as const, bank: 'Banco Estado', currency: 'CLP' },
+  { name: 'Tarjeta Crédito Empresa', type: 'CREDIT_CARD' as const, bank: 'Banco de Chile', currency: 'CLP' },
+  { name: 'Caja Chica', type: 'CASH' as const, currency: 'CLP' }
 ];
 
 /**

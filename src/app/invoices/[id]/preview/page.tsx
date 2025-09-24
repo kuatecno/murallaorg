@@ -244,38 +244,38 @@ export default function DocumentPreviewPage() {
               </div>
               <div className="space-y-3">
                 <div>
-                  <p className="text-sm text-gray-600">Company</p>
-                  <p className="font-medium">{preview.emitter.name}</p>
+                  <p className="text-sm font-medium text-gray-700">Company</p>
+                  <p className="font-semibold text-gray-900">{preview.emitter.name}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600">RUT</p>
-                  <p className="font-medium">{preview.emitter.rut}</p>
+                  <p className="text-sm font-medium text-gray-700">RUT</p>
+                  <p className="font-semibold text-gray-900">{preview.emitter.rut}</p>
                 </div>
                 {preview.emitter.businessLine && (
                   <div>
-                    <p className="text-sm text-gray-600">Business Line</p>
-                    <p className="font-medium">{preview.emitter.businessLine}</p>
+                    <p className="text-sm font-medium text-gray-700">Business Line</p>
+                    <p className="font-semibold text-gray-900">{preview.emitter.businessLine}</p>
                   </div>
                 )}
                 {preview.emitter.address && (
                   <div>
-                    <p className="text-sm text-gray-600">Address</p>
-                    <p className="font-medium">{preview.emitter.address}</p>
+                    <p className="text-sm font-medium text-gray-700">Address</p>
+                    <p className="font-semibold text-gray-900">{preview.emitter.address}</p>
                     {preview.emitter.commune && (
-                      <p className="text-sm text-gray-500">{preview.emitter.commune}</p>
+                      <p className="text-sm font-medium text-gray-700">{preview.emitter.commune}</p>
                     )}
                   </div>
                 )}
                 {preview.emitter.email && (
                   <div>
-                    <p className="text-sm text-gray-600">Email</p>
-                    <p className="font-medium">{preview.emitter.email}</p>
+                    <p className="text-sm font-medium text-gray-700">Email</p>
+                    <p className="font-semibold text-gray-900">{preview.emitter.email}</p>
                   </div>
                 )}
                 {preview.emitter.phone && (
                   <div>
-                    <p className="text-sm text-gray-600">Phone</p>
-                    <p className="font-medium">{preview.emitter.phone}</p>
+                    <p className="text-sm font-medium text-gray-700">Phone</p>
+                    <p className="font-semibold text-gray-900">{preview.emitter.phone}</p>
                   </div>
                 )}
               </div>
@@ -291,32 +291,32 @@ export default function DocumentPreviewPage() {
               </div>
               <div className="space-y-3">
                 <div>
-                  <p className="text-sm text-gray-600">Company</p>
-                  <p className="font-medium">{preview.receiver.name}</p>
+                  <p className="text-sm font-medium text-gray-700">Company</p>
+                  <p className="font-semibold text-gray-900">{preview.receiver.name}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600">RUT</p>
-                  <p className="font-medium">{preview.receiver.rut}</p>
+                  <p className="text-sm font-medium text-gray-700">RUT</p>
+                  <p className="font-semibold text-gray-900">{preview.receiver.rut}</p>
                 </div>
                 {preview.receiver.businessLine && (
                   <div>
-                    <p className="text-sm text-gray-600">Business Line</p>
-                    <p className="font-medium">{preview.receiver.businessLine}</p>
+                    <p className="text-sm font-medium text-gray-700">Business Line</p>
+                    <p className="font-semibold text-gray-900">{preview.receiver.businessLine}</p>
                   </div>
                 )}
                 {preview.receiver.address && (
                   <div>
-                    <p className="text-sm text-gray-600">Address</p>
-                    <p className="font-medium">{preview.receiver.address}</p>
+                    <p className="text-sm font-medium text-gray-700">Address</p>
+                    <p className="font-semibold text-gray-900">{preview.receiver.address}</p>
                     {preview.receiver.commune && (
-                      <p className="text-sm text-gray-500">{preview.receiver.commune}</p>
+                      <p className="text-sm font-medium text-gray-700">{preview.receiver.commune}</p>
                     )}
                   </div>
                 )}
                 {preview.receiver.contact && (
                   <div>
-                    <p className="text-sm text-gray-600">Contact</p>
-                    <p className="font-medium">{preview.receiver.contact}</p>
+                    <p className="text-sm font-medium text-gray-700">Contact</p>
+                    <p className="font-semibold text-gray-900">{preview.receiver.contact}</p>
                   </div>
                 )}
               </div>
@@ -388,25 +388,25 @@ export default function DocumentPreviewPage() {
         <div className="bg-white rounded-lg shadow-sm border border-gray-200">
           <div className="p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Financial Summary</h3>
-            <div className="space-y-3">
+            <div className="space-y-4">
               <div className="flex justify-between">
-                <span className="text-gray-600">Net Amount:</span>
-                <span className="font-medium">{formatCurrency(preview.totals.netAmount)}</span>
+                <span className="text-base font-medium text-gray-700">Net Amount:</span>
+                <span className="font-semibold text-gray-900">{formatCurrency(preview.totals.netAmount)}</span>
               </div>
               {preview.totals.exemptAmount > 0 && (
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Exempt Amount:</span>
-                  <span className="font-medium">{formatCurrency(preview.totals.exemptAmount)}</span>
+                  <span className="text-base font-medium text-gray-700">Exempt Amount:</span>
+                  <span className="font-semibold text-gray-900">{formatCurrency(preview.totals.exemptAmount)}</span>
                 </div>
               )}
               <div className="flex justify-between">
-                <span className="text-gray-600">Tax (IVA):</span>
-                <span className="font-medium">{formatCurrency(preview.totals.taxAmount)}</span>
+                <span className="text-base font-medium text-gray-700">Tax (IVA):</span>
+                <span className="font-semibold text-gray-900">{formatCurrency(preview.totals.taxAmount)}</span>
               </div>
-              <div className="border-t border-gray-200 pt-3">
+              <div className="border-t-2 border-gray-300 pt-4">
                 <div className="flex justify-between">
-                  <span className="text-lg font-semibold text-gray-900">Total Amount:</span>
-                  <span className="text-lg font-bold text-green-600">
+                  <span className="text-xl font-bold text-gray-900">Total Amount:</span>
+                  <span className="text-xl font-bold text-green-600">
                     {formatCurrency(preview.totals.totalAmount)}
                   </span>
                 </div>

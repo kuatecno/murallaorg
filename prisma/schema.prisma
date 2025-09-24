@@ -25,6 +25,7 @@ model Staff {
   department    String?
   position      String?
   phone         String?
+  rut           String?   // Chilean RUT for tax purposes
   isActive      Boolean   @default(true)
   hireDate      DateTime?
   metadata      Json      @default("{}")
@@ -43,6 +44,10 @@ model Staff {
   customerRelations   StaffCustomer[]
   transactions        Transaction[]       @relation("TransactionCreatedBy")
   auditLogs           AuditLog[]
+
+  // Expense Management Relations
+  expenses            Expense[]
+  reimbursements      EmployeeReimbursement[]
   
   @@index([tenantId])
   @@map("staff")
@@ -413,6 +418,7 @@ model TaxDocument {
   tenant           Tenant            @relation(fields: [tenantId], references: [id])
   transaction      Transaction?      @relation(fields: [transactionId], references: [id])
   items            TaxDocumentItem[]
+  expenses         Expense[]         // Auto-generated expenses from this invoice
   
   @@index([tenantId, status])
   @@map("tax_documents")
@@ -429,6 +435,152 @@ model TaxDocumentItem {
   taxDocument   TaxDocument   @relation(fields: [taxDocumentId], references: [id], onDelete: Cascade)
   
   @@map("tax_document_items")
+}
+
+// ==========================================
+// EXPENSE MANAGEMENT
+// ==========================================
+
+// Company payment accounts (bank accounts, credit cards, cash)
+model PaymentAccount {
+  id            String    @id @default(cuid())
+  name          String    // "Cuenta Corriente Banco Estado", "Tarjeta Crédito VISA", "Caja Chica"
+  type          AccountType
+  accountNumber String?   // Bank account number, card last 4 digits, etc.
+  bank          String?   // Bank name
+  currency      String    @default("CLP")
+  balance       Decimal?  @db.Decimal(12, 2) // Optional current balance tracking
+  isActive      Boolean   @default(true)
+
+  tenantId      String
+  tenant        Tenant    @relation(fields: [tenantId], references: [id])
+
+  // Relations
+  expenses      Expense[]
+  reimbursements EmployeeReimbursement[]
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@map("payment_accounts")
+}
+
+// Employee reimbursement tracking
+model EmployeeReimbursement {
+  id              String                    @id @default(cuid())
+  staffId         String
+  description     String                    // "Reembolso gastos Septiembre 2025"
+  totalAmount     Decimal                   @db.Decimal(12, 2)
+  currency        String                    @default("CLP")
+  status          ReimbursementStatus       @default(PENDING)
+
+  // Payment details when reimbursed
+  paidDate        DateTime?
+  paidAmount      Decimal?                  @db.Decimal(12, 2)
+  paymentAccountId String?                   // Which account was used to pay
+  paymentReference String?                   // Transfer reference, check number, etc.
+  notes           String?
+
+  tenantId        String
+
+  // Relations
+  staff           Staff                     @relation(fields: [staffId], references: [id])
+  tenant          Tenant                    @relation(fields: [tenantId], references: [id])
+  paymentAccount  PaymentAccount?           @relation(fields: [paymentAccountId], references: [id])
+  expenses        Expense[]                 // Expenses included in this reimbursement
+
+  createdAt       DateTime                  @default(now())
+  updatedAt       DateTime                  @updatedAt
+
+  @@map("employee_reimbursements")
+}
+
+// Enhanced expense categories
+model ExpenseCategory {
+  id          String   @id @default(cuid())
+  name        String
+  emoji       String?
+  description String?
+  color       String   @default("#64748B")
+  isActive    Boolean  @default(true)
+
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+
+  expenses    Expense[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("expense_categories")
+}
+
+// Expense status tracking
+model ExpenseStatus {
+  id        String   @id @default(cuid())
+  name      String
+  color     String   @default("#64748B")
+  isDefault Boolean  @default(false)
+
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+
+  expenses  Expense[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("expense_statuses")
+}
+
+// Main expenses table with comprehensive payment tracking
+model Expense {
+  id                    String           @id @default(cuid())
+  date                  DateTime
+  supplier              String
+  description           String
+  amount                Decimal          @db.Decimal(12, 2)
+  currency              String           @default("CLP")
+
+  // Document information
+  documentType          String           // FACTURA, BOLETA, RECIBO, OTRO
+  documentNumber        String?
+  thirdPartyDocType     String?          // Type from supplier
+  thirdPartyDocNumber   String?
+  notes                 String?
+
+  // PAYMENT TRACKING - This is the key enhancement
+  paymentType           ExpensePaymentType
+  paymentAccountId      String?          // Which company account paid (if company paid)
+  staffId               String?          // Which employee paid (if employee paid)
+  reimbursementId       String?          // Link to reimbursement if applicable
+
+  // Company expense classification
+  isCompanyExpense      Boolean          @default(true)  // Can be set to false for personal items
+  excludeFromReports    Boolean          @default(false) // Exclude from company reports
+
+  // Auto-generation from invoices
+  isFromInvoice         Boolean          @default(false)
+  taxDocumentId         String?          // Link to TaxDocument if auto-generated
+
+  // Categorization
+  categoryId            String
+  statusId              String
+  tenantId              String
+
+  // Relations
+  category              ExpenseCategory       @relation(fields: [categoryId], references: [id])
+  status                ExpenseStatus         @relation(fields: [statusId], references: [id])
+  tenant                Tenant               @relation(fields: [tenantId], references: [id])
+  taxDocument           TaxDocument?         @relation(fields: [taxDocumentId], references: [id])
+  paymentAccount        PaymentAccount?      @relation(fields: [paymentAccountId], references: [id])
+  staff                 Staff?               @relation(fields: [staffId], references: [id])
+  reimbursement         EmployeeReimbursement? @relation(fields: [reimbursementId], references: [id])
+
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+
+  @@map("expenses")
 }
 
 // ==========================================
@@ -460,6 +612,13 @@ model Tenant {
   movements       ProductMovement[]
   purchaseOrders  PurchaseOrder[]
   inventory       InventoryRecord[]
+
+  // Expense Management Relations
+  paymentAccounts PaymentAccount[]
+  expenses        Expense[]
+  expenseCategories ExpenseCategory[]
+  expenseStatuses ExpenseStatus[]
+  employeeReimbursements EmployeeReimbursement[]
   
   @@map("tenants")
 }
@@ -561,4 +720,29 @@ enum TaxDocumentStatus {
   ISSUED
   CANCELLED
   REJECTED
+}
+
+enum AccountType {
+  BANK_ACCOUNT      // Cuenta corriente/ahorro
+  CREDIT_CARD       // Tarjeta de crédito
+  DEBIT_CARD        // Tarjeta débito
+  CASH              // Efectivo/caja chica
+  DIGITAL_WALLET    // Mercado Pago, PayPal, etc.
+  OTHER
+}
+
+enum ReimbursementStatus {
+  PENDING       // Pending approval/payment
+  APPROVED      // Approved but not paid
+  PAID          // Fully paid
+  PARTIALLY_PAID // Partially paid
+  REJECTED      // Rejected
+  CANCELLED     // Cancelled
+}
+
+enum ExpensePaymentType {
+  COMPANY_ACCOUNT   // Paid directly by company account
+  EMPLOYEE_PAID     // Employee paid, needs reimbursement
+  PERSONAL          // Personal expense, no reimbursement needed
+  MIXED            // Split between company and personal
 }

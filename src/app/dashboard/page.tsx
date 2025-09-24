@@ -81,6 +81,10 @@ export default function DashboardPage() {
                   <h4 className="text-lg font-semibold text-indigo-900">Invoices</h4>
                   <p className="text-indigo-700 mt-2">Create and manage tax documents</p>
                 </Link>
+                <Link href="/expenses" className="bg-orange-50 p-6 rounded-lg hover:bg-orange-100 transition-colors cursor-pointer">
+                  <h4 className="text-lg font-semibold text-orange-900">Expenses</h4>
+                  <p className="text-orange-700 mt-2">Track expenses and employee reimbursements</p>
+                </Link>
                 <div className="bg-blue-50 p-6 rounded-lg">
                   <h4 className="text-lg font-semibold text-blue-900">Products</h4>
                   <p className="text-blue-700 mt-2">Manage your inventory</p>

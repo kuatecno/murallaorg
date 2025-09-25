@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
       firstTenant = await prisma.tenant.create({
         data: {
           name: 'Default Tenant',
-          subdomain: 'default',
+          slug: 'default',
           isActive: true
         }
       });
@@ -145,7 +145,7 @@ export async function POST(request: NextRequest) {
       firstTenant = await prisma.tenant.create({
         data: {
           name: 'Default Tenant',
-          subdomain: 'default',
+          slug: 'default',
           isActive: true
         }
       });

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Filter, Download, DollarSign, Users, Clock, CheckCircle } from 'lucide-react';
+import { Plus, Filter, Download, DollarSign, Users, Clock, CheckCircle, X } from 'lucide-react';
 
 interface Expense {
   id: string;
@@ -54,6 +54,50 @@ interface ExpenseSummary {
   pendingReimbursements: number;
 }
 
+interface ExpenseFormData {
+  date: string;
+  supplier: string;
+  description: string;
+  amount: string;
+  currency: string;
+  documentType: string;
+  documentNumber: string;
+  notes: string;
+  paymentType: string;
+  paymentAccountId: string;
+  staffId: string;
+  categoryId: string;
+  statusId: string;
+  isCompanyExpense: boolean;
+}
+
+interface Category {
+  id: string;
+  name: string;
+  emoji: string;
+  color: string;
+}
+
+interface Status {
+  id: string;
+  name: string;
+  color: string;
+}
+
+interface PaymentAccount {
+  id: string;
+  name: string;
+  type: string;
+  bank?: string;
+}
+
+interface Staff {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+}
+
 export default function ExpensesPage() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [summary, setSummary] = useState<ExpenseSummary | null>(null);
@@ -65,10 +109,40 @@ export default function ExpensesPage() {
     isCompanyExpense: ''
   });
 
+  // Modal and form state
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [statuses, setStatuses] = useState<Status[]>([]);
+  const [paymentAccounts, setPaymentAccounts] = useState<PaymentAccount[]>([]);
+  const [staff, setStaff] = useState<Staff[]>([]);
+  const [formData, setFormData] = useState<ExpenseFormData>({
+    date: new Date().toISOString().split('T')[0],
+    supplier: '',
+    description: '',
+    amount: '',
+    currency: 'CLP',
+    documentType: 'OTRO',
+    documentNumber: '',
+    notes: '',
+    paymentType: 'COMPANY_ACCOUNT',
+    paymentAccountId: '',
+    staffId: '',
+    categoryId: '',
+    statusId: '',
+    isCompanyExpense: true
+  });
+
   useEffect(() => {
     fetchExpenses();
     fetchSummary();
   }, [filters]);
+
+  useEffect(() => {
+    if (isModalOpen) {
+      fetchFormData();
+    }
+  }, [isModalOpen]);
 
   const fetchExpenses = async () => {
     try {
@@ -102,6 +176,139 @@ export default function ExpensesPage() {
       companyExpenses: companyExpenses.length,
       employeePaidExpenses: employeePaidExpenses.length,
       pendingReimbursements: pendingReimbursements.length
+    });
+  };
+
+  const fetchFormData = async () => {
+    try {
+      // Fetch categories
+      const categoriesResponse = await fetch('/api/expenses/categories');
+      if (categoriesResponse.ok) {
+        const categoriesData = await categoriesResponse.json();
+        if (categoriesData.success) {
+          setCategories(categoriesData.data);
+          if (categoriesData.data.length > 0 && !formData.categoryId) {
+            setFormData(prev => ({ ...prev, categoryId: categoriesData.data[0].id }));
+          }
+        }
+      }
+
+      // Fetch statuses
+      const statusesResponse = await fetch('/api/expenses/statuses');
+      if (statusesResponse.ok) {
+        const statusesData = await statusesResponse.json();
+        if (statusesData.success) {
+          setStatuses(statusesData.data);
+          const defaultStatus = statusesData.data.find((s: Status) => s.name === 'Pending Review');
+          if (defaultStatus && !formData.statusId) {
+            setFormData(prev => ({ ...prev, statusId: defaultStatus.id }));
+          } else if (statusesData.data.length > 0 && !formData.statusId) {
+            setFormData(prev => ({ ...prev, statusId: statusesData.data[0].id }));
+          }
+        }
+      }
+
+      // Fetch payment accounts
+      const accountsResponse = await fetch('/api/payment-accounts');
+      if (accountsResponse.ok) {
+        const accountsData = await accountsResponse.json();
+        if (accountsData.success) {
+          setPaymentAccounts(accountsData.data);
+          if (accountsData.data.length > 0 && !formData.paymentAccountId) {
+            setFormData(prev => ({ ...prev, paymentAccountId: accountsData.data[0].id }));
+          }
+        }
+      }
+
+      // Fetch staff
+      const staffResponse = await fetch('/api/staff');
+      if (staffResponse.ok) {
+        const staffData = await staffResponse.json();
+        if (staffData.success) {
+          setStaff(staffData.data);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching form data:', error);
+    }
+  };
+
+  const handleFormSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+
+    try {
+      const response = await fetch('/api/expenses', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...formData,
+          amount: parseFloat(formData.amount)
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Reset form and close modal
+        setFormData({
+          date: new Date().toISOString().split('T')[0],
+          supplier: '',
+          description: '',
+          amount: '',
+          currency: 'CLP',
+          documentType: 'OTRO',
+          documentNumber: '',
+          notes: '',
+          paymentType: 'COMPANY_ACCOUNT',
+          paymentAccountId: formData.paymentAccountId,
+          staffId: '',
+          categoryId: formData.categoryId,
+          statusId: formData.statusId,
+          isCompanyExpense: true
+        });
+        setIsModalOpen(false);
+
+        // Refresh expenses list
+        fetchExpenses();
+      } else {
+        alert('Error creating expense: ' + data.error);
+      }
+    } catch (error) {
+      console.error('Error creating expense:', error);
+      alert('Error creating expense');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleInputChange = (field: keyof ExpenseFormData, value: any) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const openModal = () => {
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setFormData({
+      date: new Date().toISOString().split('T')[0],
+      supplier: '',
+      description: '',
+      amount: '',
+      currency: 'CLP',
+      documentType: 'OTRO',
+      documentNumber: '',
+      notes: '',
+      paymentType: 'COMPANY_ACCOUNT',
+      paymentAccountId: paymentAccounts.length > 0 ? paymentAccounts[0].id : '',
+      staffId: '',
+      categoryId: categories.length > 0 ? categories[0].id : '',
+      statusId: statuses.length > 0 ? statuses[0].id : '',
+      isCompanyExpense: true
     });
   };
 
@@ -162,7 +369,10 @@ export default function ExpensesPage() {
                 <Download className="w-4 h-4 mr-2" />
                 Export
               </button>
-              <button className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700">
+              <button
+                onClick={openModal}
+                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
+              >
                 <Plus className="w-4 h-4 mr-2" />
                 Add Expense
               </button>
@@ -258,7 +468,10 @@ export default function ExpensesPage() {
                 Get started by creating a new expense or importing from invoices.
               </p>
               <div className="mt-6">
-                <button className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
+                <button
+                  onClick={openModal}
+                  className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
+                >
                   <Plus className="w-4 h-4 mr-2" />
                   Add your first expense
                 </button>
@@ -334,6 +547,289 @@ export default function ExpensesPage() {
             </ul>
           )}
         </div>
+
+        {/* Add Expense Modal */}
+        {isModalOpen && (
+          <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+            <div className="relative top-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
+              <div className="mt-3">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-gray-900">Add New Expense</h3>
+                  <button
+                    onClick={closeModal}
+                    className="text-gray-400 hover:text-gray-600 focus:outline-none"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <form onSubmit={handleFormSubmit} className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Date */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Date <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="date"
+                        value={formData.date}
+                        onChange={(e) => handleInputChange('date', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        required
+                      />
+                    </div>
+
+                    {/* Amount */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Amount <span className="text-red-500">*</span>
+                      </label>
+                      <div className="flex">
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={formData.amount}
+                          onChange={(e) => handleInputChange('amount', e.target.value)}
+                          className="flex-1 px-3 py-2 border border-gray-300 rounded-l-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          placeholder="0.00"
+                          required
+                        />
+                        <select
+                          value={formData.currency}
+                          onChange={(e) => handleInputChange('currency', e.target.value)}
+                          className="px-3 py-2 border border-l-0 border-gray-300 rounded-r-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50"
+                        >
+                          <option value="CLP">CLP</option>
+                          <option value="USD">USD</option>
+                          <option value="EUR">EUR</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Supplier */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Supplier <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.supplier}
+                      onChange={(e) => handleInputChange('supplier', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Enter supplier name"
+                      required
+                    />
+                  </div>
+
+                  {/* Description */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Description <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.description}
+                      onChange={(e) => handleInputChange('description', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Describe the expense"
+                      required
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Category */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Category <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        value={formData.categoryId}
+                        onChange={(e) => handleInputChange('categoryId', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        required
+                      >
+                        <option value="">Select a category</option>
+                        {categories.map((category) => (
+                          <option key={category.id} value={category.id}>
+                            {category.emoji} {category.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Status */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Status <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        value={formData.statusId}
+                        onChange={(e) => handleInputChange('statusId', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        required
+                      >
+                        <option value="">Select a status</option>
+                        {statuses.map((status) => (
+                          <option key={status.id} value={status.id}>
+                            {status.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Payment Type */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Payment Type <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={formData.paymentType}
+                      onChange={(e) => {
+                        handleInputChange('paymentType', e.target.value);
+                        // Clear staff selection when switching away from EMPLOYEE_PAID
+                        if (e.target.value !== 'EMPLOYEE_PAID') {
+                          handleInputChange('staffId', '');
+                        }
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      required
+                    >
+                      <option value="COMPANY_ACCOUNT">Company Account</option>
+                      <option value="EMPLOYEE_PAID">Employee Paid</option>
+                      <option value="PERSONAL">Personal</option>
+                      <option value="MIXED">Mixed</option>
+                    </select>
+                  </div>
+
+                  {/* Payment Account (only if COMPANY_ACCOUNT) */}
+                  {formData.paymentType === 'COMPANY_ACCOUNT' && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Payment Account <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        value={formData.paymentAccountId}
+                        onChange={(e) => handleInputChange('paymentAccountId', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        required
+                      >
+                        <option value="">Select a payment account</option>
+                        {paymentAccounts.map((account) => (
+                          <option key={account.id} value={account.id}>
+                            {account.name} ({account.type}){account.bank && ` - ${account.bank}`}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {/* Staff (only if EMPLOYEE_PAID) */}
+                  {formData.paymentType === 'EMPLOYEE_PAID' && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Staff Member <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        value={formData.staffId}
+                        onChange={(e) => handleInputChange('staffId', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        required
+                      >
+                        <option value="">Select a staff member</option>
+                        {staff.map((member) => (
+                          <option key={member.id} value={member.id}>
+                            {member.firstName} {member.lastName} ({member.email})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Document Type */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Document Type
+                      </label>
+                      <select
+                        value={formData.documentType}
+                        onChange={(e) => handleInputChange('documentType', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="FACTURA">Factura</option>
+                        <option value="BOLETA">Boleta</option>
+                        <option value="NOTA_CREDITO">Nota de Crédito</option>
+                        <option value="NOTA_DEBITO">Nota de Débito</option>
+                        <option value="OTRO">Otro</option>
+                      </select>
+                    </div>
+
+                    {/* Document Number */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Document Number
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.documentNumber}
+                        onChange={(e) => handleInputChange('documentNumber', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Enter document number"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Company Expense Toggle */}
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="isCompanyExpense"
+                      checked={formData.isCompanyExpense}
+                      onChange={(e) => handleInputChange('isCompanyExpense', e.target.checked)}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    />
+                    <label htmlFor="isCompanyExpense" className="ml-2 block text-sm text-gray-900">
+                      This is a company expense
+                    </label>
+                  </div>
+
+                  {/* Notes */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Notes
+                    </label>
+                    <textarea
+                      value={formData.notes}
+                      onChange={(e) => handleInputChange('notes', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      rows={3}
+                      placeholder="Additional notes (optional)"
+                    />
+                  </div>
+
+                  <div className="flex justify-end space-x-3 pt-6">
+                    <button
+                      type="button"
+                      onClick={closeModal}
+                      className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isSubmitting}
+                      className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-blue-300"
+                    >
+                      {isSubmitting ? 'Creating...' : 'Create Expense'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

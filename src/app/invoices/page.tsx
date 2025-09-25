@@ -147,14 +147,19 @@ export default function InvoicesPage() {
           setPagination(data.pagination)
         }
 
-        // Calculate stats from the current data (these are page-specific stats)
-        const invoiceList = data.data || []
-        setStats({
-          total: data.pagination?.totalCount || invoiceList.length,
-          issued: invoiceList.filter((inv: Invoice) => inv.status.toLowerCase() === 'issued').length,
-          draft: invoiceList.filter((inv: Invoice) => inv.status.toLowerCase() === 'draft').length,
-          rejected: invoiceList.filter((inv: Invoice) => inv.status.toLowerCase() === 'rejected').length,
-        })
+        // Use stats from API response (these are global stats for all documents)
+        if (data.stats) {
+          setStats(data.stats)
+        } else {
+          // Fallback to calculating from current page data if stats not available
+          const invoiceList = data.data || []
+          setStats({
+            total: data.pagination?.totalCount || invoiceList.length,
+            issued: invoiceList.filter((inv: Invoice) => inv.status.toLowerCase() === 'issued').length,
+            draft: invoiceList.filter((inv: Invoice) => inv.status.toLowerCase() === 'draft').length,
+            rejected: invoiceList.filter((inv: Invoice) => inv.status.toLowerCase() === 'rejected').length,
+          })
+        }
       } else {
         throw new Error('Failed to fetch invoices')
       }

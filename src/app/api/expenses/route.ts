@@ -22,13 +22,17 @@ export async function GET(request: NextRequest) {
     const skip = (page - 1) * limit;
 
     // TODO: Get tenantId from authentication context
-    // For now, using the first available tenant
-    const firstTenant = await prisma.tenant.findFirst();
+    // For now, using the first available tenant or create a default one
+    let firstTenant = await prisma.tenant.findFirst();
     if (!firstTenant) {
-      return NextResponse.json(
-        { error: 'No tenant found' },
-        { status: 404 }
-      );
+      // Create a default tenant if none exists
+      firstTenant = await prisma.tenant.create({
+        data: {
+          name: 'Default Tenant',
+          subdomain: 'default',
+          isActive: true
+        }
+      });
     }
     const tenantId = firstTenant.id;
 
@@ -134,13 +138,17 @@ export async function POST(request: NextRequest) {
     } = body;
 
     // TODO: Get tenantId from authentication context
-    // For now, using the first available tenant
-    const firstTenant = await prisma.tenant.findFirst();
+    // For now, using the first available tenant or create a default one
+    let firstTenant = await prisma.tenant.findFirst();
     if (!firstTenant) {
-      return NextResponse.json(
-        { error: 'No tenant found' },
-        { status: 404 }
-      );
+      // Create a default tenant if none exists
+      firstTenant = await prisma.tenant.create({
+        data: {
+          name: 'Default Tenant',
+          subdomain: 'default',
+          isActive: true
+        }
+      });
     }
     const tenantId = firstTenant.id;
 

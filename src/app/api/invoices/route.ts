@@ -127,7 +127,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Execute queries
-    const [invoices, totalCount] = await Promise.all([
+    const [invoices, totalCount, statusCounts] = await Promise.all([
       prisma.taxDocument.findMany({
         where,
         orderBy,
@@ -151,6 +151,12 @@ export async function GET(request: NextRequest) {
         },
       }),
       prisma.taxDocument.count({ where }),
+      // Get status counts for all documents (not just current page)
+      prisma.taxDocument.groupBy({
+        by: ['status'],
+        where: { tenantId }, // Use base tenant filter only, ignore other filters for global stats
+        _count: true,
+      })
     ]);
 
     // Transform data for response
@@ -184,6 +190,15 @@ export async function GET(request: NextRequest) {
       })),
     }));
 
+    // Process status counts
+    const stats = {
+      total: statusCounts.reduce((sum, group) => sum + group._count, 0),
+      issued: statusCounts.find(group => group.status === 'ISSUED')?._count || 0,
+      draft: statusCounts.find(group => group.status === 'DRAFT')?._count || 0,
+      rejected: statusCounts.find(group => group.status === 'REJECTED')?._count || 0,
+      cancelled: statusCounts.find(group => group.status === 'CANCELLED')?._count || 0,
+    };
+
     const totalPages = Math.ceil(totalCount / params.limit!);
     const hasNextPage = params.page! < totalPages;
     const hasPrevPage = params.page! > 1;
@@ -198,6 +213,7 @@ export async function GET(request: NextRequest) {
         hasNextPage,
         hasPrevPage,
       },
+      stats,
       filters: {
         search: params.search,
         status: params.status,

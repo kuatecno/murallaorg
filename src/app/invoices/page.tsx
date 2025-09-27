@@ -15,10 +15,20 @@ interface Invoice {
   createdAt: string
 }
 
+interface Tenant {
+  id: string
+  name: string
+  rut: string
+  slug: string
+}
+
 export default function InvoicesPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [tenants, setTenants] = useState<Tenant[]>([])
+  const [selectedTenant, setSelectedTenant] = useState<string>('')
+  const [loadingTenants, setLoadingTenants] = useState(true)
   const [syncing, setSyncing] = useState(false)
   const [showSyncConfig, setShowSyncConfig] = useState(false)
   const [syncConfig, setSyncConfig] = useState({
@@ -51,9 +61,36 @@ export default function InvoicesPage() {
   const [syncStatus, setSyncStatus] = useState<any>(null)
 
   useEffect(() => {
+    fetchTenants()
     fetchInvoices(false, 1)
     fetchSyncStatus()
   }, [])
+
+  useEffect(() => {
+    if (selectedTenant) {
+      fetchInvoices(false, 1)
+    }
+  }, [selectedTenant])
+
+  const fetchTenants = async () => {
+    try {
+      setLoadingTenants(true)
+      const response = await fetch('/api/tenants')
+      if (response.ok) {
+        const data = await response.json()
+        setTenants(data.tenants || [])
+
+        // Auto-select first tenant if none selected
+        if (data.tenants && data.tenants.length > 0 && !selectedTenant) {
+          setSelectedTenant(data.tenants[0].id)
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching tenants:', err)
+    } finally {
+      setLoadingTenants(false)
+    }
+  }
 
   const fetchSyncStatus = async () => {
     try {
@@ -76,6 +113,11 @@ export default function InvoicesPage() {
 
       // Build query parameters or request body
       const syncParams: any = {}
+
+      // Add tenant ID if selected
+      if (selectedTenant) {
+        syncParams.tenantId = selectedTenant
+      }
 
       if (config.months > 0) {
         syncParams.months = config.months
@@ -126,6 +168,11 @@ export default function InvoicesPage() {
       // Add pagination params
       params.append('page', page.toString())
       params.append('limit', pagination.limit.toString())
+
+      // Add tenant filter
+      if (selectedTenant) {
+        params.append('tenantId', selectedTenant)
+      }
 
       if (useFilters) {
         if (filters.type) params.append('type', filters.type)
@@ -311,7 +358,23 @@ export default function InvoicesPage() {
 
         {/* Filters */}
         <div className="bg-white rounded-lg shadow p-6 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-7 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Company</label>
+              <select
+                value={selectedTenant}
+                onChange={e => setSelectedTenant(e.target.value)}
+                disabled={loadingTenants}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">All Companies</option>
+                {tenants.map(tenant => (
+                  <option key={tenant.id} value={tenant.id}>
+                    {tenant.name} ({tenant.rut})
+                  </option>
+                ))}
+              </select>
+            </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
               <select

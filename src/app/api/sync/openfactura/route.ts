@@ -11,7 +11,6 @@ import { Decimal } from '@prisma/client/runtime/library';
 const OPENFACTURA_API_URL = 'https://api.haulmer.com/v2/dte/document/received';
 const OPENFACTURA_DETAIL_URL = 'https://api.haulmer.com/v2/dte/document';
 const OPENFACTURA_API_KEY = process.env.OPENFACTURA_API_KEY;
-const COMPANY_RUT = '78188363';
 
 interface OpenFacturaDocument {
   // Basic document info
@@ -427,18 +426,38 @@ export async function POST(request: NextRequest) {
       finalFromDate = new Date(now.getTime() - defaultDays * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     }
 
-    // Get tenant (for now use first active tenant)
-    const tenant = await prisma.tenant.findFirst({
-      where: { isActive: true },
-      select: { id: true, name: true, rut: true }
-    });
+    // Get tenant from request or use first active tenant with RUT configured
+    let tenantId = url.searchParams.get('tenantId') || requestBody.tenantId;
+    let tenant;
 
-    if (!tenant) {
+    if (tenantId) {
+      tenant = await prisma.tenant.findUnique({
+        where: { id: tenantId, isActive: true },
+        select: { id: true, name: true, rut: true }
+      });
+    } else {
+      // Find first active tenant that has a RUT configured for OpenFactura
+      tenant = await prisma.tenant.findFirst({
+        where: {
+          isActive: true,
+          rut: { not: null }
+        },
+        select: { id: true, name: true, rut: true }
+      });
+    }
+
+    if (!tenant || !tenant.rut) {
       return NextResponse.json(
-        { error: 'No active tenant found' },
+        {
+          error: 'No configured tenant found',
+          details: 'No active tenant with RUT found for OpenFactura integration'
+        },
         { status: 404 }
       );
     }
+
+    // Convert RUT to format expected by OpenFactura (remove dots and dash)
+    const companyRut = tenant.rut.replace(/[.-]/g, '');
 
     // Calculate total date range and chunking strategy
     const totalDays = Math.ceil((new Date(finalToDate).getTime() - new Date(finalFromDate).getTime()) / (24 * 60 * 60 * 1000));

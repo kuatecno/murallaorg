@@ -4,10 +4,10 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import prisma from '@/lib/prisma';
 
 const OPENFACTURA_API_URL = 'https://api.haulmer.com/v2/dte/document/received';
 const OPENFACTURA_API_KEY = process.env.OPENFACTURA_API_KEY;
-const COMPANY_RUT = '78188363'; // Your company RUT without dots and dash
 
 interface FilterOperator {
   eq?: string | number;
@@ -74,6 +74,40 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
+
+    // Get tenant from request or use first active tenant with OpenFactura configured
+    let tenantId = body.tenantId;
+    let tenant;
+
+    if (tenantId) {
+      tenant = await prisma.tenant.findUnique({
+        where: { id: tenantId, isActive: true },
+        select: { id: true, name: true, rut: true }
+      });
+    } else {
+      // Find first active tenant that has a RUT configured for OpenFactura
+      tenant = await prisma.tenant.findFirst({
+        where: {
+          isActive: true,
+          rut: { not: null }
+        },
+        select: { id: true, name: true, rut: true }
+      });
+    }
+
+    if (!tenant || !tenant.rut) {
+      return NextResponse.json(
+        {
+          error: 'No configured tenant found',
+          details: 'No active tenant with RUT found for OpenFactura integration',
+          success: false
+        },
+        { status: 404 }
+      );
+    }
+
+    // Convert RUT to format expected by OpenFactura (remove dots and dash)
+    const companyRut = tenant.rut.replace(/[.-]/g, '');
 
     // Build the request payload for OpenFactura
     const payload: ReceivedDocumentsRequest = {
@@ -180,7 +214,9 @@ export async function POST(request: NextRequest) {
         acuses: doc.Acuses,
         // Additional metadata
         metadata: {
-          companyRut: COMPANY_RUT,
+          companyRut: companyRut,
+          tenantId: tenant.id,
+          tenantName: tenant.name,
           apiSource: 'OpenFactura',
           retrievedAt: new Date().toISOString(),
         }
@@ -218,8 +254,9 @@ export async function GET() {
     endpoint: '/api/documents/received',
     method: 'POST',
     description: 'Fetch received documents from OpenFactura API',
-    companyRut: COMPANY_RUT,
+    note: 'Use tenantId in request body to specify which tenant to fetch documents for',
     availableFilters: {
+      tenantId: 'Tenant ID (optional - uses first active tenant if not provided)',
       page: 'Page number (default: 1)',
       tipoDTE: 'Document type (33=Factura, 39=Boleta, etc.)',
       fechaEmision: 'Emission date (YYYY-mm-dd)',

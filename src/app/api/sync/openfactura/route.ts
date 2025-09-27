@@ -51,6 +51,12 @@ interface OpenFacturaDocument {
   ValorDR?: number; // Discount/surcharge value
   TipoDespacho?: number; // Dispatch type
   IndTraslado?: number; // Transfer indicator
+
+  // Receiver fields that might exist in the actual API response
+  RUTRecep?: number;
+  DVRecep?: string;
+  RznSocRecep?: string;
+
   [key: string]: any; // Allow additional unknown fields
 }
 
@@ -498,12 +504,34 @@ export async function POST(request: NextRequest) {
             toDate: chunk.to
           });
         syncStats.pages++;
-        syncStats.totalDocuments += pageData.data.length;
 
-        console.log(`Processing page ${currentPage}/${pageData.last_page} with ${pageData.data.length} documents`);
+        console.log(`Fetched page ${currentPage}/${pageData.last_page} with ${pageData.data.length} total documents from OpenFactura`);
 
-        // Process each document in the page
-        for (const doc of pageData.data) {
+        // Filter documents by receiving company RUT for this tenant
+        let filteredDocuments = pageData.data;
+
+        // Check if we have receiver RUT info in the response to filter by it
+        if (pageData.data.length > 0 && (pageData.data[0].RUTRecep || pageData.data[0].DVRecep)) {
+          // If the API response includes receiver RUT info, filter by it
+          const targetRutNumber = parseInt(companyRut.replace(/\D/g, ''));
+          filteredDocuments = pageData.data.filter(doc => {
+            if (doc.RUTRecep) {
+              return doc.RUTRecep === targetRutNumber;
+            }
+            return true; // If no RUTRecep field, include all documents
+          });
+
+          console.log(`Filtered from ${pageData.data.length} to ${filteredDocuments.length} documents for tenant ${tenant.name} (RUT: ${tenant.rut})`);
+        } else {
+          console.log(`No receiver RUT filtering needed for tenant ${tenant.name} - assuming API already filters by receiving company`);
+        }
+
+        syncStats.totalDocuments += filteredDocuments.length;
+
+        console.log(`Processing ${filteredDocuments.length} filtered documents for tenant ${tenant.name}`);
+
+        // Process each document in the filtered page
+        for (const doc of filteredDocuments) {
           try {
             // Create unique identifier
             const uniqueId = `${doc.RUTEmisor}-${doc.TipoDTE}-${doc.Folio}`;

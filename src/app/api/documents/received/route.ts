@@ -47,6 +47,10 @@ interface OpenFacturaDocument {
   }>;
   FmaPago: string;
   TpoTranCompra: number;
+  // Add potential receiver fields that might exist in the actual API response
+  RUTRecep?: number;
+  DVRecep?: string;
+  RznSocRecep?: string;
 }
 
 interface OpenFacturaResponse {
@@ -154,7 +158,13 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    console.log('Sending request to OpenFactura:', JSON.stringify(payload, null, 2));
+    console.log('Sending request to OpenFactura for tenant:', {
+      tenantId: tenant.id,
+      tenantName: tenant.name,
+      tenantRut: tenant.rut,
+      companyRut: companyRut,
+      payload: JSON.stringify(payload, null, 2)
+    });
 
     // Make request to OpenFactura API
     const response = await fetch(OPENFACTURA_API_URL, {
@@ -182,6 +192,34 @@ export async function POST(request: NextRequest) {
 
     const data: OpenFacturaResponse = await response.json();
 
+    console.log(`OpenFactura returned ${data.data.length} documents total`);
+
+    // Log first document structure for debugging
+    if (data.data.length > 0) {
+      console.log('Sample document structure:', JSON.stringify(data.data[0], null, 2));
+    }
+
+    // Filter documents by receiving company RUT if needed
+    // Since this is the /document/received endpoint, documents should already be filtered by receiving company
+    // But if the API key has access to multiple companies, we might need to filter further
+    let filteredDocuments = data.data;
+
+    // Check if we have receiver RUT info in the response to do additional filtering
+    if (data.data.length > 0 && (data.data[0].RUTRecep || data.data[0].DVRecep)) {
+      // If the API response includes receiver RUT info, filter by it
+      const targetRutNumber = parseInt(companyRut.replace(/\D/g, ''));
+      filteredDocuments = data.data.filter(doc => {
+        if (doc.RUTRecep) {
+          return doc.RUTRecep === targetRutNumber;
+        }
+        return true; // If no RUTRecep field, include all documents
+      });
+
+      console.log(`Filtered from ${data.data.length} to ${filteredDocuments.length} documents for RUT ${companyRut}`);
+    } else {
+      console.log('No receiver RUT filtering needed - assuming API already filters by receiving company');
+    }
+
     // Transform response to match our format
     const transformedResponse = {
       success: true,
@@ -191,7 +229,7 @@ export async function POST(request: NextRequest) {
         total: data.total,
         perPage: data.data.length,
       },
-      documents: data.data.map(doc => ({
+      documents: filteredDocuments.map(doc => ({
         id: `${doc.RUTEmisor}-${doc.TipoDTE}-${doc.Folio}`,
         rutEmisor: `${doc.RUTEmisor}-${doc.DV}`,
         razonSocialEmisor: doc.RznSoc,

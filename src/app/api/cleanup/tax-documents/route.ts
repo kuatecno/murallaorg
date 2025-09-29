@@ -82,6 +82,12 @@ export async function POST(request: NextRequest) {
         }
 
         const tenantRutClean = tenant.rut.replace(/[.-]/g, '');
+
+        if (!doc.receiverRUT) {
+          console.log(`  ⚠️  Document ${doc.folio} has no receiver RUT - skipping`);
+          continue;
+        }
+
         const docReceiverRutClean = doc.receiverRUT.replace(/[.-]/g, '');
 
         // Check if the document's receiver RUT matches the tenant's RUT

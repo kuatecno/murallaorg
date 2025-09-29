@@ -96,6 +96,7 @@ export async function POST(request: NextRequest) {
 
           // Try to find the correct tenant for this document
           let correctTenant = tenants.find(t => {
+            if (!t.rut) return false;
             const tRutClean = t.rut.replace(/[.-]/g, '');
             return tRutClean === docReceiverRutClean;
           });
@@ -103,6 +104,7 @@ export async function POST(request: NextRequest) {
           // If no exact match, try to find close matches (handle potential typos)
           if (!correctTenant) {
             correctTenant = tenants.find(t => {
+              if (!t.rut) return false;
               const tRutClean = t.rut.replace(/[.-]/g, '');
               // Check if RUTs are similar (same first 7 digits - common typo pattern)
               const tRutBase = tRutClean.substring(0, 7);

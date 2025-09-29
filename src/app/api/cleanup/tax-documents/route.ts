@@ -76,6 +76,11 @@ export async function POST(request: NextRequest) {
       // Check each document
       for (const doc of documents) {
         // Clean and normalize RUTs for comparison
+        if (!tenant.rut) {
+          console.log(`  ⚠️  Tenant ${tenant.name} has no RUT - skipping document checks`);
+          continue;
+        }
+
         const tenantRutClean = tenant.rut.replace(/[.-]/g, '');
         const docReceiverRutClean = doc.receiverRUT.replace(/[.-]/g, '');
 

@@ -122,27 +122,27 @@ export async function POST(request: NextRequest) {
             cleanupStats.documentsToMove++;
             cleanupStats.moveOperations.push({
               documentId: doc.id,
-              folio: doc.folio,
+              folio: doc.folio || 'unknown',
               currentTenant: tenant.name,
               correctTenant: correctTenant.name,
-              receiverRUT: doc.receiverRUT
+              receiverRUT: doc.receiverRUT || 'unknown'
             });
 
-            console.log(`  ❌ Document ${doc.folio} (${doc.receiverRUT}) should be moved from ${tenant.name} to ${correctTenant.name}`);
+            console.log(`  ❌ Document ${doc.folio || 'unknown'} (${doc.receiverRUT || 'unknown'}) should be moved from ${tenant.name} to ${correctTenant.name}`);
           } else {
             // No matching tenant found - might be orphaned or from external RUT
             cleanupStats.documentsToDelete++;
             cleanupStats.deleteOperations.push({
               documentId: doc.id,
-              folio: doc.folio,
+              folio: doc.folio || 'unknown',
               tenant: tenant.name,
-              reason: `No tenant found for receiver RUT: ${doc.receiverRUT}`
+              reason: `No tenant found for receiver RUT: ${doc.receiverRUT || 'unknown'}`
             });
 
-            console.log(`  ⚠️  Document ${doc.folio} (${doc.receiverRUT}) has no matching tenant - scheduled for review`);
+            console.log(`  ⚠️  Document ${doc.folio || 'unknown'} (${doc.receiverRUT || 'unknown'}) has no matching tenant - scheduled for review`);
           }
         } else {
-          console.log(`  ✅ Document ${doc.folio} correctly attributed to ${tenant.name}`);
+          console.log(`  ✅ Document ${doc.folio || 'unknown'} correctly attributed to ${tenant.name}`);
         }
       }
     }

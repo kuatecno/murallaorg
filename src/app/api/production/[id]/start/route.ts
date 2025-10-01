@@ -7,7 +7,7 @@ import { productionService } from '../../production.service';
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const tenantId = request.headers.get('x-tenant-id');
@@ -16,7 +16,8 @@ export async function POST(
       return NextResponse.json({ error: 'Tenant ID required' }, { status: 400 });
     }
 
-    const batch = await productionService.startProduction(params.id, tenantId);
+    const { id } = await params;
+    const batch = await productionService.startProduction(id, tenantId);
 
     return NextResponse.json(batch);
   } catch (error: any) {

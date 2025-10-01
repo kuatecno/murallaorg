@@ -7,7 +7,7 @@ import { recipeService } from '../recipe.service';
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const tenantId = request.headers.get('x-tenant-id');
@@ -16,7 +16,8 @@ export async function GET(
       return NextResponse.json({ error: 'Tenant ID required' }, { status: 400 });
     }
 
-    const recipe = await recipeService.getRecipe(params.id, tenantId);
+    const { id } = await params;
+    const recipe = await recipeService.getRecipe(id, tenantId);
 
     if (!recipe) {
       return NextResponse.json({ error: 'Recipe not found' }, { status: 404 });
@@ -35,7 +36,7 @@ export async function GET(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const tenantId = request.headers.get('x-tenant-id');
@@ -44,7 +45,8 @@ export async function DELETE(
       return NextResponse.json({ error: 'Tenant ID required' }, { status: 400 });
     }
 
-    await recipeService.removeIngredient(params.id, params.id, tenantId);
+    const { id } = await params;
+    await recipeService.removeIngredient(id, id, tenantId);
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

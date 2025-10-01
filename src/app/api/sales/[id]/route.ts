@@ -7,7 +7,7 @@ import { salesService } from '../sales.service';
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const tenantId = request.headers.get('x-tenant-id');
@@ -16,7 +16,8 @@ export async function GET(
       return NextResponse.json({ error: 'Tenant ID required' }, { status: 400 });
     }
 
-    const sale = await salesService.getSale(params.id, tenantId);
+    const { id } = await params;
+    const sale = await salesService.getSale(id, tenantId);
 
     if (!sale) {
       return NextResponse.json({ error: 'Sale not found' }, { status: 404 });

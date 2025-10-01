@@ -7,7 +7,7 @@ import { recipeService } from '../../recipe.service';
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const tenantId = request.headers.get('x-tenant-id');
@@ -17,8 +17,9 @@ export async function POST(
     }
 
     const body = await request.json();
+    const { id } = await params;
 
-    const ingredient = await recipeService.addIngredient(params.id, body, tenantId);
+    const ingredient = await recipeService.addIngredient(id, body, tenantId);
 
     return NextResponse.json(ingredient, { status: 201 });
   } catch (error: any) {

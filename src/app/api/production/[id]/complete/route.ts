@@ -7,7 +7,7 @@ import { productionService } from '../../production.service';
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const tenantId = request.headers.get('x-tenant-id');
@@ -26,8 +26,10 @@ export async function POST(
       );
     }
 
+    const { id } = await params;
+
     const batch = await productionService.completeProduction(
-      params.id,
+      id,
       actualQuantity,
       laborCost,
       overheadCost,

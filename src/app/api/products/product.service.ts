@@ -109,14 +109,15 @@ export class ProductService {
   }
 
   /**
-   * Get all purchased/ingredient products (for recipe ingredient selection)
+   * Get all input/ingredient products (for recipe ingredient selection)
+   * Can use INPUT (raw materials) or MANUFACTURED products as ingredients
    */
   async getIngredientsProducts(tenantId: string) {
     return await prisma.product.findMany({
       where: {
         tenantId,
         isActive: true,
-        OR: [{ type: 'PURCHASED' }, { type: 'MANUFACTURED' }],
+        OR: [{ type: 'INPUT' }, { type: 'MANUFACTURED' }],
       },
       orderBy: { name: 'asc' },
     });

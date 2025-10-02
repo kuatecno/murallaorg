@@ -2,21 +2,32 @@
 
 ## Overview
 
-This document describes the complete implementation of the Recipe/BOM and Production system for Muralla 5.0, supporting three distinct product types with their corresponding inventory workflows.
+This document describes the complete implementation of the Recipe/BOM and Production system for Muralla 5.0, supporting five distinct product types with their corresponding inventory workflows.
 
 ## Product Types
 
-### 1. PURCHASED (Productos comprados listos para vender)
+### 1. INPUT (Insumos - Raw Materials & Ingredients)
+- Raw materials and ingredients
+- Used to make other products (in recipes)
+- **Cannot be sold directly**
+- Direct inventory management
+
+**Flow:**
+```
+Purchase → Stock In → Used as ingredient in recipes
+```
+
+### 2. READY_PRODUCT (Productos comprados listos para vender)
 - Products bought ready to sell
 - No recipe/BOM required
 - Direct inventory management
 
 **Flow:**
 ```
-Purchase → Stock In (ENTRADA_COMPRA) → Sale (SALIDA_VENTA)
+Purchase → Stock In → Sale
 ```
 
-### 2. MANUFACTURED (Productos producidos con receta)
+### 3. MANUFACTURED (Productos producidos con receta)
 - Products made from ingredients using recipes
 - Batch production with cost tracking
 - Ingredients consumed during production
@@ -34,21 +45,21 @@ Complete Production → Add Finished Product (PRODUCTION_OUTPUT)
 Sale → Stock Out (SALIDA_VENTA)
 ```
 
-### 3. MADE_TO_ORDER (Productos elaborados al momento)
+### 4. MADE_TO_ORDER (Productos elaborados al momento)
 - Products made on-the-spot when ordered
 - Real-time ingredient deduction
 - No intermediate stock of finished product
 
 **Flow:**
 ```
-Purchase Insumos → Stock In
+Purchase Inputs → Stock In
 ↓
-Sale Order → Auto-deduct Insumos (SALE_CONSUMPTION)
+Sale Order → Auto-deduct Inputs (SALE_CONSUMPTION)
 ↓
 Product Created & Sold (No stock)
 ```
 
-### 4. SERVICE
+### 5. SERVICE
 - Non-physical services
 - No inventory impact
 
@@ -349,12 +360,26 @@ enum MovementType {
 
 ## Usage Examples
 
-### Create PURCHASED Product
+### Create INPUT Product (Ingredient)
+```typescript
+const milk = await productService.createProduct({
+  sku: 'MILK-1L',
+  name: 'Whole Milk 1L',
+  type: 'INPUT',
+  unitPrice: 0, // Inputs don't have selling price
+  costPrice: 800,
+  minStock: 20,
+  unit: 'L',
+  tenantId: 'tenant_123'
+});
+```
+
+### Create READY_PRODUCT (Purchased finished product)
 ```typescript
 const cola = await productService.createProduct({
   sku: 'COLA-500',
   name: 'Coca Cola 500ml',
-  type: 'PURCHASED',
+  type: 'READY_PRODUCT',
   unitPrice: 1500,
   costPrice: 800,
   minStock: 50,
@@ -480,11 +505,13 @@ npx prisma generate
 
 ---
 
-## Features Preserved from Muralla 4.0
+## Features Preserved & Enhanced from Muralla 4.0
 
-✅ **PURCHASED Products** - Direct buy → stock → sell flow
+✅ **INPUT Products** - Raw materials and ingredients (cannot be sold directly)
+✅ **READY_PRODUCT** - Direct buy → stock → sell flow (renamed from PURCHASED)
 ✅ **MANUFACTURED Products** - Recipe-based production with batch tracking
 ✅ **MADE_TO_ORDER Products** - Real-time ingredient deduction on sale
+✅ **SERVICE Products** - Non-physical services with no inventory impact
 ✅ **Projected Inventory** - Calculate how many can be made
 ✅ **Cost Tracking** - Automatic cost rollup from ingredients
 ✅ **Multi-location** - Supported via inventory records
@@ -493,6 +520,16 @@ npx prisma generate
 ✅ **BOM Components** - Ingredient tracking with quantities
 ✅ **Production Batches** - Full batch lifecycle management
 ✅ **Ingredient Consumption** - Detailed consumption tracking
+
+## Product Type Summary
+
+| Type | Description | Has Recipe | Stock Tracking | Can Sell | Use Case |
+|------|-------------|------------|----------------|----------|----------|
+| INPUT | Raw materials | ❌ | ✅ | ❌ | Milk, flour, coffee beans |
+| READY_PRODUCT | Purchased finished goods | ❌ | ✅ | ✅ | Coca-Cola, packaged cookies |
+| MANUFACTURED | Batch production | ✅ | ✅ | ✅ | Bread, prepared sauces |
+| MADE_TO_ORDER | On-the-spot | ✅ | ❌ | ✅ | Latte, sandwich |
+| SERVICE | Non-physical | ❌ | ❌ | ✅ | Delivery, consulting |
 
 ---
 

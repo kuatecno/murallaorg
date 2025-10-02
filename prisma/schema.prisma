@@ -58,7 +58,7 @@ model Product {
   sku          String
   name         String
   description  String?
-  type         ProductType @default(PURCHASED)
+  type         ProductType @default(INPUT)
   category     String?
   brand        String?
   unitPrice    Decimal     @db.Decimal(12, 2)
@@ -906,9 +906,10 @@ enum ExpensePaymentType {
 }
 
 enum ProductType {
-  PURCHASED // Bought ready to sell
+  INPUT // Raw materials and ingredients (insumos)
+  READY_PRODUCT // Bought ready to sell (productos comprados listos)
   MANUFACTURED // Made with recipe, produced in batches
-  MADE_TO_ORDER // Made on-the-spot (TERMINADO)
+  MADE_TO_ORDER // Made on-the-spot (elaborados al momento)
   SERVICE // Non-physical service
 }
 

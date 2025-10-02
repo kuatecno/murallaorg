@@ -21,9 +21,11 @@ export class SalesService {
   /**
    * Process a sale transaction
    * Handles different product types:
-   * - PURCHASED: Simple stock deduction
+   * - INPUT: Not sold directly (error if attempted)
+   * - READY_PRODUCT: Simple stock deduction
    * - MANUFACTURED: Stock deduction (already produced)
    * - MADE_TO_ORDER: Auto-deduct ingredients
+   * - SERVICE: No stock impact
    */
   async processSale(data: CreateSaleDto): Promise<Transaction> {
     // Calculate totals
@@ -91,8 +93,14 @@ export class SalesService {
     const product = item.product;
 
     switch (product.type as ProductType) {
-      case 'PURCHASED':
-        await this.processPurchasedProduct(tx, item, transactionId, tenantId);
+      case 'INPUT':
+        // Inputs should not be sold directly, they're used in recipes
+        throw new Error(
+          `Cannot sell INPUT product "${product.name}" directly. Use it as an ingredient in a recipe instead.`
+        );
+
+      case 'READY_PRODUCT':
+        await this.processReadyProduct(tx, item, transactionId, tenantId);
         break;
 
       case 'MANUFACTURED':
@@ -110,9 +118,9 @@ export class SalesService {
   }
 
   /**
-   * Process PURCHASED product sale
+   * Process READY_PRODUCT sale (purchased products ready to sell)
    */
-  private async processPurchasedProduct(
+  private async processReadyProduct(
     tx: any,
     item: TransactionItem & { product: any },
     transactionId: string,

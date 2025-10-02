@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import CreateProductModal from '@/components/products/CreateProductModal';
 
 interface Product {
   id: string;
@@ -33,6 +34,7 @@ export default function ProductsPage() {
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [filterType, setFilterType] = useState<FilterType>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -117,7 +119,10 @@ export default function ProductsPage() {
               </Link>
               <h1 className="text-2xl font-bold text-gray-900">Products</h1>
             </div>
-            <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+            <button
+              onClick={() => setIsCreateModalOpen(true)}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+            >
               + New Product
             </button>
           </div>
@@ -300,6 +305,16 @@ export default function ProductsPage() {
           </div>
         )}
       </main>
+
+      {/* Create Product Modal */}
+      <CreateProductModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onSuccess={() => {
+          loadProducts();
+          setIsCreateModalOpen(false);
+        }}
+      />
     </div>
   );
 }

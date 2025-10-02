@@ -85,8 +85,9 @@ model Product {
   tenant Tenant @relation(fields: [tenantId], references: [id])
 
   // Recipe relations
-  recipesAsProduct    Recipe[]           @relation("ProductRecipes")
-  recipesAsIngredient RecipeIngredient[] @relation("IngredientInRecipes")
+  recipesAsProduct       Recipe[]                @relation("ProductRecipes")
+  recipesAsIngredient    RecipeIngredient[]      @relation("IngredientInRecipes")
+  ingredientConsumptions IngredientConsumption[] @relation("ConsumedIngredients")
 
   // M:M Relationships
   suppliers        ProductSupplier[]
@@ -503,9 +504,11 @@ model IngredientConsumption {
   // Relations
   tenant      Tenant       @relation(fields: [tenantId], references: [id])
   transaction Transaction? @relation(fields: [transactionId], references: [id])
+  ingredient  Product      @relation("ConsumedIngredients", fields: [ingredientId], references: [id])
 
   @@index([transactionId])
   @@index([productId])
+  @@index([ingredientId])
   @@index([tenantId, consumedAt])
   @@map("ingredient_consumptions")
 }

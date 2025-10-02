@@ -38,7 +38,7 @@ interface Recipe {
   servingSize: number;
   prepTime?: number;
   cookTime?: number;
-  difficulty: string;
+  difficulty: 'EASY' | 'MEDIUM' | 'HARD' | 'EXPERT';
   instructions?: string;
   estimatedCost?: number;
   totalCost?: number;

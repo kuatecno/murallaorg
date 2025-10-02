@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import CreateProductModal from '@/components/products/CreateProductModal';
+import ProductNavigation from '@/components/products/ProductNavigation';
 
 interface Product {
   id: string;
@@ -126,6 +127,9 @@ export default function ProductsPage() {
               + New Product
             </button>
           </div>
+
+          {/* Navigation Tabs */}
+          <ProductNavigation />
         </div>
       </header>
 

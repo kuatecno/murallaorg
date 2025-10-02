@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import ProductNavigation from '@/components/products/ProductNavigation';
 
 interface Product {
   id: string;
@@ -243,8 +244,8 @@ export default function ProductionPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-6">
             <div className="flex items-center space-x-4">
-              <Link href="/products" className="text-gray-600 hover:text-gray-900">
-                ← Back to Products
+              <Link href="/dashboard" className="text-gray-600 hover:text-gray-900">
+                ← Back
               </Link>
               <h1 className="text-2xl font-bold text-gray-900">Production Batches</h1>
             </div>
@@ -255,6 +256,7 @@ export default function ProductionPage() {
               + New Batch
             </button>
           </div>
+          <ProductNavigation />
         </div>
       </header>
 

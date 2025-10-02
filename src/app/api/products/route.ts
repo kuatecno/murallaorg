@@ -5,8 +5,9 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { productService } from './product.service';
 import { Prisma } from '@prisma/client';
+import prisma from '@/lib/prisma';
 
 interface ProductParams {
   page?: number;
@@ -144,6 +145,7 @@ export async function GET(request: NextRequest) {
       sku: product.sku,
       name: product.name,
       description: product.description,
+      type: product.type,
       category: product.category,
       brand: product.brand,
       unitPrice: Number(product.unitPrice),
@@ -152,7 +154,12 @@ export async function GET(request: NextRequest) {
       minStock: product.minStock,
       maxStock: product.maxStock,
       unit: product.unit,
+      hasRecipe: product.hasRecipe,
       isActive: product.isActive,
+      cafePrice: product.cafePrice ? Number(product.cafePrice) : null,
+      rappiPrice: product.rappiPrice ? Number(product.rappiPrice) : null,
+      pedidosyaPrice: product.pedidosyaPrice ? Number(product.pedidosyaPrice) : null,
+      uberPrice: product.uberPrice ? Number(product.uberPrice) : null,
       createdAt: product.createdAt,
       updatedAt: product.updatedAt,
       suppliers: product.suppliers.map(ps => ({

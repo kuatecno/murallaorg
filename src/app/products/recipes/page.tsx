@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import RecipeEditor from '@/components/recipes/RecipeEditor';
 
 interface Product {
   id: string;
@@ -69,6 +70,7 @@ export default function RecipesPage() {
   const [projectedInventory, setProjectedInventory] = useState<ProjectedInventory | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>('projected');
   const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -169,6 +171,60 @@ export default function RecipesPage() {
       EXPERT: 'bg-red-100 text-red-800',
     };
     return badges[difficulty as keyof typeof badges] || badges.EASY;
+  };
+
+  const handleSetDefaultRecipe = async (recipeId: string) => {
+    setActionLoading(true);
+    try {
+      const userData = localStorage.getItem('user');
+      if (!userData) return;
+
+      const user = JSON.parse(userData);
+      const response = await fetch(`/api/recipes/${recipeId}/set-default`, {
+        method: 'POST',
+        headers: {
+          'x-tenant-id': user.tenantId,
+        },
+      });
+
+      if (response.ok) {
+        // Reload recipes
+        if (selectedProduct) {
+          handleSelectProduct(selectedProduct);
+        }
+      }
+    } catch (error) {
+      console.error('Error setting default recipe:', error);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDuplicateRecipe = async (recipeId: string) => {
+    setActionLoading(true);
+    try {
+      const userData = localStorage.getItem('user');
+      if (!userData) return;
+
+      const user = JSON.parse(userData);
+      const response = await fetch(`/api/recipes/${recipeId}/duplicate`, {
+        method: 'POST',
+        headers: {
+          'x-tenant-id': user.tenantId,
+        },
+      });
+
+      if (response.ok) {
+        // Reload recipes
+        if (selectedProduct) {
+          handleSelectProduct(selectedProduct);
+        }
+      }
+    } catch (error) {
+      console.error('Error duplicating recipe:', error);
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   if (loading && products.length === 0) {
@@ -395,7 +451,7 @@ export default function RecipesPage() {
                               className="border border-gray-200 rounded-lg p-4 hover:border-blue-300 transition-colors"
                             >
                               <div className="flex justify-between items-start mb-3">
-                                <div>
+                                <div className="flex-1">
                                   <h3 className="font-semibold text-gray-900">{recipe.name}</h3>
                                   <div className="flex items-center space-x-2 mt-1">
                                     <span
@@ -415,10 +471,30 @@ export default function RecipesPage() {
                                     )}
                                   </div>
                                 </div>
-                                <div className="text-right">
-                                  <div className="text-sm text-gray-600">Cost</div>
-                                  <div className="text-lg font-bold text-gray-900">
-                                    ${recipe.totalCost?.toFixed(0) || '0'}
+                                <div className="flex items-center space-x-3">
+                                  <div className="text-right">
+                                    <div className="text-sm text-gray-600">Cost</div>
+                                    <div className="text-lg font-bold text-gray-900">
+                                      ${recipe.totalCost?.toFixed(0) || '0'}
+                                    </div>
+                                  </div>
+                                  <div className="flex flex-col space-y-1">
+                                    {!recipe.isDefault && (
+                                      <button
+                                        onClick={() => handleSetDefaultRecipe(recipe.id)}
+                                        disabled={actionLoading}
+                                        className="text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1 rounded disabled:opacity-50"
+                                      >
+                                        Set Default
+                                      </button>
+                                    )}
+                                    <button
+                                      onClick={() => handleDuplicateRecipe(recipe.id)}
+                                      disabled={actionLoading}
+                                      className="text-xs bg-gray-50 text-gray-600 hover:bg-gray-100 px-3 py-1 rounded disabled:opacity-50"
+                                    >
+                                      Duplicate
+                                    </button>
                                   </div>
                                 </div>
                               </div>
@@ -467,7 +543,21 @@ export default function RecipesPage() {
                   {activeTab === 'editor' && (
                     <div className="bg-white rounded-lg shadow p-6">
                       <h2 className="text-lg font-bold text-gray-900 mb-4">Recipe Editor</h2>
-                      <p className="text-gray-500">Recipe editor coming soon...</p>
+                      {recipes.length > 0 ? (
+                        <RecipeEditor
+                          productId={selectedProduct.id}
+                          productName={selectedProduct.name}
+                          recipe={recipes.find((r) => r.isDefault) || recipes[0]}
+                          onSave={() => handleSelectProduct(selectedProduct)}
+                        />
+                      ) : (
+                        <RecipeEditor
+                          productId={selectedProduct.id}
+                          productName={selectedProduct.name}
+                          recipe={null}
+                          onSave={() => handleSelectProduct(selectedProduct)}
+                        />
+                      )}
                     </div>
                   )}
                 </>

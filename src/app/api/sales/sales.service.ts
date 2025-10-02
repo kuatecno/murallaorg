@@ -464,7 +464,10 @@ export class SalesService {
     }
 
     switch (product.type) {
-      case 'PURCHASED':
+      case 'INPUT':
+        return { available: false, reason: 'INPUT products cannot be sold directly' };
+
+      case 'READY_PRODUCT':
       case 'MANUFACTURED':
         if (product.currentStock < quantity) {
           return {

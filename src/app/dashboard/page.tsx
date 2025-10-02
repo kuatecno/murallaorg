@@ -85,22 +85,22 @@ export default function DashboardPage() {
                   <h4 className="text-lg font-semibold text-orange-900">Expenses</h4>
                   <p className="text-orange-700 mt-2">Track expenses and employee reimbursements</p>
                 </Link>
-                <div className="bg-blue-50 p-6 rounded-lg">
+                <Link href="/products" className="bg-blue-50 p-6 rounded-lg hover:bg-blue-100 transition-colors cursor-pointer">
                   <h4 className="text-lg font-semibold text-blue-900">Products</h4>
                   <p className="text-blue-700 mt-2">Manage your inventory</p>
-                </div>
-                <div className="bg-green-50 p-6 rounded-lg">
+                </Link>
+                <Link href="/sales" className="bg-green-50 p-6 rounded-lg hover:bg-green-100 transition-colors cursor-pointer">
                   <h4 className="text-lg font-semibold text-green-900">Sales</h4>
                   <p className="text-green-700 mt-2">Point of sale system</p>
-                </div>
-                <div className="bg-yellow-50 p-6 rounded-lg">
+                </Link>
+                <Link href="/customers" className="bg-yellow-50 p-6 rounded-lg hover:bg-yellow-100 transition-colors cursor-pointer">
                   <h4 className="text-lg font-semibold text-yellow-900">Customers</h4>
                   <p className="text-yellow-700 mt-2">Customer management</p>
-                </div>
-                <div className="bg-purple-50 p-6 rounded-lg">
+                </Link>
+                <Link href="/reports" className="bg-purple-50 p-6 rounded-lg hover:bg-purple-100 transition-colors cursor-pointer">
                   <h4 className="text-lg font-semibold text-purple-900">Reports</h4>
                   <p className="text-purple-700 mt-2">Analytics & insights</p>
-                </div>
+                </Link>
               </div>
             </div>
           </div>

@@ -229,12 +229,12 @@ async function main() {
 
   // Link some products to supplier 1
   for (const product of allProducts.slice(0, 3)) {
-    await prisma.productContact.upsert({
-      where: { productId_contactId: { productId: product.id, contactId: supplier1.id } },
+    await prisma.productSupplier.upsert({
+      where: { productId_supplierId: { productId: product.id, supplierId: supplier1.id } },
       update: {},
       create: {
         productId: product.id,
-        contactId: supplier1.id,
+        supplierId: supplier1.id,
         supplierSKU: `SUP1-${product.sku}`,
         supplierPrice: product.costPrice || 0,
         leadTimeDays: 7,
@@ -246,12 +246,12 @@ async function main() {
 
   // Link remaining products to supplier 2
   for (const product of allProducts.slice(3)) {
-    await prisma.productContact.upsert({
-      where: { productId_contactId: { productId: product.id, contactId: supplier2.id } },
+    await prisma.productSupplier.upsert({
+      where: { productId_supplierId: { productId: product.id, supplierId: supplier2.id } },
       update: {},
       create: {
         productId: product.id,
-        contactId: supplier2.id,
+        supplierId: supplier2.id,
         supplierSKU: `SUP2-${product.sku}`,
         supplierPrice: product.costPrice || 0,
         leadTimeDays: 3,

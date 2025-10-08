@@ -69,13 +69,14 @@ async function main() {
     },
   });
 
-  // Create sample suppliers
-  const supplier1 = await prisma.supplier.upsert({
+  // Create sample contacts - Suppliers
+  const supplier1 = await prisma.contact.upsert({
     where: { tenantId_code: { tenantId: tenant.id, code: 'SUP001' } },
     update: {},
     create: {
       code: 'SUP001',
       name: 'Distribuidora Central',
+      contactType: 'SUPPLIER',
       rut: '96123456-7',
       contactName: 'María González',
       email: 'contacto@distribuidora.cl',
@@ -83,18 +84,19 @@ async function main() {
       address: 'Av. Industrial 5678, Santiago',
       city: 'Santiago',
       country: 'Chile',
-      paymentTerms: '30 días',
+      paymentTerms: '30_days',
       rating: 4,
       tenantId: tenant.id,
     },
   });
 
-  const supplier2 = await prisma.supplier.upsert({
+  const supplier2 = await prisma.contact.upsert({
     where: { tenantId_code: { tenantId: tenant.id, code: 'SUP002' } },
     update: {},
     create: {
       code: 'SUP002',
       name: 'Proveedor Local',
+      contactType: 'SUPPLIER',
       rut: '78987654-3',
       contactName: 'Carlos Ruiz',
       email: 'ventas@proveedorlocal.cl',
@@ -102,41 +104,45 @@ async function main() {
       address: 'Calle Comercial 123, Valparaíso',
       city: 'Valparaíso',
       country: 'Chile',
-      paymentTerms: '15 días',
+      paymentTerms: '15_days',
       rating: 5,
       tenantId: tenant.id,
     },
   });
 
-  // Create sample customers
-  const customer1 = await prisma.customer.upsert({
+  // Create sample contacts - Customers
+  const customer1 = await prisma.contact.upsert({
     where: { tenantId_code: { tenantId: tenant.id, code: 'CLI001' } },
     update: {},
     create: {
       code: 'CLI001',
       name: 'Restaurant El Buen Sabor',
+      contactType: 'CUSTOMER',
       rut: '76555666-7',
       email: 'gerencia@elbuensabor.cl',
       phone: '+56 2 2111 2222',
       address: 'Av. Las Condes 987, Santiago',
       city: 'Santiago',
+      country: 'Chile',
       creditLimit: 500000,
       currentDebt: 0,
       tenantId: tenant.id,
     },
   });
 
-  const customer2 = await prisma.customer.upsert({
+  const customer2 = await prisma.contact.upsert({
     where: { tenantId_code: { tenantId: tenant.id, code: 'CLI002' } },
     update: {},
     create: {
       code: 'CLI002',
       name: 'Ana Sofía Martínez',
+      contactType: 'CUSTOMER',
       rut: '12345678-9',
       email: 'ana.martinez@email.com',
       phone: '+56 9 8888 7777',
       address: 'Pasaje Los Aromos 456, Providencia',
       city: 'Santiago',
+      country: 'Chile',
       creditLimit: 100000,
       currentDebt: 0,
       tenantId: tenant.id,
@@ -218,17 +224,17 @@ async function main() {
     });
   }
 
-  // Link products to suppliers
+  // Link products to suppliers (contacts)
   const allProducts = await prisma.product.findMany({ where: { tenantId: tenant.id } });
 
   // Link some products to supplier 1
   for (const product of allProducts.slice(0, 3)) {
-    await prisma.productSupplier.upsert({
-      where: { productId_supplierId: { productId: product.id, supplierId: supplier1.id } },
+    await prisma.productContact.upsert({
+      where: { productId_contactId: { productId: product.id, contactId: supplier1.id } },
       update: {},
       create: {
         productId: product.id,
-        supplierId: supplier1.id,
+        contactId: supplier1.id,
         supplierSKU: `SUP1-${product.sku}`,
         supplierPrice: product.costPrice || 0,
         leadTimeDays: 7,
@@ -240,12 +246,12 @@ async function main() {
 
   // Link remaining products to supplier 2
   for (const product of allProducts.slice(3)) {
-    await prisma.productSupplier.upsert({
-      where: { productId_supplierId: { productId: product.id, supplierId: supplier2.id } },
+    await prisma.productContact.upsert({
+      where: { productId_contactId: { productId: product.id, contactId: supplier2.id } },
       update: {},
       create: {
         productId: product.id,
-        supplierId: supplier2.id,
+        contactId: supplier2.id,
         supplierSKU: `SUP2-${product.sku}`,
         supplierPrice: product.costPrice || 0,
         leadTimeDays: 3,
@@ -255,54 +261,56 @@ async function main() {
     });
   }
 
-  // Assign staff to manage suppliers
-  await prisma.staffSupplier.upsert({
+  // Assign staff to manage contacts
+  await prisma.staffContact.upsert({
     where: {
-      staffId_supplierId_role: {
+      staffId_contactId_relationship: {
         staffId: adminUser.id,
-        supplierId: supplier1.id,
-        role: 'ACCOUNT_MANAGER'
+        contactId: supplier1.id,
+        relationship: 'ACCOUNT_MANAGER'
       }
     },
     update: {},
     create: {
       staffId: adminUser.id,
-      supplierId: supplier1.id,
-      role: 'ACCOUNT_MANAGER',
+      contactId: supplier1.id,
+      relationship: 'ACCOUNT_MANAGER',
+      commissionRate: 0,
       notes: 'Primary contact for all orders'
     },
   });
 
-  await prisma.staffSupplier.upsert({
+  await prisma.staffContact.upsert({
     where: {
-      staffId_supplierId_role: {
+      staffId_contactId_relationship: {
         staffId: employee.id,
-        supplierId: supplier2.id,
-        role: 'BUYER'
+        contactId: supplier2.id,
+        relationship: 'BUYER'
       }
     },
     update: {},
     create: {
       staffId: employee.id,
-      supplierId: supplier2.id,
-      role: 'BUYER',
+      contactId: supplier2.id,
+      relationship: 'BUYER',
+      commissionRate: 0,
       notes: 'Handles local purchases'
     },
   });
 
   // Assign staff to customers
-  await prisma.staffCustomer.upsert({
+  await prisma.staffContact.upsert({
     where: {
-      staffId_customerId_relationship: {
+      staffId_contactId_relationship: {
         staffId: employee.id,
-        customerId: customer1.id,
+        contactId: customer1.id,
         relationship: 'ACCOUNT_MANAGER'
       }
     },
     update: {},
     create: {
       staffId: employee.id,
-      customerId: customer1.id,
+      contactId: customer1.id,
       relationship: 'ACCOUNT_MANAGER',
       commissionRate: 3.5,
       notes: 'VIP customer - restaurant'
@@ -314,8 +322,8 @@ async function main() {
   console.log('👤 Admin user: admin@demo.com / Demo1234');
   console.log('👤 Employee: employee@demo.com / Employee123');
   console.log('📦 Created', products.length, 'sample products');
-  console.log('🏭 Created 2 suppliers');
-  console.log('👥 Created 2 customers');
+  console.log('📇 Created 2 supplier contacts');
+  console.log('📇 Created 2 customer contacts');
 }
 
 main()

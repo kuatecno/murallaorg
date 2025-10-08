@@ -6,17 +6,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
-interface RouteParams {
-  params: {
-    id: string;
-  };
-}
-
 /**
  * GET /api/contacts/[id]/activity
  * Fetch all activity (transactions, purchase orders, etc.) for a contact
  */
-export async function GET(request: NextRequest, { params }: RouteParams) {
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
   try {
     const tenantId = request.headers.get('x-tenant-id');
     if (!tenantId) {
@@ -30,7 +28,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     // Verify contact exists
     const contact = await prisma.contact.findFirst({
       where: {
-        id: params.id,
+        id: id,
         tenantId,
       },
     });
@@ -46,7 +44,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         ['CUSTOMER'].includes(contact.contactType)) {
       const transactions = await prisma.transaction.findMany({
         where: {
-          contactId: params.id,
+          contactId: id,
           tenantId,
         },
         take: limit,
@@ -97,7 +95,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         ['SUPPLIER'].includes(contact.contactType)) {
       const purchaseOrders = await prisma.purchaseOrder.findMany({
         where: {
-          supplierId: params.id,
+          supplierId: id,
           tenantId,
         },
         take: limit,

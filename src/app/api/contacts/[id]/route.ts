@@ -8,17 +8,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
-interface RouteParams {
-  params: {
-    id: string;
-  };
-}
-
 /**
  * GET /api/contacts/[id]
  * Fetch single contact with all relations
  */
-export async function GET(request: NextRequest, { params }: RouteParams) {
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
   try {
     const tenantId = request.headers.get('x-tenant-id');
     if (!tenantId) {
@@ -27,7 +25,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     const contact = await prisma.contact.findFirst({
       where: {
-        id: params.id,
+        id: id,
         tenantId,
       },
       include: {
@@ -94,7 +92,11 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
  * PUT /api/contacts/[id]
  * Update contact information
  */
-export async function PUT(request: NextRequest, { params }: RouteParams) {
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
   try {
     const tenantId = request.headers.get('x-tenant-id');
     if (!tenantId) {
@@ -106,7 +108,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     // Verify contact exists and belongs to tenant
     const existingContact = await prisma.contact.findFirst({
       where: {
-        id: params.id,
+        id: id,
         tenantId,
       },
     });
@@ -121,7 +123,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
         where: {
           tenantId,
           code: body.code,
-          id: { not: params.id },
+          id: { not: id },
         },
       });
 
@@ -134,7 +136,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     }
 
     const updatedContact = await prisma.contact.update({
-      where: { id: params.id },
+      where: { id: id },
       data: {
         code: body.code,
         name: body.name,
@@ -168,7 +170,11 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
  * DELETE /api/contacts/[id]
  * Soft delete contact (set isActive to false)
  */
-export async function DELETE(request: NextRequest, { params }: RouteParams) {
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
   try {
     const tenantId = request.headers.get('x-tenant-id');
     if (!tenantId) {
@@ -178,7 +184,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     // Verify contact exists and belongs to tenant
     const existingContact = await prisma.contact.findFirst({
       where: {
-        id: params.id,
+        id: id,
         tenantId,
       },
     });
@@ -189,7 +195,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
 
     // Soft delete
     const deletedContact = await prisma.contact.update({
-      where: { id: params.id },
+      where: { id: id },
       data: { isActive: false },
     });
 

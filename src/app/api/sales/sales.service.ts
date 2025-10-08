@@ -3,7 +3,7 @@ import { PrismaClient, Transaction, TransactionItem, ProductType } from '@prisma
 const prisma = new PrismaClient();
 
 export interface CreateSaleDto {
-  customerId?: string;
+  contactId?: string; // Contact (customer) ID
   items: {
     productId: string;
     productName: string;
@@ -42,7 +42,7 @@ export class SalesService {
         data: {
           type: 'SALE',
           status: 'COMPLETED',
-          customerId: data.customerId,
+          contactId: data.contactId,
           subtotal,
           tax,
           discount: data.items.reduce((sum, item) => sum + (item.discount || 0), 0),
@@ -300,7 +300,7 @@ export class SalesService {
         items: {
           include: { product: true },
         },
-        customer: true,
+        contact: true,
         createdBy: true,
         ingredientConsumptions: {
           include: {
@@ -317,7 +317,7 @@ export class SalesService {
   async listSales(
     tenantId: string,
     filters: {
-      customerId?: string;
+      contactId?: string;
       startDate?: Date;
       endDate?: Date;
       status?: string;
@@ -327,7 +327,7 @@ export class SalesService {
       where: {
         tenantId,
         type: 'SALE',
-        customerId: filters.customerId,
+        contactId: filters.contactId,
         status: filters.status as any,
         createdAt: {
           gte: filters.startDate,
@@ -338,7 +338,7 @@ export class SalesService {
         items: {
           include: { product: true },
         },
-        customer: true,
+        contact: true,
         createdBy: true,
       },
       orderBy: { createdAt: 'desc' },

@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { validateRUT, getRUTNumber, formatRUTForAPI } from '@/lib/chilean-utils';
 
 const OPENFACTURA_API_URL = 'https://api.haulmer.com/v2/dte/document/received';
 const OPENFACTURA_API_KEY = process.env.OPENFACTURA_API_KEY;
@@ -25,6 +26,7 @@ interface ReceivedDocumentsRequest {
   FchRecepOF?: FilterOperator;
   FchRecepSII?: FilterOperator;
   RUTEmisor?: FilterOperator;
+  RUTRecep?: FilterOperator; // Receiver RUT filter
 }
 
 interface OpenFacturaDocument {
@@ -110,12 +112,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Convert RUT to format expected by OpenFactura (remove dots and dash)
-    const companyRut = tenant.rut.replace(/[.-]/g, '');
+    // Validate tenant RUT
+    if (!validateRUT(tenant.rut)) {
+      return NextResponse.json(
+        {
+          error: 'Invalid tenant RUT',
+          details: `Tenant RUT ${tenant.rut} is not a valid Chilean RUT`,
+          success: false
+        },
+        { status: 400 }
+      );
+    }
+
+    // Get RUT number for filtering (receiver RUT)
+    const companyRutNumber = getRUTNumber(tenant.rut);
+    const companyRutFormatted = formatRUTForAPI(tenant.rut);
 
     // Build the request payload for OpenFactura
     const payload: ReceivedDocumentsRequest = {
       Page: body.page || "1",
+      // CRITICAL: Filter by receiver RUT to get only documents received by this tenant
+      RUTRecep: { eq: companyRutNumber }
     };
 
     // Add filters if provided
@@ -162,7 +179,8 @@ export async function POST(request: NextRequest) {
       tenantId: tenant.id,
       tenantName: tenant.name,
       tenantRut: tenant.rut,
-      companyRut: companyRut,
+      companyRutNumber: companyRutNumber,
+      companyRutFormatted: companyRutFormatted,
       payload: JSON.stringify(payload, null, 2)
     });
 
@@ -192,33 +210,16 @@ export async function POST(request: NextRequest) {
 
     const data: OpenFacturaResponse = await response.json();
 
-    console.log(`OpenFactura returned ${data.data.length} documents total`);
+    console.log(`OpenFactura returned ${data.data.length} documents for RUT ${companyRutFormatted}`);
 
     // Log first document structure for debugging
     if (data.data.length > 0) {
       console.log('Sample document structure:', JSON.stringify(data.data[0], null, 2));
     }
 
-    // Filter documents by receiving company RUT if needed
-    // Since this is the /document/received endpoint, documents should already be filtered by receiving company
-    // But if the API key has access to multiple companies, we might need to filter further
-    let filteredDocuments = data.data;
-
-    // Check if we have receiver RUT info in the response to do additional filtering
-    if (data.data.length > 0 && (data.data[0].RUTRecep || data.data[0].DVRecep)) {
-      // If the API response includes receiver RUT info, filter by it
-      const targetRutNumber = parseInt(companyRut.replace(/\D/g, ''));
-      filteredDocuments = data.data.filter(doc => {
-        if (doc.RUTRecep) {
-          return doc.RUTRecep === targetRutNumber;
-        }
-        return true; // If no RUTRecep field, include all documents
-      });
-
-      console.log(`Filtered from ${data.data.length} to ${filteredDocuments.length} documents for RUT ${companyRut}`);
-    } else {
-      console.log('No receiver RUT filtering needed - assuming API already filters by receiving company');
-    }
+    // Since we're filtering by RUTRecep in the API request, all returned documents
+    // should already be for the correct receiving company
+    const filteredDocuments = data.data;
 
     // Transform response to match our format
     const transformedResponse = {
@@ -252,7 +253,8 @@ export async function POST(request: NextRequest) {
         acuses: doc.Acuses,
         // Additional metadata
         metadata: {
-          companyRut: companyRut,
+          companyRutNumber: companyRutNumber,
+          companyRutFormatted: companyRutFormatted,
           tenantId: tenant.id,
           tenantName: tenant.name,
           apiSource: 'OpenFactura',

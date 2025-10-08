@@ -93,9 +93,9 @@ export default function DashboardPage() {
                   <h4 className="text-lg font-semibold text-green-900">Sales</h4>
                   <p className="text-green-700 mt-2">Point of sale system</p>
                 </Link>
-                <Link href="/customers" className="bg-yellow-50 p-6 rounded-lg hover:bg-yellow-100 transition-colors cursor-pointer">
-                  <h4 className="text-lg font-semibold text-yellow-900">Customers</h4>
-                  <p className="text-yellow-700 mt-2">Customer management</p>
+                <Link href="/contacts" className="bg-yellow-50 p-6 rounded-lg hover:bg-yellow-100 transition-colors cursor-pointer">
+                  <h4 className="text-lg font-semibold text-yellow-900">Contacts</h4>
+                  <p className="text-yellow-700 mt-2">Manage all business contacts</p>
                 </Link>
                 <Link href="/reports" className="bg-purple-50 p-6 rounded-lg hover:bg-purple-100 transition-colors cursor-pointer">
                   <h4 className="text-lg font-semibold text-purple-900">Reports</h4>

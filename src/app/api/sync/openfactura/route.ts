@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { TaxDocumentType, TaxDocumentStatus } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
+import { validateRUT, getRUTNumber, formatRUTForAPI } from '@/lib/chilean-utils';
 
 const OPENFACTURA_API_URL = 'https://api.haulmer.com/v2/dte/document/received';
 const OPENFACTURA_DETAIL_URL = 'https://api.haulmer.com/v2/dte/document';
@@ -169,6 +170,7 @@ interface FetchOptions {
   fromDate?: string; // YYYY-MM-DD format
   toDate?: string; // YYYY-MM-DD format
   maxDays?: number; // Maximum days to query (default 90)
+  receiverRut?: number; // Receiver RUT for filtering
 }
 
 async function fetchOpenFacturaPage(options: FetchOptions = {}): Promise<OpenFacturaResponse> {
@@ -202,13 +204,18 @@ async function fetchOpenFacturaPage(options: FetchOptions = {}): Promise<OpenFac
     startDate = new Date(Date.now() - maxDays * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
   }
 
-  const payload = {
+  const payload: any = {
     Page: page.toString(),
     FchEmis: {
       gte: startDate,
       lte: endDate
     }
   };
+
+  // Add RUTRecep filter if available from options
+  if (options.receiverRut) {
+    payload.RUTRecep = { eq: options.receiverRut };
+  }
 
   console.log(`Fetching OpenFactura page ${page}:`, JSON.stringify(payload, null, 2));
 
@@ -462,8 +469,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Convert RUT to format expected by OpenFactura (remove dots and dash)
-    const companyRut = tenant.rut.replace(/[.-]/g, '');
+    // Validate tenant RUT
+    if (!validateRUT(tenant.rut)) {
+      return NextResponse.json(
+        {
+          error: 'Invalid tenant RUT',
+          details: `Tenant RUT ${tenant.rut} is not a valid Chilean RUT`
+        },
+        { status: 400 }
+      );
+    }
+
+    // Get RUT number for filtering (receiver RUT)
+    const companyRutNumber = getRUTNumber(tenant.rut);
+    const companyRutFormatted = formatRUTForAPI(tenant.rut);
 
     // Calculate total date range and chunking strategy
     const totalDays = Math.ceil((new Date(finalToDate).getTime() - new Date(finalFromDate).getTime()) / (24 * 60 * 60 * 1000));
@@ -501,34 +520,20 @@ export async function POST(request: NextRequest) {
           const pageData = await fetchOpenFacturaPage({
             page: currentPage,
             fromDate: chunk.from,
-            toDate: chunk.to
+            toDate: chunk.to,
+            receiverRut: companyRutNumber
           });
         syncStats.pages++;
 
-        console.log(`Fetched page ${currentPage}/${pageData.last_page} with ${pageData.data.length} total documents from OpenFactura`);
+        console.log(`Fetched page ${currentPage}/${pageData.last_page} with ${pageData.data.length} documents from OpenFactura for RUT ${companyRutFormatted}`);
 
-        // Filter documents by receiving company RUT for this tenant
-        let filteredDocuments = pageData.data;
-
-        // Check if we have receiver RUT info in the response to filter by it
-        if (pageData.data.length > 0 && (pageData.data[0].RUTRecep || pageData.data[0].DVRecep)) {
-          // If the API response includes receiver RUT info, filter by it
-          const targetRutNumber = parseInt(companyRut.replace(/\D/g, ''));
-          filteredDocuments = pageData.data.filter(doc => {
-            if (doc.RUTRecep) {
-              return doc.RUTRecep === targetRutNumber;
-            }
-            return true; // If no RUTRecep field, include all documents
-          });
-
-          console.log(`Filtered from ${pageData.data.length} to ${filteredDocuments.length} documents for tenant ${tenant.name} (RUT: ${tenant.rut})`);
-        } else {
-          console.log(`No receiver RUT filtering needed for tenant ${tenant.name} - assuming API already filters by receiving company`);
-        }
+        // Since we're filtering by RUTRecep in the API request, all returned documents
+        // should already be for the correct receiving company
+        const filteredDocuments = pageData.data;
 
         syncStats.totalDocuments += filteredDocuments.length;
 
-        console.log(`Processing ${filteredDocuments.length} filtered documents for tenant ${tenant.name}`);
+        console.log(`Processing ${filteredDocuments.length} documents for tenant ${tenant.name} (${companyRutFormatted})`);
 
         // Process each document in the filtered page
         for (const doc of filteredDocuments) {

@@ -189,3 +189,30 @@ export function formatChileanPhone(phone: string): string {
 
   return phone; // Return original if format is not recognized
 }
+
+/**
+ * Get RUT number without verifier digit (for OpenFactura API)
+ */
+export function getRUTNumber(rut: string): number {
+  const cleaned = cleanRUT(rut);
+  const digits = cleaned.slice(0, -1);
+  return parseInt(digits);
+}
+
+/**
+ * Get RUT verifier digit
+ */
+export function getRUTVerifier(rut: string): string {
+  const cleaned = cleanRUT(rut);
+  return cleaned.slice(-1);
+}
+
+/**
+ * Format RUT for OpenFactura API (with dash, e.g., "12345678-9")
+ */
+export function formatRUTForAPI(rut: string): string {
+  const cleaned = cleanRUT(rut);
+  const digits = cleaned.slice(0, -1);
+  const verifier = cleaned.slice(-1);
+  return `${digits}-${verifier}`;
+}

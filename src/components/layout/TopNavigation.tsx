@@ -55,7 +55,7 @@ export default function TopNavigation({
   const menuItems = [
     { href: '/dashboard', icon: Home, label: 'Dashboard' },
     { href: '/invoices', icon: FileText, label: 'Invoices' },
-    { href: '/customers', icon: Users, label: 'Customers' },
+    { href: '/contacts', icon: Users, label: 'Contacts' },
     { href: '/settings', icon: Settings, label: 'Settings' },
   ]
 

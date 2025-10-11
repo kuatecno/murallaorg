@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
       taxDocuments: await prisma.taxDocument.count(),
       taxDocumentItems: await prisma.taxDocumentItem.count(),
       tenants: await prisma.tenant.count(),
-      customers: await prisma.customer.count(),
+      contacts: await prisma.contact.count(),
       transactions: await prisma.transaction.count()
     };
 
@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
       taxDocuments: await prisma.taxDocument.count(),
       taxDocumentItems: await prisma.taxDocumentItem.count(),
       tenants: await prisma.tenant.count(),
-      customers: await prisma.customer.count(),
+      contacts: await prisma.contact.count(),
       transactions: await prisma.transaction.count()
     };
 
@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
     // Verify that we only deleted tax document data
     const preservedDataIntact = (
       afterCounts.tenants === beforeCounts.tenants &&
-      afterCounts.customers === beforeCounts.customers &&
+      afterCounts.contacts === beforeCounts.contacts &&
       afterCounts.transactions === beforeCounts.transactions &&
       afterCounts.taxDocuments === 0 &&
       afterCounts.taxDocumentItems === 0
@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
       afterCounts,
       dataIntegrityCheck: {
         tenantsPreserved: afterCounts.tenants === beforeCounts.tenants,
-        customersPreserved: afterCounts.customers === beforeCounts.customers,
+        contactsPreserved: afterCounts.contacts === beforeCounts.contacts,
         transactionsPreserved: afterCounts.transactions === beforeCounts.transactions,
         taxDocumentsCleared: afterCounts.taxDocuments === 0,
         taxDocumentItemsCleared: afterCounts.taxDocumentItems === 0
@@ -127,7 +127,7 @@ export async function GET() {
       taxDocuments: await prisma.taxDocument.count(),
       taxDocumentItems: await prisma.taxDocumentItem.count(),
       tenants: await prisma.tenant.count(),
-      customers: await prisma.customer.count(),
+      contacts: await prisma.contact.count(),
       transactions: await prisma.transaction.count()
     };
 
@@ -142,7 +142,7 @@ export async function GET() {
       },
       willPreserve: {
         tenants: counts.tenants,
-        customers: counts.customers,
+        contacts: counts.contacts,
         transactions: counts.transactions
       },
       exampleRequest: {

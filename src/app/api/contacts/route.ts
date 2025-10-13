@@ -6,7 +6,6 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { ContactType } from '@prisma/client';
 
 /**
  * GET /api/contacts
@@ -20,7 +19,7 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const contactType = searchParams.get('type') as ContactType | null;
+    const contactType = searchParams.get('type');
     const search = searchParams.get('search');
 
     const contacts = await prisma.contact.findMany({

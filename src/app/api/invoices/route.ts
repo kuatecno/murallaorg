@@ -409,7 +409,7 @@ export async function POST(request: NextRequest) {
       status: newInvoice.status,
       createdAt: newInvoice.createdAt,
       updatedAt: newInvoice.updatedAt,
-      customer: newInvoice.transaction?.customer || null,
+      customer: newInvoice.transaction?.contact || null,
       items: newInvoice.items.map(item => ({
         id: item.id,
         productName: item.productName,

@@ -39,7 +39,7 @@ export async function GET(
 
     const activity: any[] = [];
 
-    // Fetch sales transactions if customer
+    // Fetch sales transactions for contact
     if ((!type || type === 'sales' || type === 'all') &&
         ['CUSTOMER'].includes(contact.contactType)) {
       const transactions = await prisma.transaction.findMany({

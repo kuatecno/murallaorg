@@ -105,7 +105,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         items: true,
         transaction: {
           include: {
-            customer: {
+            contact: {
               select: {
                 id: true,
                 name: true,
@@ -182,7 +182,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       createdAt: approvedInvoice.createdAt,
       updatedAt: approvedInvoice.updatedAt,
       tenant: approvedInvoice.tenant,
-      customer: approvedInvoice.transaction?.customer || null,
+      customer: approvedInvoice.transaction?.contact || null,
       items: approvedInvoice.items.map(item => ({
         id: item.id,
         productName: item.productName,

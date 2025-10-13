@@ -14,7 +14,7 @@ interface InvoiceParams {
   search?: string;
   status?: TaxDocumentStatus;
   type?: TaxDocumentType;
-  customerId?: string;
+  contactId?: string;
   sortBy?: 'folio' | 'totalAmount' | 'issuedAt' | 'createdAt';
   sortOrder?: 'asc' | 'desc';
   dateFrom?: string;
@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
       search: searchParams.get('search') || undefined,
       status: (searchParams.get('status') as TaxDocumentStatus) || undefined,
       type: (searchParams.get('type') as TaxDocumentType) || undefined,
-      customerId: searchParams.get('customerId') || undefined,
+      contactId: searchParams.get('contactId') || undefined,
       sortBy: (searchParams.get('sortBy') as InvoiceParams['sortBy']) || 'createdAt',
       sortOrder: (searchParams.get('sortOrder') as InvoiceParams['sortOrder']) || 'desc',
       dateFrom: searchParams.get('dateFrom') || undefined,
@@ -79,10 +79,10 @@ export async function GET(request: NextRequest) {
       where.type = params.type;
     }
 
-    // Add customer filter
-    if (params.customerId) {
+    // Add contact filter
+    if (params.contactId) {
       where.transaction = {
-        customerId: params.customerId
+        contactId: params.contactId
       };
     }
 
@@ -136,7 +136,7 @@ export async function GET(request: NextRequest) {
         include: {
           transaction: {
             include: {
-              customer: {
+              contact: {
                 select: {
                   id: true,
                   name: true,
@@ -179,7 +179,7 @@ export async function GET(request: NextRequest) {
       xmlUrl: invoice.xmlUrl,
       createdAt: invoice.createdAt,
       updatedAt: invoice.updatedAt,
-      customer: invoice.transaction?.customer || null,
+      customer: invoice.transaction?.contact || null,
       itemCount: invoice.items.length,
       items: invoice.items.map(item => ({
         id: item.id,
@@ -218,7 +218,7 @@ export async function GET(request: NextRequest) {
         search: params.search,
         status: params.status,
         type: params.type,
-        customerId: params.customerId,
+        contactId: params.contactId,
         sortBy: params.sortBy,
         sortOrder: params.sortOrder,
         dateFrom: params.dateFrom,
@@ -344,7 +344,7 @@ export async function POST(request: NextRequest) {
           total: totalAmount,
           paymentStatus: 'PENDING',
           tenantId,
-          customerId: body.customerId || null,
+          contactId: body.contactId || null,
         }
       });
       transactionId = transaction.id;
@@ -378,7 +378,7 @@ export async function POST(request: NextRequest) {
         items: true,
         transaction: {
           include: {
-            customer: {
+            contact: {
               select: {
                 id: true,
                 name: true,

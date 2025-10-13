@@ -33,7 +33,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       include: {
         transaction: {
           include: {
-            customer: {
+            contact: {
               select: {
                 id: true,
                 name: true,
@@ -99,7 +99,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       createdAt: invoice.createdAt,
       updatedAt: invoice.updatedAt,
       tenant: invoice.tenant,
-      customer: invoice.transaction?.customer || null,
+      customer: invoice.transaction?.contact || null,
       transaction: invoice.transaction ? {
         id: invoice.transaction.id,
         type: invoice.transaction.type,
@@ -254,7 +254,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
         items: true,
         transaction: {
           include: {
-            customer: {
+            contact: {
               select: {
                 id: true,
                 name: true,
@@ -287,7 +287,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       xmlUrl: updatedInvoice.xmlUrl,
       createdAt: updatedInvoice.createdAt,
       updatedAt: updatedInvoice.updatedAt,
-      customer: updatedInvoice.transaction?.customer || null,
+      customer: updatedInvoice.transaction?.contact || null,
       items: updatedInvoice.items.map(item => ({
         id: item.id,
         productName: item.productName,

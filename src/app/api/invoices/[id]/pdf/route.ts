@@ -33,7 +33,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         items: true,
         transaction: {
           include: {
-            customer: {
+            contact: {
               select: {
                 id: true,
                 name: true,
@@ -245,9 +245,9 @@ function generateInvoiceHTML(invoice: any): string {
             <h3>Información del Cliente</h3>
             <p><strong>Nombre:</strong> ${invoice.receiverName}</p>
             <p><strong>RUT:</strong> ${invoice.receiverRUT}</p>
-            ${invoice.transaction?.customer?.email ? `<p><strong>Email:</strong> ${invoice.transaction.customer.email}</p>` : ''}
-            ${invoice.transaction?.customer?.phone ? `<p><strong>Teléfono:</strong> ${invoice.transaction.customer.phone}</p>` : ''}
-            ${invoice.transaction?.customer?.address ? `<p><strong>Dirección:</strong> ${invoice.transaction.customer.address}</p>` : ''}
+            ${invoice.transaction?.contact?.email ? `<p><strong>Email:</strong> ${invoice.transaction.contact.email}</p>` : ''}
+            ${invoice.transaction?.contact?.phone ? `<p><strong>Teléfono:</strong> ${invoice.transaction.contact.phone}</p>` : ''}
+            ${invoice.transaction?.contact?.address ? `<p><strong>Dirección:</strong> ${invoice.transaction.contact.address}</p>` : ''}
         </div>
 
         <table>

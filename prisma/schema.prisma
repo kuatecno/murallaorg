@@ -89,11 +89,12 @@ model Product {
   ingredientConsumptions IngredientConsumption[] @relation("ConsumedIngredients")
 
   // M:M Relationships
-  suppliers        ProductSupplier[]
-  staffOwners      StaffProduct[]    @relation("ProductOwnedByStaff")
-  movements        ProductMovement[]
-  transactionItems TransactionItem[]
-  inventoryRecords InventoryRecord[]
+  suppliers         ProductSupplier[]
+  staffOwners       StaffProduct[]       @relation("ProductOwnedByStaff")
+  movements         ProductMovement[]
+  transactionItems  TransactionItem[]
+  purchaseOrderItems PurchaseOrderItem[]
+  inventoryRecords  InventoryRecord[]
 
   @@unique([tenantId, sku])
   @@index([tenantId, type])
@@ -402,6 +403,7 @@ model PurchaseOrderItem {
 
   // Relations
   purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  product       Product       @relation(fields: [productId], references: [id])
 
   @@map("purchase_order_items")
 }

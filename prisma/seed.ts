@@ -11,7 +11,7 @@ async function main() {
     create: {
       name: 'Demo Company',
       slug: 'demo',
-      rut: '76123456-7',
+      rut: '76123456-0',
       address: 'Av. Providencia 1234, Santiago',
       phone: '+56 2 2345 6789',
       email: 'admin@demo.com',

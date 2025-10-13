@@ -575,14 +575,21 @@ export async function POST(request: NextRequest) {
             // Create enhanced document data with details
             const enhancedDocData = enhanceDocumentWithDetails(doc, documentDetails);
 
+            // Use actual receiver data from invoice, not tenant data
+            // OpenFactura provides RUTRecep and RznSocRecep in the document
+            const receiverRUT = doc.RUTRecep && doc.DVRecep
+              ? `${doc.RUTRecep}-${doc.DVRecep}`
+              : tenant.rut || '';
+            const receiverName = doc.RznSocRecep || tenant.name;
+
             const documentData = {
               type: mapDocumentType(doc.TipoDTE),
               folio: doc.Folio.toString(),
               documentCode: doc.TipoDTE,
               emitterRUT: `${doc.RUTEmisor}-${doc.DV}`,
               emitterName: doc.RznSoc,
-              receiverRUT: tenant.rut || '',
-              receiverName: tenant.name,
+              receiverRUT,
+              receiverName,
               netAmount: new Decimal(doc.MntNeto || 0),
               taxAmount: new Decimal(doc.IVA || 0),
               totalAmount: new Decimal(doc.MntTotal || 0),

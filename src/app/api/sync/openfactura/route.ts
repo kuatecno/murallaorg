@@ -185,7 +185,7 @@ async function fetchOpenFacturaPage(options: FetchOptions = {}): Promise<OpenFac
     maxDays = 90
   } = options;
 
-  // Calculate date range
+  // Calculate date range (using Chilean timezone)
   let startDate: string;
   let endDate: string;
 
@@ -199,9 +199,11 @@ async function fetchOpenFacturaPage(options: FetchOptions = {}): Promise<OpenFac
     const to = new Date(from.getTime() + maxDays * 24 * 60 * 60 * 1000);
     endDate = to.toISOString().split('T')[0];
   } else {
-    // Default: last maxDays
-    endDate = new Date().toISOString().split('T')[0];
-    startDate = new Date(Date.now() - maxDays * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    // Default: last maxDays (using Chilean timezone + 1 day buffer)
+    const chileanDate = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Santiago' }));
+    chileanDate.setDate(chileanDate.getDate() + 1); // Tomorrow in Chile
+    endDate = chileanDate.toISOString().split('T')[0];
+    startDate = new Date(chileanDate.getTime() - maxDays * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
   }
 
   const payload: any = {
@@ -414,29 +416,38 @@ export async function POST(request: NextRequest) {
 
     console.log('Starting OpenFactura sync with options:', syncOptions);
 
+    // Helper function to get date in Chilean timezone
+    const getChileanDate = (offset: number = 0): string => {
+      const date = new Date();
+      // Convert to Chilean timezone (UTC-3 or UTC-4 depending on DST)
+      const chileanDate = new Date(date.toLocaleString('en-US', { timeZone: 'America/Santiago' }));
+      chileanDate.setDate(chileanDate.getDate() + offset);
+      return chileanDate.toISOString().split('T')[0];
+    };
+
     // Calculate date range based on options
     let finalFromDate: string;
     let finalToDate: string;
 
     if (syncOptions.months > 0) {
-      // Sync last N months
-      const now = new Date();
-      finalToDate = now.toISOString().split('T')[0];
-      const monthsAgo = new Date(now);
-      monthsAgo.setMonth(monthsAgo.getMonth() - syncOptions.months);
-      finalFromDate = monthsAgo.toISOString().split('T')[0];
+      // Sync last N months (using Chilean timezone)
+      finalToDate = getChileanDate(1); // Tomorrow in Chile to ensure we capture all of today
+      const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Santiago' }));
+      now.setMonth(now.getMonth() - syncOptions.months);
+      finalFromDate = now.toISOString().split('T')[0];
     } else if (syncOptions.fromDate && syncOptions.toDate) {
       finalFromDate = syncOptions.fromDate;
       finalToDate = syncOptions.toDate;
     } else if (syncOptions.fromDate) {
       finalFromDate = syncOptions.fromDate;
-      finalToDate = new Date().toISOString().split('T')[0];
+      finalToDate = getChileanDate(1); // Tomorrow in Chile
     } else {
-      // Default: last 90 days
-      const now = new Date();
-      finalToDate = now.toISOString().split('T')[0];
+      // Default: last 90 days (using Chilean timezone)
+      // Add 1 day buffer to ensure we capture today's invoices in Chile
+      finalToDate = getChileanDate(1); // Tomorrow in Chile
       const defaultDays = syncOptions.maxDays;
-      finalFromDate = new Date(now.getTime() - defaultDays * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      const chileanNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Santiago' }));
+      finalFromDate = new Date(chileanNow.getTime() - defaultDays * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     }
 
     // Get tenant from request or use first active tenant with RUT configured

@@ -50,7 +50,9 @@ export default function InvoicesPage() {
     status: '',
     startDate: '',
     endDate: '',
-    search: ''
+    search: '',
+    sortBy: 'createdAt' as 'folio' | 'totalAmount' | 'issuedAt' | 'createdAt',
+    sortOrder: 'desc' as 'asc' | 'desc'
   })
   const [stats, setStats] = useState({
     total: 0,
@@ -78,11 +80,13 @@ export default function InvoicesPage() {
       const response = await fetch('/api/tenants')
       if (response.ok) {
         const data = await response.json()
-        setTenants(data.tenants || [])
+        // Exclude Demo Company (slug: 'demo')
+        const filteredTenants = (data.tenants || []).filter((t: Tenant) => t.slug !== 'demo')
+        setTenants(filteredTenants)
 
         // Auto-select first tenant if none selected
-        if (data.tenants && data.tenants.length > 0 && !selectedTenant) {
-          setSelectedTenant(data.tenants[0].id)
+        if (filteredTenants && filteredTenants.length > 0 && !selectedTenant) {
+          setSelectedTenant(filteredTenants[0].id)
         }
       }
     } catch (err) {
@@ -182,6 +186,10 @@ export default function InvoicesPage() {
         if (filters.search) params.append('search', filters.search)
       }
 
+      // Always include sort parameters
+      params.append('sortBy', filters.sortBy)
+      params.append('sortOrder', filters.sortOrder)
+
       const url = `/api/invoices?${params.toString()}`
       const response = await fetch(url)
 
@@ -250,6 +258,18 @@ export default function InvoicesPage() {
   const formatSyncTime = (timestamp: string) => {
     const date = new Date(timestamp)
     return date.toLocaleString('es-CL')
+  }
+
+  const handleSort = (column: 'folio' | 'totalAmount' | 'issuedAt' | 'createdAt') => {
+    const newOrder = filters.sortBy === column && filters.sortOrder === 'desc' ? 'asc' : 'desc'
+    setFilters({ ...filters, sortBy: column, sortOrder: newOrder })
+    setPagination(prev => ({ ...prev, page: 1 }))
+    fetchInvoices(true, 1)
+  }
+
+  const SortIcon = ({ column }: { column: string }) => {
+    if (filters.sortBy !== column) return <span className="ml-1 text-gray-400">⇅</span>
+    return filters.sortOrder === 'desc' ? <span className="ml-1">↓</span> : <span className="ml-1">↑</span>
   }
 
   if (loading) {
@@ -444,7 +464,7 @@ export default function InvoicesPage() {
             </button>
             <button
               onClick={() => {
-                setFilters({ type: '', status: '', startDate: '', endDate: '', search: '' });
+                setFilters({ type: '', status: '', startDate: '', endDate: '', search: '', sortBy: 'createdAt', sortOrder: 'desc' });
                 setPagination(prev => ({ ...prev, page: 1 }))
                 fetchInvoices(false, 1);
               }}
@@ -485,20 +505,47 @@ export default function InvoicesPage() {
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Document
+                    <th
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                      onClick={() => handleSort('folio')}
+                    >
+                      <div className="flex items-center">
+                        Document
+                        <SortIcon column="folio" />
+                      </div>
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Emitter
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Amount
+                    <th
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                      onClick={() => handleSort('totalAmount')}
+                    >
+                      <div className="flex items-center">
+                        Amount
+                        <SortIcon column="totalAmount" />
+                      </div>
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Status
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Date
+                    <th
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                      onClick={() => handleSort('issuedAt')}
+                    >
+                      <div className="flex items-center">
+                        Issue Date
+                        <SortIcon column="issuedAt" />
+                      </div>
+                    </th>
+                    <th
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                      onClick={() => handleSort('createdAt')}
+                    >
+                      <div className="flex items-center">
+                        Created Date
+                        <SortIcon column="createdAt" />
+                      </div>
                     </th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Actions
@@ -533,7 +580,10 @@ export default function InvoicesPage() {
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {formatDate(invoice.issuedAt || invoice.createdAt)}
+                        {invoice.issuedAt ? formatDate(invoice.issuedAt) : '-'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {formatDate(invoice.createdAt)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <div className="flex items-center justify-end space-x-2">

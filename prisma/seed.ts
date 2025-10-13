@@ -317,6 +317,81 @@ async function main() {
     },
   });
 
+  // Create default contact type configurations
+  const contactTypeConfigs = [
+    {
+      name: 'CUSTOMER',
+      label: 'Customer',
+      description: 'Regular customers who purchase products',
+      icon: '👤',
+      color: 'bg-blue-100 text-blue-800',
+      isSystem: true,
+      order: 1,
+      fields: [
+        { fieldName: 'code', fieldLabel: 'Code', fieldType: 'text', isRequired: true, isVisible: true, order: 1, placeholder: 'CLI001' },
+        { fieldName: 'name', fieldLabel: 'Name', fieldType: 'text', isRequired: true, isVisible: true, order: 2, placeholder: 'Company or Person Name' },
+        { fieldName: 'rut', fieldLabel: 'RUT', fieldType: 'text', isRequired: false, isVisible: true, order: 3, placeholder: '12345678-9' },
+        { fieldName: 'email', fieldLabel: 'Email', fieldType: 'email', isRequired: false, isVisible: true, order: 4 },
+        { fieldName: 'phone', fieldLabel: 'Phone', fieldType: 'phone', isRequired: false, isVisible: true, order: 5 },
+        { fieldName: 'address', fieldLabel: 'Address', fieldType: 'text', isRequired: false, isVisible: true, order: 6 },
+        { fieldName: 'city', fieldLabel: 'City', fieldType: 'text', isRequired: false, isVisible: true, order: 7 },
+        { fieldName: 'creditLimit', fieldLabel: 'Credit Limit', fieldType: 'number', isRequired: false, isVisible: true, order: 8 },
+      ],
+    },
+    {
+      name: 'SUPPLIER',
+      label: 'Supplier',
+      description: 'Vendors and suppliers',
+      icon: '🏭',
+      color: 'bg-green-100 text-green-800',
+      isSystem: true,
+      order: 2,
+      fields: [
+        { fieldName: 'code', fieldLabel: 'Code', fieldType: 'text', isRequired: true, isVisible: true, order: 1, placeholder: 'SUP001' },
+        { fieldName: 'name', fieldLabel: 'Name', fieldType: 'text', isRequired: true, isVisible: true, order: 2 },
+        { fieldName: 'rut', fieldLabel: 'RUT', fieldType: 'text', isRequired: false, isVisible: true, order: 3 },
+        { fieldName: 'contactName', fieldLabel: 'Contact Person', fieldType: 'text', isRequired: false, isVisible: true, order: 4 },
+        { fieldName: 'email', fieldLabel: 'Email', fieldType: 'email', isRequired: false, isVisible: true, order: 5 },
+        { fieldName: 'phone', fieldLabel: 'Phone', fieldType: 'phone', isRequired: false, isVisible: true, order: 6 },
+        { fieldName: 'address', fieldLabel: 'Address', fieldType: 'text', isRequired: false, isVisible: true, order: 7 },
+        { fieldName: 'paymentTerms', fieldLabel: 'Payment Terms', fieldType: 'select', isRequired: false, isVisible: true, order: 8, options: JSON.stringify(['cash', '15_days', '30_days', '60_days', '90_days']) },
+      ],
+    },
+    {
+      name: 'BRAND',
+      label: 'Brand',
+      description: 'Product brands and manufacturers',
+      icon: '🏷️',
+      color: 'bg-purple-100 text-purple-800',
+      isSystem: true,
+      order: 3,
+      fields: [
+        { fieldName: 'code', fieldLabel: 'Code', fieldType: 'text', isRequired: true, isVisible: true, order: 1 },
+        { fieldName: 'name', fieldLabel: 'Brand Name', fieldType: 'text', isRequired: true, isVisible: true, order: 2 },
+        { fieldName: 'contactName', fieldLabel: 'Contact Person', fieldType: 'text', isRequired: false, isVisible: true, order: 3 },
+        { fieldName: 'email', fieldLabel: 'Email', fieldType: 'email', isRequired: false, isVisible: true, order: 4 },
+        { fieldName: 'phone', fieldLabel: 'Phone', fieldType: 'phone', isRequired: false, isVisible: true, order: 5 },
+      ],
+    },
+  ];
+
+  for (const config of contactTypeConfigs) {
+    await prisma.contactTypeConfig.upsert({
+      where: { tenantId_name: { tenantId: tenant.id, name: config.name } },
+      update: {},
+      create: {
+        ...config,
+        tenantId: tenant.id,
+        fields: {
+          create: config.fields.map(field => ({
+            ...field,
+            tenantId: tenant.id,
+          })),
+        },
+      },
+    });
+  }
+
   console.log('✅ Database seeded successfully!');
   console.log('🏢 Tenant:', tenant.name);
   console.log('👤 Admin user: admin@demo.com / Demo1234');
@@ -324,6 +399,7 @@ async function main() {
   console.log('📦 Created', products.length, 'sample products');
   console.log('📇 Created 2 supplier contacts');
   console.log('📇 Created 2 customer contacts');
+  console.log('⚙️  Created', contactTypeConfigs.length, 'contact type configurations');
 }
 
 main()

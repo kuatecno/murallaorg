@@ -78,7 +78,7 @@ export class ProductService {
           },
         },
         suppliers: {
-          include: { contact: true },
+          include: { supplier: true },
         },
       },
     });

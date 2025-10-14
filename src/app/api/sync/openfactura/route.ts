@@ -214,12 +214,13 @@ async function fetchOpenFacturaPage(options: FetchOptions = {}): Promise<OpenFac
     }
   };
 
-  // Add RUTRecep filter if available from options
-  if (options.receiverRut) {
-    payload.RUTRecep = { eq: options.receiverRut };
-  }
+  // NOTE: RUTRecep filter does NOT work - OpenFactura API ignores it
+  // We fetch ALL documents and filter on our side using detail endpoint data
+  // if (options.receiverRut) {
+  //   payload.RUTRecep = { eq: options.receiverRut };
+  // }
 
-  console.log(`Fetching OpenFactura page ${page}:`, JSON.stringify(payload, null, 2));
+  console.log(`Fetching OpenFactura page ${page} (all companies):`, JSON.stringify(payload, null, 2));
 
   const response = await fetch(OPENFACTURA_API_URL, {
     method: 'POST',
@@ -574,26 +575,58 @@ export async function POST(request: NextRequest) {
             const pageData = await fetchOpenFacturaPage({
               page: currentPage,
               fromDate: chunk.from,
-              toDate: chunk.to,
-              receiverRut: companyRutNumber
+              toDate: chunk.to
+              // NOTE: Not passing receiverRut - filter doesn't work in API
             });
             tenantStats.pages++;
 
-            console.log(`  📄 Fetched page ${currentPage}/${pageData.last_page} with ${pageData.data.length} documents from OpenFactura for ${tenant.name} (${companyRutFormatted})`);
+            console.log(`  📄 Fetched page ${currentPage}/${pageData.last_page} with ${pageData.data.length} documents from OpenFactura (all companies)`);
 
-            // Since we're filtering by RUTRecep in the API request, all returned documents
-            // should already be for the correct receiving company
-            const filteredDocuments = pageData.data;
+            // NOTE: OpenFactura API returns ALL documents across all companies
+            // We need to filter by checking the actual receiver RUT from detail endpoint
+            const allDocuments = pageData.data;
 
-            tenantStats.totalDocuments += filteredDocuments.length;
+            tenantStats.totalDocuments += allDocuments.length;
 
-            console.log(`  ⚙️  Processing ${filteredDocuments.length} documents for ${tenant.name}`);
+            console.log(`  ⚙️  Processing ${allDocuments.length} documents, will filter by receiver RUT ${companyRutFormatted}`);
 
-            // Process each document in the filtered page
-            for (const doc of filteredDocuments) {
+            // Process each document and filter by actual receiver
+            for (const doc of allDocuments) {
               try {
                 // Create unique identifier
                 const uniqueId = `${doc.RUTEmisor}-${doc.TipoDTE}-${doc.Folio}`;
+
+                // Fetch detailed document information to get ACTUAL receiver RUT
+                const documentDetails = await fetchDocumentDetails(
+                  `${doc.RUTEmisor}-${doc.DV}`,
+                  doc.TipoDTE,
+                  doc.Folio
+                );
+
+                // Small delay to be respectful to the API (250ms between detail requests)
+                await new Promise(resolve => setTimeout(resolve, 250));
+
+                // Extract ACTUAL receiver RUT from detail endpoint
+                const actualReceiverRUT = documentDetails?.json?.Encabezado?.Receptor?.RUTRecep;
+                const actualReceiverDV = documentDetails?.json?.Encabezado?.Receptor?.DV;
+                const actualReceiverName = documentDetails?.json?.Encabezado?.Receptor?.RznSocRecep;
+
+                // CRITICAL: Skip invoice if receiver doesn't match current tenant
+                if (!actualReceiverRUT) {
+                  console.log(`    ⏭️  Skipping ${uniqueId}: No receiver RUT in detail endpoint`);
+                  tenantStats.skippedDocuments++;
+                  continue;
+                }
+
+                // Check if this invoice belongs to current tenant
+                if (actualReceiverRUT !== companyRutNumber) {
+                  console.log(`    ⏭️  Skipping ${uniqueId}: Receiver RUT ${actualReceiverRUT} doesn't match tenant ${companyRutNumber}`);
+                  tenantStats.skippedDocuments++;
+                  continue;
+                }
+
+                // This invoice belongs to current tenant!
+                console.log(`    ✓ ${uniqueId}: Matches tenant ${tenant.name}`);
 
                 // Check if document already exists (use unique constraint fields)
                 const existingDoc = await prisma.taxDocument.findFirst({
@@ -604,30 +637,12 @@ export async function POST(request: NextRequest) {
                   }
                 });
 
-                // Fetch detailed document information including line items
-                const documentDetails = await fetchDocumentDetails(
-                  `${doc.RUTEmisor}-${doc.DV}`,
-                  doc.TipoDTE,
-                  doc.Folio
-                );
-
-                // Small delay to be respectful to the API (250ms between detail requests)
-                await new Promise(resolve => setTimeout(resolve, 250));
-
                 // Create enhanced document data with details
                 const enhancedDocData = enhanceDocumentWithDetails(doc, documentDetails);
 
-                // Use actual receiver data from invoice, not tenant data
-                // OpenFactura provides RUTRecep and RznSocRecep in the document
-                const receiverRUT = doc.RUTRecep && doc.DVRecep
-                  ? `${doc.RUTRecep}-${doc.DVRecep}`
-                  : tenant.rut || '';
-                const receiverName = doc.RznSocRecep || tenant.name;
-
-                // Log receiver data for debugging
-                if (!doc.RUTRecep && !existingDoc) {
-                  console.log(`    ⚠️  Document ${uniqueId}: OpenFactura returned null RUTRecep, using tenant RUT: ${tenant.rut}`);
-                }
+                // Use ACTUAL receiver data from detail endpoint (NOT fallback)
+                const receiverRUT = `${actualReceiverRUT}-${actualReceiverDV || ''}`;
+                const receiverName = actualReceiverName || tenant.name;
 
                 const documentData = {
                   type: mapDocumentType(doc.TipoDTE),

@@ -174,10 +174,10 @@ export async function POST(request: NextRequest) {
 
         if (typeof filterValue === 'object' && filterValue !== null) {
           // Handle operator objects like { eq: 'value' }
-          payload[key] = filterValue;
+          payload[key] = filterValue as any;
         } else if (typeof filterValue === 'string' || typeof filterValue === 'number') {
           // Handle simple values like 'value', wrap them in 'eq'
-          payload[key] = { eq: filterValue };
+          payload[key] = { eq: filterValue } as any;
         }
       });
     }

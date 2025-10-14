@@ -600,6 +600,7 @@ model TaxDocument {
   items       TaxDocumentItem[]
   expenses    Expense[] // Auto-generated expenses from this invoice
 
+  @@unique([emitterRUT, folio, tenantId])
   @@index([tenantId, status])
   @@map("tax_documents")
 }

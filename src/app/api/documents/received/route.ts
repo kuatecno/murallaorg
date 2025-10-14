@@ -82,22 +82,23 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
 
     // Get tenant from request or use first active tenant with OpenFactura configured
-    let tenantId = body.tenantId;
+    const { tenantId } = body;
     let tenant;
 
     if (tenantId) {
-      tenant = await prisma.tenant.findUnique({
-        where: { id: tenantId, isActive: true },
-        select: { id: true, name: true, rut: true }
+      tenant = await prisma.tenant.findFirst({
+        where: { id: tenantId, isActive: true, rut: { not: null } },
+        select: { id: true, name: true, rut: true },
       });
     } else {
       // Find first active tenant that has a RUT configured for OpenFactura
       tenant = await prisma.tenant.findFirst({
         where: {
           isActive: true,
-          rut: { not: null }
+          rut: { not: null },
         },
-        select: { id: true, name: true, rut: true }
+        orderBy: { createdAt: 'asc' }, // Ensure consistent default tenant
+        select: { id: true, name: true, rut: true },
       });
     }
 
@@ -169,8 +170,14 @@ export async function POST(request: NextRequest) {
     if (body.filters) {
       Object.keys(body.filters).forEach(filterKey => {
         const filterValue = body.filters[filterKey];
-        if (typeof filterValue === 'object') {
-          payload[filterKey as keyof ReceivedDocumentsRequest] = filterValue;
+        const key = filterKey as keyof ReceivedDocumentsRequest;
+
+        if (typeof filterValue === 'object' && filterValue !== null) {
+          // Handle operator objects like { eq: 'value' }
+          payload[key] = filterValue;
+        } else if (typeof filterValue === 'string' || typeof filterValue === 'number') {
+          // Handle simple values like 'value', wrap them in 'eq'
+          payload[key] = { eq: filterValue };
         }
       });
     }

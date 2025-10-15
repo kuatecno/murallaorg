@@ -606,29 +606,31 @@ export async function POST(request: NextRequest) {
                 // Small delay to be respectful to the API (250ms between detail requests)
                 await new Promise(resolve => setTimeout(resolve, 250));
 
-                // Extract ACTUAL receiver RUT from detail endpoint
-                const actualReceiverRUT = documentDetails?.json?.Encabezado?.Receptor?.RUTRecep;
-                const actualReceiverDV = documentDetails?.json?.Encabezado?.Receptor?.DV;
-                const actualReceiverName = documentDetails?.json?.Encabezado?.Receptor?.RznSocRecep;
+                // Create enhanced document data with details FIRST to access receiver info
+                const enhancedDocData = enhanceDocumentWithDetails(doc, documentDetails);
 
-                // TEMPORARILY DISABLED: Receiver validation
-                // The detail endpoint returns 401, so we can't filter by receiver
-                // For now, store ALL invoices to see what we actually have
-                // TODO: Re-enable once OpenFactura API access is fixed
+                // Extract ACTUAL receiver RUT from detailedData (built from detail endpoint)
+                // The receiver data comes from details.json.Encabezado.Receptor
+                const actualReceiverRUTFormatted = enhancedDocData.detailedData?.receiver?.rut;
+                const actualReceiverName = enhancedDocData.detailedData?.receiver?.businessName;
 
-                // if (!actualReceiverRUT) {
-                //   console.log(`    ⏭️  Skipping ${uniqueId}: No receiver RUT in detail endpoint`);
-                //   tenantStats.skippedDocuments++;
-                //   continue;
-                // }
+                // Validate receiver RUT matches the tenant
+                if (!actualReceiverRUTFormatted) {
+                  console.log(`    ⏭️  Skipping ${uniqueId}: No receiver RUT in detail endpoint`);
+                  tenantStats.skippedDocuments++;
+                  continue;
+                }
 
-                // if (actualReceiverRUT !== companyRutNumber) {
-                //   console.log(`    ⏭️  Skipping ${uniqueId}: Receiver RUT ${actualReceiverRUT} doesn't match tenant ${companyRutNumber}`);
-                //   tenantStats.skippedDocuments++;
-                //   continue;
-                // }
+                // Format receiver RUT for comparison (remove dashes/dots, keep only numbers)
+                const receiverRutNumber = getRUTNumber(actualReceiverRUTFormatted);
 
-                console.log(`    ℹ️  ${uniqueId}: Storing without receiver validation (detail endpoint unavailable)`);
+                if (receiverRutNumber !== companyRutNumber) {
+                  console.log(`    ⏭️  Skipping ${uniqueId}: Receiver RUT ${actualReceiverRUTFormatted} (${receiverRutNumber}) doesn't match tenant ${companyRutFormatted} (${companyRutNumber})`);
+                  tenantStats.skippedDocuments++;
+                  continue;
+                }
+
+                console.log(`    ✅  ${uniqueId}: Receiver validated (${actualReceiverRUTFormatted})`);
 
                 // Check if document already exists (use unique constraint fields)
                 const existingDoc = await prisma.taxDocument.findFirst({
@@ -639,14 +641,8 @@ export async function POST(request: NextRequest) {
                   }
                 });
 
-                // Create enhanced document data with details
-                const enhancedDocData = enhanceDocumentWithDetails(doc, documentDetails);
-
-                // Use ACTUAL receiver data from detail endpoint (or fallback if unavailable)
-                // TEMPORARILY using fallback since detail endpoint fails with 401
-                const receiverRUT = actualReceiverRUT
-                  ? `${actualReceiverRUT}-${actualReceiverDV || ''}`
-                  : tenant.rut || '';
+                // Use ACTUAL receiver data from enhanced document (already validated above)
+                const receiverRUT = actualReceiverRUTFormatted;
                 const receiverName = actualReceiverName || tenant.name;
 
                 const documentData = {

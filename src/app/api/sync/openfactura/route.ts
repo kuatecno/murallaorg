@@ -507,15 +507,21 @@ export async function POST(request: NextRequest) {
     }
 
     console.log(`📋 Found ${tenantsToSync.length} tenant(s) to sync`);
+    console.log(`📌 Tenants:`, tenantsToSync.map(t => `${t.name} (${t.rut})`).join(', '));
 
     // Get API keys for each tenant
+    console.log(`\n🔑 API Key Configuration:`);
+    console.log(`  OPENFACTURA_API_KEY_MURALLA: ${OPENFACTURA_API_KEY_MURALLA ? 'SET' : 'NOT SET'}`);
+    console.log(`  OPENFACTURA_API_KEY_MURALLITA: ${OPENFACTURA_API_KEY_MURALLITA ? 'SET' : 'NOT SET'}`);
+    console.log(`  API_KEY_BY_RUT mapping:`, API_KEY_BY_RUT);
+
     for (const tenant of tenantsToSync) {
       const rutNumber = getRUTNumber(tenant.rut!);
       const apiKey = API_KEY_BY_RUT[rutNumber];
       if (!apiKey) {
-        console.error(`❌ No API key configured for tenant ${tenant.name} (RUT: ${rutNumber})`);
+        console.error(`  ❌ No API key for ${tenant.name} (RUT: ${rutNumber})`);
       } else {
-        console.log(`  📌 ${tenant.name} (RUT: ${rutNumber}) → API key configured ✅`);
+        console.log(`  ✅ ${tenant.name} (RUT: ${rutNumber}) → API key configured`);
       }
     }
 

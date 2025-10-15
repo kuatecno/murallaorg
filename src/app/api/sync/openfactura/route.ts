@@ -16,6 +16,10 @@ const OPENFACTURA_DETAIL_URL = 'https://api.haulmer.com/v2/dte/document';
 const OPENFACTURA_API_KEY_MURALLA = process.env.OPENFACTURA_API_KEY_MURALLA;
 const OPENFACTURA_API_KEY_MURALLITA = process.env.OPENFACTURA_API_KEY_MURALLITA;
 
+console.log('🔑 ENV VARIABLES:');
+console.log(`  OPENFACTURA_API_KEY_MURALLA: ${OPENFACTURA_API_KEY_MURALLA ? `${OPENFACTURA_API_KEY_MURALLA.substring(0, 10)}...` : 'UNDEFINED'}`);
+console.log(`  OPENFACTURA_API_KEY_MURALLITA: ${OPENFACTURA_API_KEY_MURALLITA ? `${OPENFACTURA_API_KEY_MURALLITA.substring(0, 10)}...` : 'UNDEFINED'}`);
+
 // Map tenant RUT numbers to their API keys
 const API_KEY_BY_RUT: Record<number, string> = {
   78188363: OPENFACTURA_API_KEY_MURALLA || '',     // Muralla SPA

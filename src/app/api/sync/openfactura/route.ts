@@ -609,25 +609,28 @@ export async function POST(request: NextRequest) {
                 continue;
               }
 
-              // Find which tenant this invoice belongs to
+              // Find which tenant this invoice belongs to based on receiver RUT
               const receiverRutNumber = getRUTNumber(actualReceiverRUTFormatted);
               const matchedTenant = tenantsByRutNumber.get(receiverRutNumber);
 
-              if (!matchedTenant) {
-                console.log(`      ⏭️  Skipping ${uniqueId}: Receiver RUT ${actualReceiverRUTFormatted} (${receiverRutNumber}) doesn't match any configured tenant`);
-                overallStats.skippedDocuments++;
-                continue;
+              // Use matched tenant if found, otherwise use first available tenant as fallback
+              // This ensures ALL invoices are stored (not skipped)
+              // Filtering by company happens in queries using receiverRUT field
+              const ownerTenant = matchedTenant || tenantsToSync[0];
+
+              if (matchedTenant) {
+                console.log(`      ✅  ${uniqueId}: Matched to ${matchedTenant.name} (receiver: ${actualReceiverRUTFormatted})`);
+              } else {
+                console.log(`      ⚠️  ${uniqueId}: No tenant match for receiver ${actualReceiverRUTFormatted}, storing under ${ownerTenant.name}`);
               }
 
-              console.log(`      ✅  ${uniqueId}: Matched to ${matchedTenant.name} (receiver: ${actualReceiverRUTFormatted})`);
-
               // Get stats for this tenant
-              const tenantStats = tenantStatsMap.get(matchedTenant.id)!;
+              const tenantStats = tenantStatsMap.get(ownerTenant.id)!;
 
               // Check if document already exists (use unique constraint fields)
               const existingDoc = await prisma.taxDocument.findFirst({
                 where: {
-                  tenantId: matchedTenant.id,
+                  tenantId: ownerTenant.id,
                   folio: doc.Folio.toString(),
                   emitterRUT: `${doc.RUTEmisor}-${doc.DV}`
                 }
@@ -635,7 +638,7 @@ export async function POST(request: NextRequest) {
 
               // Use ACTUAL receiver data from enhanced document
               const receiverRUT = actualReceiverRUTFormatted;
-              const receiverName = actualReceiverName || matchedTenant.name;
+              const receiverName = actualReceiverName || ownerTenant.name;
 
               const documentData = {
                 type: mapDocumentType(doc.TipoDTE),
@@ -652,7 +655,7 @@ export async function POST(request: NextRequest) {
                 issuedAt: new Date(doc.FchEmis),
                 status: 'ISSUED' as TaxDocumentStatus,
                 rawResponse: enhancedDocData as any,
-                tenantId: matchedTenant.id
+                tenantId: ownerTenant.id
               };
 
                 // Extract line items for database storage

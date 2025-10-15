@@ -497,6 +497,14 @@ export async function POST(request: NextRequest) {
 
     console.log(`📋 Found ${tenantsToSync.length} tenant(s) to sync`);
 
+    // Create tenant lookup by RUT number for efficient matching
+    const tenantsByRutNumber = new Map();
+    for (const tenant of tenantsToSync) {
+      const rutNumber = getRUTNumber(tenant.rut!);
+      tenantsByRutNumber.set(rutNumber, tenant);
+      console.log(`  📌 Mapped RUT ${rutNumber} → ${tenant.name}`);
+    }
+
     // Overall sync statistics
     let overallStats = {
       totalTenants: tenantsToSync.length,
@@ -517,36 +525,10 @@ export async function POST(request: NextRequest) {
       tenantResults: [] as any[]
     };
 
-    // Sync each tenant sequentially
-    for (let i = 0; i < tenantsToSync.length; i++) {
-      const tenant = tenantsToSync[i];
-
-      console.log(`\n${'='.repeat(80)}`);
-      console.log(`🏢 Syncing tenant ${i + 1}/${tenantsToSync.length}: ${tenant.name} (${tenant.rut})`);
-      console.log(`${'='.repeat(80)}\n`);
-
-      // Validate tenant RUT
-      if (!validateRUT(tenant.rut!)) {
-        console.error(`❌ Invalid RUT for tenant ${tenant.name}: ${tenant.rut}`);
-        overallStats.failedTenants++;
-        overallStats.tenantResults.push({
-          tenantId: tenant.id,
-          tenantName: tenant.name,
-          tenantRUT: tenant.rut,
-          success: false,
-          error: 'Invalid RUT format'
-        });
-        continue;
-      }
-
-      // Get RUT number for filtering (receiver RUT)
-      const companyRutNumber = getRUTNumber(tenant.rut!);
-      const companyRutFormatted = formatRUTForAPI(tenant.rut!);
-
-      // Calculate chunking strategy
-      const chunks = await chunkDateRange(finalFromDate, finalToDate, syncOptions.chunkSize);
-
-      let tenantStats = {
+    // Initialize stats for each tenant
+    const tenantStatsMap = new Map();
+    for (const tenant of tenantsToSync) {
+      tenantStatsMap.set(tenant.id, {
         tenantId: tenant.id,
         tenantName: tenant.name,
         tenantRUT: tenant.rut,
@@ -558,248 +540,230 @@ export async function POST(request: NextRequest) {
         startTime: new Date(),
         endTime: null as Date | null,
         pages: 0,
-        chunks: chunks.length,
+        chunks: 0,
         success: true
-      };
+      });
+    }
 
-      // Process each date chunk
-      for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex++) {
-        const chunk = chunks[chunkIndex];
-        console.log(`  📦 Processing chunk ${chunkIndex + 1}/${chunks.length}: ${chunk.from} to ${chunk.to}`);
+    console.log(`\n${'='.repeat(80)}`);
+    console.log(`📥 Fetching ALL invoices from OpenFactura (will distribute to tenants by receiver RUT)`);
+    console.log(`${'='.repeat(80)}\n`);
 
-        let currentPage = 1;
-        let hasMorePages = true;
+    // Calculate chunking strategy
+    const chunks = await chunkDateRange(finalFromDate, finalToDate, syncOptions.chunkSize);
+    console.log(`📦 Will process ${chunks.length} date chunk(s)`);
 
-        while (hasMorePages) {
-          try {
-            const pageData = await fetchOpenFacturaPage({
-              page: currentPage,
-              fromDate: chunk.from,
-              toDate: chunk.to
-              // NOTE: Not passing receiverRut - filter doesn't work in API
-            });
-            tenantStats.pages++;
+    // Process each date chunk ONCE (not per tenant)
+    for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex++) {
+      const chunk = chunks[chunkIndex];
+      console.log(`\n  📦 Processing chunk ${chunkIndex + 1}/${chunks.length}: ${chunk.from} to ${chunk.to}`);
 
-            console.log(`  📄 Fetched page ${currentPage}/${pageData.last_page} with ${pageData.data.length} documents from OpenFactura (all companies)`);
+      let currentPage = 1;
+      let hasMorePages = true;
 
-            // NOTE: OpenFactura API returns ALL documents across all companies
-            // We need to filter by checking the actual receiver RUT from detail endpoint
-            const allDocuments = pageData.data;
+      while (hasMorePages) {
+        try {
+          const pageData = await fetchOpenFacturaPage({
+            page: currentPage,
+            fromDate: chunk.from,
+            toDate: chunk.to
+            // NOTE: Not passing receiverRut - filter doesn't work in API
+          });
 
-            tenantStats.totalDocuments += allDocuments.length;
+          console.log(`    📄 Page ${currentPage}/${pageData.last_page}: ${pageData.data.length} documents`);
 
-            console.log(`  ⚙️  Processing ${allDocuments.length} documents, will filter by receiver RUT ${companyRutFormatted}`);
+          // NOTE: OpenFactura API returns ALL documents across all companies
+          // We determine which tenant each belongs to by checking receiver RUT
+          const allDocuments = pageData.data;
+          overallStats.totalDocuments += allDocuments.length;
 
-            // Process each document and filter by actual receiver
-            for (const doc of allDocuments) {
-              try {
-                // Create unique identifier
-                const uniqueId = `${doc.RUTEmisor}-${doc.TipoDTE}-${doc.Folio}`;
+          console.log(`    ⚙️  Processing ${allDocuments.length} documents, will assign to tenants by receiver RUT`);
 
-                // Fetch detailed document information to get ACTUAL receiver RUT
-                const documentDetails = await fetchDocumentDetails(
-                  `${doc.RUTEmisor}-${doc.DV}`,
-                  doc.TipoDTE,
-                  doc.Folio
-                );
+          // Process each document
+          for (const doc of allDocuments) {
+            try {
+              // Create unique identifier
+              const uniqueId = `${doc.RUTEmisor}-${doc.TipoDTE}-${doc.Folio}`;
 
-                // Small delay to be respectful to the API (250ms between detail requests)
-                await new Promise(resolve => setTimeout(resolve, 250));
+              // Fetch detailed document information to get ACTUAL receiver RUT
+              const documentDetails = await fetchDocumentDetails(
+                `${doc.RUTEmisor}-${doc.DV}`,
+                doc.TipoDTE,
+                doc.Folio
+              );
 
-                // Create enhanced document data with details FIRST to access receiver info
-                const enhancedDocData = enhanceDocumentWithDetails(doc, documentDetails);
+              // Small delay to be respectful to the API (250ms between detail requests)
+              await new Promise(resolve => setTimeout(resolve, 250));
 
-                // Extract ACTUAL receiver RUT from detailedData (built from detail endpoint)
-                // The receiver data comes from details.json.Encabezado.Receptor
-                const actualReceiverRUTFormatted = enhancedDocData.detailedData?.receiver?.rut;
-                const actualReceiverName = enhancedDocData.detailedData?.receiver?.businessName;
+              // Create enhanced document data with details
+              const enhancedDocData = enhanceDocumentWithDetails(doc, documentDetails);
 
-                // Validate receiver RUT matches the tenant
-                if (!actualReceiverRUTFormatted) {
-                  console.log(`    ⏭️  Skipping ${uniqueId}: No receiver RUT in detail endpoint`);
-                  tenantStats.skippedDocuments++;
-                  continue;
-                }
+              // Extract ACTUAL receiver RUT from detailedData
+              const actualReceiverRUTFormatted = enhancedDocData.detailedData?.receiver?.rut;
+              const actualReceiverName = enhancedDocData.detailedData?.receiver?.businessName;
 
-                // Format receiver RUT for comparison (remove dashes/dots, keep only numbers)
-                const receiverRutNumber = getRUTNumber(actualReceiverRUTFormatted);
+              // Skip if no receiver RUT found
+              if (!actualReceiverRUTFormatted) {
+                console.log(`      ⏭️  Skipping ${uniqueId}: No receiver RUT in detail endpoint`);
+                overallStats.skippedDocuments++;
+                continue;
+              }
 
-                if (receiverRutNumber !== companyRutNumber) {
-                  console.log(`    ⏭️  Skipping ${uniqueId}: Receiver RUT ${actualReceiverRUTFormatted} (${receiverRutNumber}) doesn't match tenant ${companyRutFormatted} (${companyRutNumber})`);
-                  tenantStats.skippedDocuments++;
-                  continue;
-                }
+              // Find which tenant this invoice belongs to
+              const receiverRutNumber = getRUTNumber(actualReceiverRUTFormatted);
+              const matchedTenant = tenantsByRutNumber.get(receiverRutNumber);
 
-                console.log(`    ✅  ${uniqueId}: Receiver validated (${actualReceiverRUTFormatted})`);
+              if (!matchedTenant) {
+                console.log(`      ⏭️  Skipping ${uniqueId}: Receiver RUT ${actualReceiverRUTFormatted} (${receiverRutNumber}) doesn't match any configured tenant`);
+                overallStats.skippedDocuments++;
+                continue;
+              }
 
-                // Check if document already exists (use unique constraint fields)
-                const existingDoc = await prisma.taxDocument.findFirst({
-                  where: {
-                    tenantId: tenant.id,
-                    folio: doc.Folio.toString(),
-                    emitterRUT: `${doc.RUTEmisor}-${doc.DV}`
-                  }
-                });
+              console.log(`      ✅  ${uniqueId}: Matched to ${matchedTenant.name} (receiver: ${actualReceiverRUTFormatted})`);
 
-                // Use ACTUAL receiver data from enhanced document (already validated above)
-                const receiverRUT = actualReceiverRUTFormatted;
-                const receiverName = actualReceiverName || tenant.name;
+              // Get stats for this tenant
+              const tenantStats = tenantStatsMap.get(matchedTenant.id)!;
 
-                const documentData = {
-                  type: mapDocumentType(doc.TipoDTE),
+              // Check if document already exists (use unique constraint fields)
+              const existingDoc = await prisma.taxDocument.findFirst({
+                where: {
+                  tenantId: matchedTenant.id,
                   folio: doc.Folio.toString(),
-                  documentCode: doc.TipoDTE,
-                  emitterRUT: `${doc.RUTEmisor}-${doc.DV}`,
-                  emitterName: doc.RznSoc,
-                  receiverRUT,
-                  receiverName,
-                  netAmount: new Decimal(doc.MntNeto || 0),
-                  taxAmount: new Decimal(doc.IVA || 0),
-                  totalAmount: new Decimal(doc.MntTotal || 0),
-                  currency: 'CLP',
-                  issuedAt: new Date(doc.FchEmis),
-                  status: 'ISSUED' as TaxDocumentStatus, // All received documents are issued
-                  rawResponse: enhancedDocData as any,
-                  tenantId: tenant.id
-                };
+                  emitterRUT: `${doc.RUTEmisor}-${doc.DV}`
+                }
+              });
+
+              // Use ACTUAL receiver data from enhanced document
+              const receiverRUT = actualReceiverRUTFormatted;
+              const receiverName = actualReceiverName || matchedTenant.name;
+
+              const documentData = {
+                type: mapDocumentType(doc.TipoDTE),
+                folio: doc.Folio.toString(),
+                documentCode: doc.TipoDTE,
+                emitterRUT: `${doc.RUTEmisor}-${doc.DV}`,
+                emitterName: doc.RznSoc,
+                receiverRUT,
+                receiverName,
+                netAmount: new Decimal(doc.MntNeto || 0),
+                taxAmount: new Decimal(doc.IVA || 0),
+                totalAmount: new Decimal(doc.MntTotal || 0),
+                currency: 'CLP',
+                issuedAt: new Date(doc.FchEmis),
+                status: 'ISSUED' as TaxDocumentStatus,
+                rawResponse: enhancedDocData as any,
+                tenantId: matchedTenant.id
+              };
 
                 // Extract line items for database storage
-                const lineItems = enhancedDocData.detailedData?.lineItems || [];
+              const lineItems = enhancedDocData.detailedData?.lineItems || [];
 
-                if (existingDoc) {
-                  // Update existing document and replace line items
-                  await prisma.$transaction(async (tx) => {
-                    // Update document
-                    await tx.taxDocument.update({
-                      where: { id: existingDoc.id },
-                      data: {
-                        ...documentData,
-                        updatedAt: new Date()
-                      }
+              if (existingDoc) {
+                // Update existing document and replace line items
+                await prisma.$transaction(async (tx) => {
+                  // Update document
+                  await tx.taxDocument.update({
+                    where: { id: existingDoc.id },
+                    data: {
+                      ...documentData,
+                      updatedAt: new Date()
+                    }
+                  });
+
+                  // Delete existing line items
+                  await tx.taxDocumentItem.deleteMany({
+                    where: { taxDocumentId: existingDoc.id }
+                  });
+
+                  // Create new line items
+                  if (lineItems.length > 0) {
+                    await tx.taxDocumentItem.createMany({
+                      data: lineItems.map((item: any) => ({
+                        taxDocumentId: existingDoc.id,
+                        productName: item.productName || 'Unknown Product',
+                        quantity: item.quantity || 1,
+                        unitPrice: new Decimal(item.unitPrice || 0),
+                        totalPrice: new Decimal(item.totalPrice || 0)
+                      }))
                     });
-
-                    // Delete existing line items
-                    await tx.taxDocumentItem.deleteMany({
-                      where: { taxDocumentId: existingDoc.id }
-                    });
-
-                    // Create new line items
-                    if (lineItems.length > 0) {
-                      await tx.taxDocumentItem.createMany({
-                        data: lineItems.map((item: any) => ({
-                          taxDocumentId: existingDoc.id,
+                  }
+                });
+                tenantStats.updatedDocuments++;
+                overallStats.updatedDocuments++;
+              } else {
+                // Create new document with line items
+                try {
+                  const newDocument = await prisma.taxDocument.create({
+                    data: {
+                      ...documentData,
+                      items: lineItems.length > 0 ? {
+                        create: lineItems.map((item: any) => ({
                           productName: item.productName || 'Unknown Product',
                           quantity: item.quantity || 1,
                           unitPrice: new Decimal(item.unitPrice || 0),
                           totalPrice: new Decimal(item.totalPrice || 0)
                         }))
-                      });
+                      } : undefined
                     }
                   });
-                  tenantStats.updatedDocuments++;
-                } else {
-                  // Create new document with line items
-                  try {
-                    const newDocument = await prisma.taxDocument.create({
-                      data: {
-                        ...documentData,
-                        items: lineItems.length > 0 ? {
-                          create: lineItems.map((item: any) => ({
-                            productName: item.productName || 'Unknown Product',
-                            quantity: item.quantity || 1,
-                            unitPrice: new Decimal(item.unitPrice || 0),
-                            totalPrice: new Decimal(item.totalPrice || 0)
-                          }))
-                        } : undefined
-                      }
-                    });
-                    tenantStats.newDocuments++;
-                  } catch (createError: any) {
-                    // Check if it's a unique constraint violation
-                    if (createError.code === 'P2002') {
-                      console.log(`    ℹ️  Document ${uniqueId} already exists (unique constraint), skipping...`);
-                      tenantStats.skippedDocuments++;
-                    } else {
-                      throw createError;
-                    }
+                  tenantStats.newDocuments++;
+                  overallStats.newDocuments++;
+                } catch (createError: any) {
+                  // Check if it's a unique constraint violation
+                  if (createError.code === 'P2002') {
+                    console.log(`        ℹ️  Document ${uniqueId} already exists (unique constraint), skipping...`);
+                    tenantStats.skippedDocuments++;
+                  } else {
+                    throw createError;
                   }
                 }
-
-              } catch (docError) {
-                console.error(`    ❌ Error processing document ${doc.Folio}:`, docError);
-                tenantStats.errors++;
               }
+
+            } catch (docError) {
+              console.error(`        ❌ Error processing document ${doc.Folio}:`, docError);
+              overallStats.errors++;
             }
-
-            // Check if there are more pages
-            hasMorePages = currentPage < pageData.last_page;
-            currentPage++;
-
-            // Add small delay between pages to be respectful to the API
-            if (hasMorePages) {
-              await new Promise(resolve => setTimeout(resolve, 500));
-            }
-
-          } catch (pageError) {
-            console.error(`    ❌ Error fetching page ${currentPage}:`, pageError);
-            tenantStats.errors++;
-            tenantStats.success = false;
-            hasMorePages = false;
           }
-        }
 
-        // Add delay between chunks to be respectful to the API
-        if (chunkIndex < chunks.length - 1) {
-          console.log(`  ✓ Chunk ${chunkIndex + 1} completed. Waiting before next chunk...`);
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          // Check if there are more pages
+          hasMorePages = currentPage < pageData.last_page;
+          currentPage++;
+
+          // Add small delay between pages to be respectful to the API
+          if (hasMorePages) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
+
+        } catch (pageError) {
+          console.error(`      ❌ Error fetching page ${currentPage}:`, pageError);
+          overallStats.errors++;
+          hasMorePages = false;
         }
       }
 
-      tenantStats.endTime = new Date();
-
-      // Update overall stats
-      overallStats.totalDocuments += tenantStats.totalDocuments;
-      overallStats.newDocuments += tenantStats.newDocuments;
-      overallStats.updatedDocuments += tenantStats.updatedDocuments;
-      overallStats.skippedDocuments += tenantStats.skippedDocuments;
-      overallStats.errors += tenantStats.errors;
-
-      if (tenantStats.success && tenantStats.errors === 0) {
-        overallStats.successfulTenants++;
-        console.log(`\n✅ Successfully synced ${tenant.name}: ${tenantStats.newDocuments} new, ${tenantStats.updatedDocuments} updated, ${tenantStats.skippedDocuments} skipped`);
-      } else {
-        overallStats.failedTenants++;
-        console.log(`\n❌ Failed to sync ${tenant.name}: ${tenantStats.errors} errors`);
-      }
-
-      // Store tenant sync result
-      overallStats.tenantResults.push(tenantStats);
-
-      // Store sync metadata in tenant settings
-      try {
-        await prisma.tenant.update({
-          where: { id: tenant.id },
-          data: {
-            settings: {
-              ...((tenant as any).settings || {}),
-              lastOpenFacturaSync: {
-                ...tenantStats,
-                startTime: tenantStats.startTime.toISOString(),
-                endTime: tenantStats.endTime?.toISOString()
-              }
-            }
-          }
-        });
-      } catch (updateError) {
-        console.error(`Failed to update tenant settings for ${tenant.name}:`, updateError);
-      }
-
-      // Add delay between tenants to be respectful to the API
-      if (i < tenantsToSync.length - 1) {
-        console.log(`\n⏳ Waiting before syncing next tenant...\n`);
-        await new Promise(resolve => setTimeout(resolve, 2000));
+      // Add delay between chunks to be respectful to the API
+      if (chunkIndex < chunks.length - 1) {
+        console.log(`    ✓ Chunk ${chunkIndex + 1} completed. Waiting before next chunk...`);
+        await new Promise(resolve => setTimeout(resolve, 1000));
       }
     }
+
+    // Finalize tenant stats
+    for (const tenant of tenantsToSync) {
+      const tenantStats = tenantStatsMap.get(tenant.id)!;
+      tenantStats.endTime = new Date();
+
+      if (tenantStats.newDocuments > 0 || tenantStats.updatedDocuments > 0) {
+        overallStats.successfulTenants++;
+        console.log(`\n✅ ${tenant.name}: ${tenantStats.newDocuments} new, ${tenantStats.updatedDocuments} updated`);
+      } else if (tenantStats.errors > 0) {
+        overallStats.failedTenants++;
+        tenantStats.success = false;
+      }
+
+      overallStats.tenantResults.push(tenantStats);
+    }
+
 
     overallStats.endTime = new Date();
 

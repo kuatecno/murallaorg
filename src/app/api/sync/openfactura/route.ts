@@ -11,7 +11,16 @@ import { validateRUT, getRUTNumber, formatRUTForAPI } from '@/lib/chilean-utils'
 
 const OPENFACTURA_API_URL = 'https://api.haulmer.com/v2/dte/document/received';
 const OPENFACTURA_DETAIL_URL = 'https://api.haulmer.com/v2/dte/document';
-const OPENFACTURA_API_KEY = process.env.OPENFACTURA_API_KEY;
+
+// Multi-tenant API key support
+const OPENFACTURA_API_KEY_MURALLA = process.env.OPENFACTURA_API_KEY_MURALLA;
+const OPENFACTURA_API_KEY_MURALLITA = process.env.OPENFACTURA_API_KEY_MURALLITA;
+
+// Map tenant RUT numbers to their API keys
+const API_KEY_BY_RUT: Record<number, string> = {
+  78188363: OPENFACTURA_API_KEY_MURALLA || '',     // Muralla SPA
+  78225753: OPENFACTURA_API_KEY_MURALLITA || '',   // Murallita MEF EIRL
+};
 
 interface OpenFacturaDocument {
   // Basic document info
@@ -171,11 +180,13 @@ interface FetchOptions {
   toDate?: string; // YYYY-MM-DD format
   maxDays?: number; // Maximum days to query (default 90)
   receiverRut?: number; // Receiver RUT for filtering
+  apiKey?: string; // API key to use for this request
 }
 
 async function fetchOpenFacturaPage(options: FetchOptions = {}): Promise<OpenFacturaResponse> {
-  if (!OPENFACTURA_API_KEY) {
-    throw new Error('OPENFACTURA_API_KEY not configured');
+  const apiKey = options.apiKey;
+  if (!apiKey) {
+    throw new Error('API key not provided');
   }
 
   const {
@@ -225,7 +236,7 @@ async function fetchOpenFacturaPage(options: FetchOptions = {}): Promise<OpenFac
   const response = await fetch(OPENFACTURA_API_URL, {
     method: 'POST',
     headers: {
-      'apikey': OPENFACTURA_API_KEY,
+      'apikey': apiKey,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(payload),
@@ -239,9 +250,9 @@ async function fetchOpenFacturaPage(options: FetchOptions = {}): Promise<OpenFac
   return response.json();
 }
 
-async function fetchDocumentDetails(rut: string, type: number, folio: number): Promise<any> {
-  if (!OPENFACTURA_API_KEY) {
-    throw new Error('OPENFACTURA_API_KEY not configured');
+async function fetchDocumentDetails(rut: string, type: number, folio: number, apiKey: string): Promise<any> {
+  if (!apiKey) {
+    throw new Error('API key not provided');
   }
 
   const detailUrl = `${OPENFACTURA_DETAIL_URL}/${rut}/${type}/${folio}/json`;
@@ -252,7 +263,7 @@ async function fetchDocumentDetails(rut: string, type: number, folio: number): P
     const response = await fetch(detailUrl, {
       method: 'GET',
       headers: {
-        'apikey': OPENFACTURA_API_KEY,
+        'apikey': apiKey,
       },
     });
 
@@ -497,12 +508,15 @@ export async function POST(request: NextRequest) {
 
     console.log(`📋 Found ${tenantsToSync.length} tenant(s) to sync`);
 
-    // Create tenant lookup by RUT number for efficient matching
-    const tenantsByRutNumber = new Map();
+    // Get API keys for each tenant
     for (const tenant of tenantsToSync) {
       const rutNumber = getRUTNumber(tenant.rut!);
-      tenantsByRutNumber.set(rutNumber, tenant);
-      console.log(`  📌 Mapped RUT ${rutNumber} → ${tenant.name}`);
+      const apiKey = API_KEY_BY_RUT[rutNumber];
+      if (!apiKey) {
+        console.error(`❌ No API key configured for tenant ${tenant.name} (RUT: ${rutNumber})`);
+      } else {
+        console.log(`  📌 ${tenant.name} (RUT: ${rutNumber}) → API key configured ✅`);
+      }
     }
 
     // Overall sync statistics
@@ -525,10 +539,27 @@ export async function POST(request: NextRequest) {
       tenantResults: [] as any[]
     };
 
-    // Initialize stats for each tenant
-    const tenantStatsMap = new Map();
-    for (const tenant of tenantsToSync) {
-      tenantStatsMap.set(tenant.id, {
+    // Calculate chunking strategy
+    const chunks = await chunkDateRange(finalFromDate, finalToDate, syncOptions.chunkSize);
+    console.log(`📦 Will process ${chunks.length} date chunk(s) per tenant\n`);
+
+    // Process each tenant with their own API key
+    for (let tenantIndex = 0; tenantIndex < tenantsToSync.length; tenantIndex++) {
+      const tenant = tenantsToSync[tenantIndex];
+      const rutNumber = getRUTNumber(tenant.rut!);
+      const apiKey = API_KEY_BY_RUT[rutNumber];
+
+      if (!apiKey) {
+        console.error(`\n❌ Skipping ${tenant.name} - No API key configured`);
+        overallStats.failedTenants++;
+        continue;
+      }
+
+      console.log(`\n${'='.repeat(80)}`);
+      console.log(`🏢 Syncing tenant ${tenantIndex + 1}/${tenantsToSync.length}: ${tenant.name} (${tenant.rut})`);
+      console.log(`${'='.repeat(80)}\n`);
+
+      let tenantStats = {
         tenantId: tenant.id,
         tenantName: tenant.name,
         tenantRUT: tenant.rut,
@@ -540,121 +571,97 @@ export async function POST(request: NextRequest) {
         startTime: new Date(),
         endTime: null as Date | null,
         pages: 0,
-        chunks: 0,
+        chunks: chunks.length,
         success: true
-      });
-    }
+      };
 
-    console.log(`\n${'='.repeat(80)}`);
-    console.log(`📥 Fetching ALL invoices from OpenFactura (will distribute to tenants by receiver RUT)`);
-    console.log(`${'='.repeat(80)}\n`);
+      // Process each date chunk for this tenant
+      for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex++) {
+        const chunk = chunks[chunkIndex];
+        console.log(`  📦 Processing chunk ${chunkIndex + 1}/${chunks.length}: ${chunk.from} to ${chunk.to}`);
 
-    // Calculate chunking strategy
-    const chunks = await chunkDateRange(finalFromDate, finalToDate, syncOptions.chunkSize);
-    console.log(`📦 Will process ${chunks.length} date chunk(s)`);
+        let currentPage = 1;
+        let hasMorePages = true;
 
-    // Process each date chunk ONCE (not per tenant)
-    for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex++) {
-      const chunk = chunks[chunkIndex];
-      console.log(`\n  📦 Processing chunk ${chunkIndex + 1}/${chunks.length}: ${chunk.from} to ${chunk.to}`);
+        while (hasMorePages) {
+          try {
+            const pageData = await fetchOpenFacturaPage({
+              page: currentPage,
+              fromDate: chunk.from,
+              toDate: chunk.to,
+              apiKey: apiKey
+            });
+            tenantStats.pages++;
 
-      let currentPage = 1;
-      let hasMorePages = true;
+            console.log(`    📄 Page ${currentPage}/${pageData.last_page}: ${pageData.data.length} documents for ${tenant.name}`);
 
-      while (hasMorePages) {
-        try {
-          const pageData = await fetchOpenFacturaPage({
-            page: currentPage,
-            fromDate: chunk.from,
-            toDate: chunk.to
-            // NOTE: Not passing receiverRut - filter doesn't work in API
-          });
+            // NOTE: With per-tenant API keys, each API returns only that tenant's documents
+            const allDocuments = pageData.data;
+            tenantStats.totalDocuments += allDocuments.length;
+            overallStats.totalDocuments += allDocuments.length;
 
-          console.log(`    📄 Page ${currentPage}/${pageData.last_page}: ${pageData.data.length} documents`);
+            console.log(`    ⚙️  Processing ${allDocuments.length} documents for ${tenant.name}`);
 
-          // NOTE: OpenFactura API returns ALL documents across all companies
-          // We determine which tenant each belongs to by checking receiver RUT
-          const allDocuments = pageData.data;
-          overallStats.totalDocuments += allDocuments.length;
+            // Process each document
+            for (const doc of allDocuments) {
+              try {
+                // Create unique identifier
+                const uniqueId = `${doc.RUTEmisor}-${doc.TipoDTE}-${doc.Folio}`;
 
-          console.log(`    ⚙️  Processing ${allDocuments.length} documents, will assign to tenants by receiver RUT`);
+                // Fetch detailed document information to get receiver RUT
+                const documentDetails = await fetchDocumentDetails(
+                  `${doc.RUTEmisor}-${doc.DV}`,
+                  doc.TipoDTE,
+                  doc.Folio,
+                  apiKey
+                );
 
-          // Process each document
-          for (const doc of allDocuments) {
-            try {
-              // Create unique identifier
-              const uniqueId = `${doc.RUTEmisor}-${doc.TipoDTE}-${doc.Folio}`;
+                // Small delay to be respectful to the API (250ms between detail requests)
+                await new Promise(resolve => setTimeout(resolve, 250));
 
-              // Fetch detailed document information to get ACTUAL receiver RUT
-              const documentDetails = await fetchDocumentDetails(
-                `${doc.RUTEmisor}-${doc.DV}`,
-                doc.TipoDTE,
-                doc.Folio
-              );
+                // Create enhanced document data with details
+                const enhancedDocData = enhanceDocumentWithDetails(doc, documentDetails);
 
-              // Small delay to be respectful to the API (250ms between detail requests)
-              await new Promise(resolve => setTimeout(resolve, 250));
+                // Extract receiver RUT from detailedData
+                const actualReceiverRUTFormatted = enhancedDocData.detailedData?.receiver?.rut;
+                const actualReceiverName = enhancedDocData.detailedData?.receiver?.businessName;
 
-              // Create enhanced document data with details
-              const enhancedDocData = enhanceDocumentWithDetails(doc, documentDetails);
-
-              // Extract ACTUAL receiver RUT from detailedData
-              const actualReceiverRUTFormatted = enhancedDocData.detailedData?.receiver?.rut;
-              const actualReceiverName = enhancedDocData.detailedData?.receiver?.businessName;
-
-              // Find which tenant this invoice belongs to based on receiver RUT
-              let matchedTenant = null;
-              if (actualReceiverRUTFormatted) {
-                const receiverRutNumber = getRUTNumber(actualReceiverRUTFormatted);
-                matchedTenant = tenantsByRutNumber.get(receiverRutNumber);
-              } else {
-                console.log(`      ⚠️  ${uniqueId}: No receiver RUT in detail endpoint, will store anyway`);
-              }
-
-              // Use matched tenant if found, otherwise use first available tenant as fallback
-              // This ensures ALL invoices are stored (not skipped)
-              // Filtering by company happens in queries using receiverRUT field
-              const ownerTenant = matchedTenant || tenantsToSync[0];
-
-              if (matchedTenant) {
-                console.log(`      ✅  ${uniqueId}: Matched to ${matchedTenant.name} (receiver: ${actualReceiverRUTFormatted})`);
-              } else {
-                console.log(`      ⚠️  ${uniqueId}: No tenant match for receiver ${actualReceiverRUTFormatted}, storing under ${ownerTenant.name}`);
-              }
-
-              // Get stats for this tenant
-              const tenantStats = tenantStatsMap.get(ownerTenant.id)!;
-
-              // Check if document already exists (use unique constraint fields)
-              const existingDoc = await prisma.taxDocument.findFirst({
-                where: {
-                  tenantId: ownerTenant.id,
-                  folio: doc.Folio.toString(),
-                  emitterRUT: `${doc.RUTEmisor}-${doc.DV}`
+                if (actualReceiverRUTFormatted) {
+                  console.log(`      ✅  ${uniqueId}: Receiver ${actualReceiverRUTFormatted}`);
+                } else {
+                  console.log(`      ⚠️  ${uniqueId}: No receiver RUT in detail endpoint`);
                 }
-              });
 
-              // Use ACTUAL receiver data from enhanced document (or null if unavailable)
-              const receiverRUT = actualReceiverRUTFormatted || null;
-              const receiverName = actualReceiverName || null;
+                // Check if document already exists (use unique constraint fields)
+                const existingDoc = await prisma.taxDocument.findFirst({
+                  where: {
+                    tenantId: tenant.id,
+                    folio: doc.Folio.toString(),
+                    emitterRUT: `${doc.RUTEmisor}-${doc.DV}`
+                  }
+                });
 
-              const documentData = {
-                type: mapDocumentType(doc.TipoDTE),
-                folio: doc.Folio.toString(),
-                documentCode: doc.TipoDTE,
-                emitterRUT: `${doc.RUTEmisor}-${doc.DV}`,
-                emitterName: doc.RznSoc,
-                receiverRUT,
-                receiverName,
-                netAmount: new Decimal(doc.MntNeto || 0),
-                taxAmount: new Decimal(doc.IVA || 0),
-                totalAmount: new Decimal(doc.MntTotal || 0),
-                currency: 'CLP',
-                issuedAt: new Date(doc.FchEmis),
-                status: 'ISSUED' as TaxDocumentStatus,
-                rawResponse: enhancedDocData as any,
-                tenantId: ownerTenant.id
-              };
+                // Use ACTUAL receiver data from enhanced document (or null if unavailable)
+                const receiverRUT = actualReceiverRUTFormatted || null;
+                const receiverName = actualReceiverName || null;
+
+                const documentData = {
+                  type: mapDocumentType(doc.TipoDTE),
+                  folio: doc.Folio.toString(),
+                  documentCode: doc.TipoDTE,
+                  emitterRUT: `${doc.RUTEmisor}-${doc.DV}`,
+                  emitterName: doc.RznSoc,
+                  receiverRUT,
+                  receiverName,
+                  netAmount: new Decimal(doc.MntNeto || 0),
+                  taxAmount: new Decimal(doc.IVA || 0),
+                  totalAmount: new Decimal(doc.MntTotal || 0),
+                  currency: 'CLP',
+                  issuedAt: new Date(doc.FchEmis),
+                  status: 'ISSUED' as TaxDocumentStatus,
+                  rawResponse: enhancedDocData as any,
+                  tenantId: tenant.id
+                };
 
                 // Extract line items for database storage
               const lineItems = enhancedDocData.detailedData?.lineItems || [];
@@ -750,20 +757,18 @@ export async function POST(request: NextRequest) {
     }
 
     // Finalize tenant stats
-    for (const tenant of tenantsToSync) {
-      const tenantStats = tenantStatsMap.get(tenant.id)!;
-      tenantStats.endTime = new Date();
+    tenantStats.endTime = new Date();
 
-      if (tenantStats.newDocuments > 0 || tenantStats.updatedDocuments > 0) {
-        overallStats.successfulTenants++;
-        console.log(`\n✅ ${tenant.name}: ${tenantStats.newDocuments} new, ${tenantStats.updatedDocuments} updated`);
-      } else if (tenantStats.errors > 0) {
-        overallStats.failedTenants++;
-        tenantStats.success = false;
-      }
-
-      overallStats.tenantResults.push(tenantStats);
+    if (tenantStats.newDocuments > 0 || tenantStats.updatedDocuments > 0) {
+      overallStats.successfulTenants++;
+      console.log(`\n✅ ${tenant.name}: ${tenantStats.newDocuments} new, ${tenantStats.updatedDocuments} updated`);
+    } else if (tenantStats.errors > 0) {
+      overallStats.failedTenants++;
+      tenantStats.success = false;
     }
+
+    overallStats.tenantResults.push(tenantStats);
+  }
 
 
     overallStats.endTime = new Date();

@@ -609,34 +609,12 @@ export async function POST(request: NextRequest) {
             console.log(`    ⚙️  Processing ${allDocuments.length} documents for ${tenant.name}`);
 
             // Process each document
+            // NOTE: Each API key returns ALL documents for that company
+            // We assign them directly to the tenant without any receiverRUT filtering
             for (const doc of allDocuments) {
               try {
                 // Create unique identifier
                 const uniqueId = `${doc.RUTEmisor}-${doc.TipoDTE}-${doc.Folio}`;
-
-                // Fetch detailed document information to get receiver RUT
-                const documentDetails = await fetchDocumentDetails(
-                  `${doc.RUTEmisor}-${doc.DV}`,
-                  doc.TipoDTE,
-                  doc.Folio,
-                  apiKey
-                );
-
-                // Small delay to be respectful to the API (250ms between detail requests)
-                await new Promise(resolve => setTimeout(resolve, 250));
-
-                // Create enhanced document data with details
-                const enhancedDocData = enhanceDocumentWithDetails(doc, documentDetails);
-
-                // Extract receiver RUT from detailedData
-                const actualReceiverRUTFormatted = enhancedDocData.detailedData?.receiver?.rut;
-                const actualReceiverName = enhancedDocData.detailedData?.receiver?.businessName;
-
-                if (actualReceiverRUTFormatted) {
-                  console.log(`      ✅  ${uniqueId}: Receiver ${actualReceiverRUTFormatted}`);
-                } else {
-                  console.log(`      ⚠️  ${uniqueId}: No receiver RUT in detail endpoint`);
-                }
 
                 // Check if document already exists (use unique constraint fields)
                 const existingDoc = await prisma.taxDocument.findFirst({
@@ -647,30 +625,26 @@ export async function POST(request: NextRequest) {
                   }
                 });
 
-                // Use ACTUAL receiver data from enhanced document (or null if unavailable)
-                const receiverRUT = actualReceiverRUTFormatted || null;
-                const receiverName = actualReceiverName || null;
-
                 const documentData = {
                   type: mapDocumentType(doc.TipoDTE),
                   folio: doc.Folio.toString(),
                   documentCode: doc.TipoDTE,
                   emitterRUT: `${doc.RUTEmisor}-${doc.DV}`,
                   emitterName: doc.RznSoc,
-                  receiverRUT,
-                  receiverName,
+                  receiverRUT: null,  // Will be populated if/when we fetch details
+                  receiverName: null,
                   netAmount: new Decimal(doc.MntNeto || 0),
                   taxAmount: new Decimal(doc.IVA || 0),
                   totalAmount: new Decimal(doc.MntTotal || 0),
                   currency: 'CLP',
                   issuedAt: new Date(doc.FchEmis),
                   status: 'ISSUED' as TaxDocumentStatus,
-                  rawResponse: enhancedDocData as any,
+                  rawResponse: doc as any,
                   tenantId: tenant.id
                 };
 
-                // Extract line items for database storage
-              const lineItems = enhancedDocData.detailedData?.lineItems || [];
+                // No line items for now (only available from detail endpoint)
+              const lineItems: any[] = [];
 
               if (existingDoc) {
                 // Update existing document and replace line items

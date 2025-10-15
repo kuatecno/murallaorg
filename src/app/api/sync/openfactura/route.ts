@@ -237,6 +237,8 @@ async function fetchOpenFacturaPage(options: FetchOptions = {}): Promise<OpenFac
 
   console.log(`Fetching OpenFactura page ${page} (all companies):`, JSON.stringify(payload, null, 2));
 
+  console.log(`🔑 Using API key: ${apiKey.substring(0, 8)}...${apiKey.substring(apiKey.length - 4)}`);
+
   const response = await fetch(OPENFACTURA_API_URL, {
     method: 'POST',
     headers: {
@@ -246,13 +248,26 @@ async function fetchOpenFacturaPage(options: FetchOptions = {}): Promise<OpenFac
     body: JSON.stringify(payload),
   });
 
+  console.log(`📡 Response status: ${response.status} ${response.statusText}`);
+  console.log(`📡 Response headers:`, Object.fromEntries(response.headers.entries()));
+
   if (!response.ok) {
     const errorText = await response.text();
     console.error(`❌ OpenFactura API error ${response.status}: ${errorText}`);
     throw new Error(`OpenFactura API error ${response.status}: ${errorText}`);
   }
 
-  const responseData = await response.json();
+  const responseText = await response.text();
+  console.log(`📄 Response body (first 500 chars): ${responseText.substring(0, 500)}`);
+
+  let responseData;
+  try {
+    responseData = JSON.parse(responseText);
+  } catch (jsonError) {
+    console.error(`❌ Failed to parse JSON response. Response body:`, responseText);
+    throw new Error(`Invalid JSON response from OpenFactura API: ${jsonError}`);
+  }
+
   console.log(`✅ OpenFactura API response: page ${responseData.current_page}/${responseData.last_page}, ${responseData.data?.length || 0} documents`);
 
   return responseData;

@@ -248,10 +248,14 @@ async function fetchOpenFacturaPage(options: FetchOptions = {}): Promise<OpenFac
 
   if (!response.ok) {
     const errorText = await response.text();
+    console.error(`❌ OpenFactura API error ${response.status}: ${errorText}`);
     throw new Error(`OpenFactura API error ${response.status}: ${errorText}`);
   }
 
-  return response.json();
+  const responseData = await response.json();
+  console.log(`✅ OpenFactura API response: page ${responseData.current_page}/${responseData.last_page}, ${responseData.data?.length || 0} documents`);
+
+  return responseData;
 }
 
 async function fetchDocumentDetails(rut: string, type: number, folio: number, apiKey: string): Promise<any> {

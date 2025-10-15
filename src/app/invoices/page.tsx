@@ -118,10 +118,11 @@ export default function InvoicesPage() {
       // Build query parameters or request body
       const syncParams: any = {}
 
-      // Add tenant ID if selected
-      if (selectedTenant) {
-        syncParams.tenantId = selectedTenant
-      }
+      // NOTE: Always sync ALL tenants, not just the selected one
+      // Each tenant has its own API key and should be synced independently
+      // if (selectedTenant) {
+      //   syncParams.tenantId = selectedTenant
+      // }
 
       if (config.months > 0) {
         syncParams.months = config.months

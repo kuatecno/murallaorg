@@ -602,16 +602,14 @@ export async function POST(request: NextRequest) {
               const actualReceiverRUTFormatted = enhancedDocData.detailedData?.receiver?.rut;
               const actualReceiverName = enhancedDocData.detailedData?.receiver?.businessName;
 
-              // Skip if no receiver RUT found
-              if (!actualReceiverRUTFormatted) {
-                console.log(`      ⏭️  Skipping ${uniqueId}: No receiver RUT in detail endpoint`);
-                overallStats.skippedDocuments++;
-                continue;
-              }
-
               // Find which tenant this invoice belongs to based on receiver RUT
-              const receiverRutNumber = getRUTNumber(actualReceiverRUTFormatted);
-              const matchedTenant = tenantsByRutNumber.get(receiverRutNumber);
+              let matchedTenant = null;
+              if (actualReceiverRUTFormatted) {
+                const receiverRutNumber = getRUTNumber(actualReceiverRUTFormatted);
+                matchedTenant = tenantsByRutNumber.get(receiverRutNumber);
+              } else {
+                console.log(`      ⚠️  ${uniqueId}: No receiver RUT in detail endpoint, will store anyway`);
+              }
 
               // Use matched tenant if found, otherwise use first available tenant as fallback
               // This ensures ALL invoices are stored (not skipped)
@@ -636,9 +634,9 @@ export async function POST(request: NextRequest) {
                 }
               });
 
-              // Use ACTUAL receiver data from enhanced document
-              const receiverRUT = actualReceiverRUTFormatted;
-              const receiverName = actualReceiverName || ownerTenant.name;
+              // Use ACTUAL receiver data from enhanced document (or null if unavailable)
+              const receiverRUT = actualReceiverRUTFormatted || null;
+              const receiverName = actualReceiverName || null;
 
               const documentData = {
                 type: mapDocumentType(doc.TipoDTE),

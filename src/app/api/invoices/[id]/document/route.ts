@@ -6,13 +6,21 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { getRUTNumber } from '@/lib/chilean-utils';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
 }
 
 const OPENFACTURA_API_BASE = 'https://api.haulmer.com/v2/dte/document';
-const OPENFACTURA_API_KEY = process.env.OPENFACTURA_API_KEY;
+const OPENFACTURA_API_KEY_MURALLA = process.env.OPENFACTURA_API_KEY_MURALLA;
+const OPENFACTURA_API_KEY_MURALLITA = process.env.OPENFACTURA_API_KEY_MURALLITA;
+
+// Map tenant RUT numbers to their API keys
+const API_KEY_BY_RUT: Record<number, string> = {
+  78188363: OPENFACTURA_API_KEY_MURALLA || '',     // Muralla SPA
+  78225753: OPENFACTURA_API_KEY_MURALLITA || '',   // Murallita MEF EIRL
+};
 
 /**
  * GET /api/invoices/[id]/document
@@ -33,14 +41,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    if (!OPENFACTURA_API_KEY) {
-      return NextResponse.json(
-        { error: 'OpenFactura API key not configured' },
-        { status: 500 }
-      );
-    }
-
-    // Fetch invoice data from database
+    // Fetch invoice data from database with tenant info
     const invoice = await prisma.taxDocument.findUnique({
       where: { id },
       select: {
@@ -50,7 +51,14 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         emitterRUT: true,
         emitterName: true,
         type: true,
-        status: true
+        status: true,
+        tenantId: true,
+        tenant: {
+          select: {
+            rut: true,
+            name: true
+          }
+        }
       }
     });
 
@@ -58,6 +66,24 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json(
         { error: 'Invoice not found' },
         { status: 404 }
+      );
+    }
+
+    // Get the correct API key for this tenant
+    if (!invoice.tenant?.rut) {
+      return NextResponse.json(
+        { error: 'Tenant RUT not configured for this invoice' },
+        { status: 500 }
+      );
+    }
+
+    const tenantRutNumber = getRUTNumber(invoice.tenant.rut);
+    const apiKey = API_KEY_BY_RUT[tenantRutNumber];
+
+    if (!apiKey) {
+      return NextResponse.json(
+        { error: `OpenFactura API key not configured for tenant ${invoice.tenant.name} (RUT: ${invoice.tenant.rut})` },
+        { status: 500 }
       );
     }
 
@@ -69,13 +95,13 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     // Build OpenFactura API URL
     const openFacturaUrl = `${OPENFACTURA_API_BASE}/${rut}/${documentType}/${folio}/${format}`;
 
-    console.log(`Fetching OpenFactura document: ${openFacturaUrl}`);
+    console.log(`Fetching OpenFactura document for ${invoice.tenant.name}: ${openFacturaUrl}`);
 
-    // Fetch document from OpenFactura
+    // Fetch document from OpenFactura using tenant-specific API key
     const response = await fetch(openFacturaUrl, {
       method: 'GET',
       headers: {
-        'apikey': OPENFACTURA_API_KEY,
+        'apikey': apiKey,
       },
     });
 

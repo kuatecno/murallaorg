@@ -123,7 +123,7 @@ export async function GET(request: NextRequest) {
         orderBy.createdAt = params.sortOrder;
         break;
       default:
-        orderBy.createdAt = 'desc';
+        orderBy.issuedAt = 'desc';
     }
 
     // Execute queries

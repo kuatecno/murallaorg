@@ -13,6 +13,21 @@ interface Invoice {
   status: string
   issuedAt: string
   createdAt: string
+  expenses?: Array<{
+    id: string
+    amount: number
+    category: {
+      id: string
+      name: string
+      emoji: string
+      color: string
+    }
+    status: {
+      id: string
+      name: string
+      color: string
+    }
+  }>
 }
 
 interface Tenant {
@@ -259,6 +274,25 @@ export default function InvoicesPage() {
   const formatSyncTime = (timestamp: string) => {
     const date = new Date(timestamp)
     return date.toLocaleString('es-CL')
+  }
+
+  const handleGenerateExpense = async (invoiceId: string) => {
+    try {
+      const response = await fetch(`/api/invoices/${invoiceId}/expense`, {
+        method: 'POST'
+      })
+
+      if (response.ok) {
+        // Refresh invoices to show the new expense
+        fetchInvoices(false, pagination.page)
+      } else {
+        const data = await response.json()
+        alert(data.error || 'Failed to generate expense')
+      }
+    } catch (err) {
+      console.error('Error generating expense:', err)
+      alert('Failed to generate expense')
+    }
   }
 
   const handleSort = (column: 'folio' | 'totalAmount' | 'issuedAt' | 'createdAt') => {
@@ -548,6 +582,9 @@ export default function InvoicesPage() {
                         <SortIcon column="createdAt" />
                       </div>
                     </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Expense
+                    </th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Actions
                     </th>
@@ -585,6 +622,21 @@ export default function InvoicesPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {formatDate(invoice.createdAt)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        {invoice.expenses && invoice.expenses.length > 0 ? (
+                          <Link href={`/expenses?search=${invoice.folio}`} className="flex items-center space-x-1 text-green-600 hover:text-green-800">
+                            <span className="text-lg">{invoice.expenses[0].category.emoji}</span>
+                            <span className="font-medium">{invoice.expenses[0].category.name}</span>
+                          </Link>
+                        ) : (
+                          <button
+                            onClick={() => handleGenerateExpense(invoice.id)}
+                            className="text-gray-400 hover:text-blue-600 text-sm font-medium"
+                          >
+                            + Create
+                          </button>
+                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <div className="flex items-center justify-end space-x-2">

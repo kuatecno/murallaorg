@@ -67,6 +67,39 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
             phone: true,
             email: true,
           }
+        },
+        expenses: {
+          include: {
+            category: {
+              select: {
+                id: true,
+                name: true,
+                emoji: true,
+                color: true
+              }
+            },
+            status: {
+              select: {
+                id: true,
+                name: true,
+                color: true
+              }
+            },
+            paymentAccount: {
+              select: {
+                id: true,
+                name: true,
+                type: true
+              }
+            },
+            staff: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true
+              }
+            }
+          }
         }
       },
     });
@@ -115,6 +148,14 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         unitPrice: Number(item.unitPrice),
         totalPrice: Number(item.totalPrice),
       })),
+      expenses: invoice.expenses.map(expense => ({
+        id: expense.id,
+        amount: Number(expense.amount),
+        category: expense.category,
+        status: expense.status,
+        paymentAccount: expense.paymentAccount,
+        staff: expense.staff
+      }))
     };
 
     return NextResponse.json({

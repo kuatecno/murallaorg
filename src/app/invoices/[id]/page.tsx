@@ -32,6 +32,31 @@ interface Invoice {
   updatedAt: string
   pdfUrl?: string
   items: InvoiceItem[]
+  expenses?: Array<{
+    id: string
+    amount: number
+    category: {
+      id: string
+      name: string
+      emoji: string
+      color: string
+    }
+    status: {
+      id: string
+      name: string
+      color: string
+    }
+    paymentAccount?: {
+      id: string
+      name: string
+      type: string
+    }
+    staff?: {
+      id: string
+      firstName: string
+      lastName: string
+    }
+  }>
 }
 
 export default function InvoiceDetailPage() {
@@ -64,6 +89,29 @@ export default function InvoiceDetailPage() {
       console.error('Error fetching invoice:', err)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleGenerateExpense = async () => {
+    if (!invoice) return
+
+    setActionLoading('generate-expense')
+    try {
+      const response = await fetch(`/api/invoices/${invoice.id}/expense`, {
+        method: 'POST'
+      })
+
+      if (response.ok) {
+        // Refresh invoice to show the new expense
+        await fetchInvoice(invoice.id)
+      } else {
+        const data = await response.json()
+        setError(data.error || 'Failed to generate expense')
+      }
+    } catch (err) {
+      setError('Failed to generate expense')
+    } finally {
+      setActionLoading('')
     }
   }
 
@@ -304,6 +352,69 @@ export default function InvoiceDetailPage() {
             </div>
           ) : (
             <p className="text-gray-500 text-center py-8">No items found for this invoice</p>
+          )}
+        </div>
+
+        {/* Linked Expense */}
+        <div className="bg-white rounded-lg shadow p-6 mb-6">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-lg font-medium text-gray-900">Linked Expense</h2>
+            {(!invoice.expenses || invoice.expenses.length === 0) && (
+              <button
+                onClick={handleGenerateExpense}
+                disabled={actionLoading === 'generate-expense'}
+                className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors"
+              >
+                <Plus className="h-4 w-4" />
+                <span>{actionLoading === 'generate-expense' ? 'Generating...' : 'Generate Expense'}</span>
+              </button>
+            )}
+          </div>
+
+          {invoice.expenses && invoice.expenses.length > 0 ? (
+            <div className="space-y-3">
+              {invoice.expenses.map((expense) => (
+                <Link
+                  key={expense.id}
+                  href={`/expenses`}
+                  className="block border border-gray-200 rounded-lg p-4 hover:bg-gray-50 hover:border-blue-300 transition-colors"
+                >
+                  <div className="flex justify-between items-start">
+                    <div className="flex items-start space-x-3">
+                      <span className="text-3xl">{expense.category.emoji}</span>
+                      <div>
+                        <div className="font-medium text-gray-900">{expense.category.name}</div>
+                        {expense.paymentAccount && (
+                          <div className="text-sm text-gray-500 mt-1">
+                            Payment: {expense.paymentAccount.name} ({expense.paymentAccount.type})
+                          </div>
+                        )}
+                        {expense.staff && (
+                          <div className="text-sm text-gray-500 mt-1">
+                            Paid by: {expense.staff.firstName} {expense.staff.lastName}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-lg font-bold text-gray-900">
+                        {formatCurrency(expense.amount, invoice.currency)}
+                      </div>
+                      <div
+                        className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium text-white mt-1"
+                        style={{ backgroundColor: expense.status.color }}
+                      >
+                        {expense.status.name}
+                      </div>
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <p className="text-gray-500 text-center py-8">
+              No expense created yet. Click "Generate Expense" to automatically create one from this invoice.
+            </p>
           )}
         </div>
 

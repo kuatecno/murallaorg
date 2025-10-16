@@ -507,7 +507,13 @@ export default function ExpensesPage() {
                               {expense.taxDocument && (
                                 <>
                                   <span>•</span>
-                                  <span className="text-blue-600">From Invoice {expense.taxDocument.folio}</span>
+                                  <Link
+                                    href={`/invoices/${expense.taxDocument.id}`}
+                                    className="text-blue-600 hover:text-blue-800 font-medium hover:underline"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    📄 Invoice {expense.taxDocument.folio}
+                                  </Link>
                                 </>
                               )}
                             </div>

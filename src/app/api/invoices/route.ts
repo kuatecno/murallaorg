@@ -148,6 +148,28 @@ export async function GET(request: NextRequest) {
             }
           },
           items: true,
+          expenses: {
+            take: 1, // Only get first expense for list view
+            select: {
+              id: true,
+              amount: true,
+              category: {
+                select: {
+                  id: true,
+                  name: true,
+                  emoji: true,
+                  color: true
+                }
+              },
+              status: {
+                select: {
+                  id: true,
+                  name: true,
+                  color: true
+                }
+              }
+            }
+          }
         },
       }),
       prisma.taxDocument.count({ where }),
@@ -181,6 +203,7 @@ export async function GET(request: NextRequest) {
       updatedAt: invoice.updatedAt,
       customer: invoice.transaction?.contact || null,
       itemCount: invoice.items.length,
+      expenses: invoice.expenses || [],
       items: invoice.items.map(item => ({
         id: item.id,
         productName: item.productName,

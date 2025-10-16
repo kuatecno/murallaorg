@@ -587,6 +587,8 @@ export async function POST(request: NextRequest) {
 
       console.log(`\n${'='.repeat(80)}`);
       console.log(`🏢 Syncing tenant ${tenantIndex + 1}/${tenantsToSync.length}: ${tenant.name} (${tenant.rut})`);
+      console.log(`🔑 RUT Number: ${rutNumber} → API Key: ${apiKey.substring(0, 8)}...`);
+      console.log(`📋 Tenant ID: ${tenant.id}`);
       console.log(`${'='.repeat(80)}\n`);
 
       let tenantStats = {
@@ -630,7 +632,8 @@ export async function POST(request: NextRequest) {
             tenantStats.totalDocuments += allDocuments.length;
             overallStats.totalDocuments += allDocuments.length;
 
-            console.log(`    ⚙️  Processing ${allDocuments.length} documents for ${tenant.name}`);
+            console.log(`    ⚙️  Processing ${allDocuments.length} documents for ${tenant.name} (Tenant ID: ${tenant.id})`);
+            console.log(`    📋 Document folios: ${allDocuments.map((d: any) => d.Folio).join(', ')}`);
 
             // Process each document
             // NOTE: Each API key returns ALL documents for that company

@@ -13,7 +13,7 @@ const OPENFACTURA_API_URL = 'https://api.haulmer.com/v2/dte/document/received';
 const OPENFACTURA_DETAIL_URL = 'https://api.haulmer.com/v2/dte/document';
 
 // Multi-tenant API key support
-// FORCE REBUILD: Each company requires its own API key
+// CACHE BUST 2025-10-15: Each company requires its own API key
 const OPENFACTURA_API_KEY_MURALLA = process.env.OPENFACTURA_API_KEY_MURALLA;
 const OPENFACTURA_API_KEY_MURALLITA = process.env.OPENFACTURA_API_KEY_MURALLITA;
 

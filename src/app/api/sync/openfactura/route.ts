@@ -8,6 +8,7 @@ import prisma from '@/lib/prisma';
 import { TaxDocumentType, TaxDocumentStatus } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { validateRUT, getRUTNumber, formatRUTForAPI } from '@/lib/chilean-utils';
+import { autoGenerateExpenses } from '@/lib/auto-generate-expenses';
 
 const OPENFACTURA_API_URL = 'https://api.haulmer.com/v2/dte/document/received';
 const OPENFACTURA_DETAIL_URL = 'https://api.haulmer.com/v2/dte/document';
@@ -793,6 +794,45 @@ export async function POST(request: NextRequest) {
     console.log(`   ⏭️  Skipped: ${overallStats.skippedDocuments}`);
     console.log(`   ❌ Errors: ${overallStats.errors}`);
     console.log(`${'='.repeat(80)}\n`);
+
+    // Auto-generate expenses for new invoices
+    if (overallStats.newDocuments > 0) {
+      console.log(`\n${'='.repeat(80)}`);
+      console.log(`🤖 AUTO-GENERATING EXPENSES FROM NEW INVOICES`);
+      console.log(`${'='.repeat(80)}\n`);
+
+      for (const tenantResult of overallStats.tenantResults) {
+        if (tenantResult.newDocuments > 0) {
+          try {
+            console.log(`\n📋 Generating expenses for ${tenantResult.tenantName}...`);
+
+            const result = await autoGenerateExpenses({
+              tenantId: tenantResult.tenantId,
+              onlyUnprocessed: true
+            });
+
+            console.log(`   ✅ Created ${result.created} expense(s)`);
+            if (result.skipped > 0) {
+              console.log(`   ⏭️  Skipped ${result.skipped} document(s)`);
+            }
+
+            // Add expense stats to tenant result
+            tenantResult.expensesGenerated = result.created;
+            tenantResult.expensesSkipped = result.skipped;
+
+          } catch (error) {
+            console.error(`   ❌ Error generating expenses for ${tenantResult.tenantName}:`, error);
+            tenantResult.expensesGenerated = 0;
+            tenantResult.expensesSkipped = 0;
+          }
+        }
+      }
+
+      const totalExpensesGenerated = overallStats.tenantResults.reduce((sum, t) => sum + (t.expensesGenerated || 0), 0);
+      console.log(`\n${'='.repeat(80)}`);
+      console.log(`✨ Total expenses auto-generated: ${totalExpensesGenerated}`);
+      console.log(`${'='.repeat(80)}\n`);
+    }
 
     return NextResponse.json({
       success: overallStats.failedTenants === 0,

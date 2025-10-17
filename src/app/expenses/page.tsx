@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { Plus, Filter, Download, DollarSign, Users, Clock, CheckCircle, X } from 'lucide-react';
 
 interface Expense {

@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
     const staffId = searchParams.get('staffId');
     const isCompanyExpense = searchParams.get('isCompanyExpense');
     const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '50');
+    const limit = parseInt(searchParams.get('limit') || '1000'); // Show all expenses by default
     const skip = (page - 1) * limit;
 
     // TODO: Get tenantId from authentication context

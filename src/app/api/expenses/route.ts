@@ -134,7 +134,9 @@ export async function POST(request: NextRequest) {
       isCompanyExpense,
       categoryId,
       statusId,
-      taxDocumentId
+      taxDocumentId,
+      receiptImageUrl,
+      receiptPublicId
     } = body;
 
     // TODO: Get tenantId from authentication context
@@ -195,6 +197,9 @@ export async function POST(request: NextRequest) {
         statusId,
         taxDocumentId,
         isFromInvoice: !!taxDocumentId,
+        receiptImageUrl,
+        receiptPublicId,
+        hasReceipt: !!receiptImageUrl,
         tenantId
       },
       include: {

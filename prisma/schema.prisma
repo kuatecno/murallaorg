@@ -744,6 +744,11 @@ model Expense {
   isFromInvoice Boolean @default(false)
   taxDocumentId String? // Link to TaxDocument if auto-generated
 
+  // Receipt/Boleta image attachment (Cloudinary)
+  receiptImageUrl String? // Cloudinary URL
+  receiptPublicId String? // Cloudinary public ID for deletion
+  hasReceipt      Boolean @default(false)
+
   // Categorization
   categoryId String
   statusId   String

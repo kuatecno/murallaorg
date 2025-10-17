@@ -70,6 +70,8 @@ interface ExpenseFormData {
   categoryId: string;
   statusId: string;
   isCompanyExpense: boolean;
+  receiptImageUrl: string;
+  receiptPublicId: string;
 }
 
 interface Category {
@@ -117,6 +119,8 @@ export default function ExpensesPage() {
   const [statuses, setStatuses] = useState<Status[]>([]);
   const [paymentAccounts, setPaymentAccounts] = useState<PaymentAccount[]>([]);
   const [staff, setStaff] = useState<Staff[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [formData, setFormData] = useState<ExpenseFormData>({
     date: new Date().toISOString().split('T')[0],
     supplier: '',
@@ -131,7 +135,9 @@ export default function ExpensesPage() {
     staffId: '',
     categoryId: '',
     statusId: '',
-    isCompanyExpense: true
+    isCompanyExpense: true,
+    receiptImageUrl: '',
+    receiptPublicId: ''
   });
 
   useEffect(() => {
@@ -268,8 +274,11 @@ export default function ExpensesPage() {
           staffId: '',
           categoryId: formData.categoryId,
           statusId: formData.statusId,
-          isCompanyExpense: true
+          isCompanyExpense: true,
+          receiptImageUrl: '',
+          receiptPublicId: ''
         });
+        setUploadedImage(null);
         setIsModalOpen(false);
 
         // Refresh expenses list
@@ -285,6 +294,63 @@ export default function ExpensesPage() {
     }
   };
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/heic'];
+    if (!validTypes.includes(file.type)) {
+      alert('Invalid file type. Please upload JPG, PNG, WebP, or HEIC images.');
+      return;
+    }
+
+    const maxSizeMB = 10;
+    if (file.size > maxSizeMB * 1024 * 1024) {
+      alert(`File size exceeds ${maxSizeMB}MB. Please upload a smaller image.`);
+      return;
+    }
+
+    setUploading(true);
+
+    try {
+      const formDataUpload = new FormData();
+      formDataUpload.append('file', file);
+
+      const response = await fetch('/api/expenses/upload', {
+        method: 'POST',
+        body: formDataUpload
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setFormData(prev => ({
+          ...prev,
+          receiptImageUrl: data.data.url,
+          receiptPublicId: data.data.publicId
+        }));
+        setUploadedImage(data.data.url);
+      } else {
+        alert('Upload failed: ' + data.error);
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      alert('Failed to upload image');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setUploadedImage(null);
+    setFormData(prev => ({
+      ...prev,
+      receiptImageUrl: '',
+      receiptPublicId: ''
+    }));
+  };
+
   const handleInputChange = (field: keyof ExpenseFormData, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
@@ -295,6 +361,7 @@ export default function ExpensesPage() {
 
   const closeModal = () => {
     setIsModalOpen(false);
+    setUploadedImage(null);
     setFormData({
       date: new Date().toISOString().split('T')[0],
       supplier: '',
@@ -309,7 +376,9 @@ export default function ExpensesPage() {
       staffId: '',
       categoryId: categories.length > 0 ? categories[0].id : '',
       statusId: statuses.length > 0 ? statuses[0].id : '',
-      isCompanyExpense: true
+      isCompanyExpense: true,
+      receiptImageUrl: '',
+      receiptPublicId: ''
     });
   };
 
@@ -814,6 +883,59 @@ export default function ExpensesPage() {
                       rows={3}
                       placeholder="Additional notes (optional)"
                     />
+                  </div>
+
+                  {/* Receipt Image Upload */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Receipt/Boleta Image
+                    </label>
+                    {!uploadedImage && !formData.receiptImageUrl ? (
+                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-500 transition-colors">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleFileUpload}
+                          className="hidden"
+                          id="receipt-upload"
+                          disabled={uploading}
+                        />
+                        <label
+                          htmlFor="receipt-upload"
+                          className="cursor-pointer flex flex-col items-center"
+                        >
+                          {uploading ? (
+                            <>
+                              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-3"></div>
+                              <p className="text-sm text-gray-600">Uploading...</p>
+                            </>
+                          ) : (
+                            <>
+                              <svg className="w-12 h-12 text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                              </svg>
+                              <p className="text-sm text-gray-600 mb-1">Click to upload receipt image</p>
+                              <p className="text-xs text-gray-500">PNG, JPG, WebP up to 10MB</p>
+                            </>
+                          )}
+                        </label>
+                      </div>
+                    ) : (
+                      <div className="relative border border-gray-300 rounded-lg p-4">
+                        <img
+                          src={uploadedImage || formData.receiptImageUrl}
+                          alt="Receipt preview"
+                          className="max-h-64 mx-auto rounded"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleRemoveImage}
+                          className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-2 hover:bg-red-600 transition-colors"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex justify-end space-x-3 pt-6">

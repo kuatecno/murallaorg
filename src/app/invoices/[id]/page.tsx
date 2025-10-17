@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Download, CheckCircle, XCircle, Clock, Edit, Trash2 } from 'lucide-react'
+import { Download, CheckCircle, XCircle, Clock, Edit, Trash2, Plus } from 'lucide-react'
 import TopNavigation from '@/components/layout/TopNavigation'
 
 interface InvoiceItem {

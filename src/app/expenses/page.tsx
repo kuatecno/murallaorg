@@ -13,6 +13,9 @@ interface Expense {
   currency: string;
   paymentType: 'COMPANY_ACCOUNT' | 'EMPLOYEE_PAID' | 'PERSONAL' | 'MIXED';
   isCompanyExpense: boolean;
+  receiptImageUrl?: string;
+  receiptPublicId?: string;
+  hasReceipt?: boolean;
   category: {
     id: string;
     name: string;
@@ -114,6 +117,8 @@ export default function ExpensesPage() {
 
   // Modal and form state
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
   const [statuses, setStatuses] = useState<Status[]>([]);
@@ -122,6 +127,24 @@ export default function ExpensesPage() {
   const [uploading, setUploading] = useState(false);
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [formData, setFormData] = useState<ExpenseFormData>({
+    date: new Date().toISOString().split('T')[0],
+    supplier: '',
+    description: '',
+    amount: '',
+    currency: 'CLP',
+    documentType: 'OTRO',
+    documentNumber: '',
+    notes: '',
+    paymentType: 'COMPANY_ACCOUNT',
+    paymentAccountId: '',
+    staffId: '',
+    categoryId: '',
+    statusId: '',
+    isCompanyExpense: true,
+    receiptImageUrl: '',
+    receiptPublicId: ''
+  });
+  const [editFormData, setEditFormData] = useState<ExpenseFormData>({
     date: new Date().toISOString().split('T')[0],
     supplier: '',
     description: '',
@@ -150,6 +173,32 @@ export default function ExpensesPage() {
       fetchFormData();
     }
   }, [isModalOpen]);
+
+  useEffect(() => {
+    if (isEditModalOpen && selectedExpense) {
+      fetchFormData().then(() => {
+        // Set form data after fetching accounts and staff
+        setEditFormData({
+          date: new Date(selectedExpense.date).toISOString().split('T')[0],
+          supplier: selectedExpense.supplier,
+          description: selectedExpense.description,
+          amount: selectedExpense.amount.toString(),
+          currency: selectedExpense.currency,
+          documentType: selectedExpense.taxDocument?.type || 'OTRO',
+          documentNumber: selectedExpense.taxDocument?.folio || '',
+          notes: '',
+          paymentType: selectedExpense.paymentType,
+          paymentAccountId: selectedExpense.paymentAccount?.id || '',
+          staffId: selectedExpense.staff?.id || '',
+          categoryId: selectedExpense.category.id,
+          statusId: selectedExpense.status.id,
+          isCompanyExpense: selectedExpense.isCompanyExpense,
+          receiptImageUrl: '',
+          receiptPublicId: ''
+        });
+      });
+    }
+  }, [isEditModalOpen, selectedExpense]);
 
   const fetchExpenses = async () => {
     try {
@@ -389,6 +438,91 @@ export default function ExpensesPage() {
     }).format(amount);
   };
 
+  const handleExpenseClick = (expense: Expense) => {
+    console.log('Expense clicked:', expense.id);
+    setSelectedExpense(expense);
+    setIsEditModalOpen(true);
+  };
+
+  const handlePaymentAssignment = async (expenseId: string, paymentType: string, staffId?: string) => {
+    try {
+      const updateData: any = {
+        paymentType: paymentType === 'COMPANY' ? 'COMPANY_ACCOUNT' : 'EMPLOYEE_PAID',
+        staffId: paymentType === 'COMPANY' ? null : staffId,
+        paymentAccountId: paymentType === 'COMPANY' ? (paymentAccounts[0]?.id || null) : null
+      };
+
+      const response = await fetch(`/api/expenses/${expenseId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updateData)
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        fetchExpenses();
+      } else {
+        alert('Error updating payment: ' + data.error);
+      }
+    } catch (error) {
+      console.error('Error updating payment:', error);
+      alert('Error updating payment');
+    }
+  };
+
+  const closeEditModal = () => {
+    setIsEditModalOpen(false);
+    setSelectedExpense(null);
+  };
+
+  const handleEditInputChange = (field: keyof ExpenseFormData, value: any) => {
+    setEditFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedExpense) return;
+
+    setIsSubmitting(true);
+
+    try {
+      // Ensure paymentAccountId is set for COMPANY_ACCOUNT
+      const updateData = {
+        ...editFormData,
+        amount: parseFloat(editFormData.amount),
+        paymentAccountId: editFormData.paymentType === 'COMPANY_ACCOUNT'
+          ? (editFormData.paymentAccountId || paymentAccounts[0]?.id)
+          : null,
+        staffId: editFormData.paymentType === 'EMPLOYEE_PAID' ? editFormData.staffId : null
+      };
+
+      const response = await fetch(`/api/expenses/${selectedExpense.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updateData)
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        closeEditModal();
+        fetchExpenses();
+      } else {
+        alert('Error updating expense: ' + data.error);
+      }
+    } catch (error) {
+      console.error('Error updating expense:', error);
+      alert('Error updating expense');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const getPaymentTypeColor = (paymentType: string) => {
     switch (paymentType) {
       case 'COMPANY_ACCOUNT': return 'bg-blue-100 text-blue-800';
@@ -550,9 +684,9 @@ export default function ExpensesPage() {
           ) : (
             <ul className="divide-y divide-gray-200">
               {expenses.map((expense) => (
-                <li key={expense.id} className="px-4 py-4 hover:bg-gray-50 cursor-pointer">
+                <li key={expense.id} className="px-4 py-4 hover:bg-gray-50">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center min-w-0 flex-1">
+                    <div className="flex items-center min-w-0 flex-1 cursor-pointer" onClick={() => handleExpenseClick(expense)}>
                       <div className="flex-shrink-0">
                         <span className="text-2xl" title={expense.category.name}>
                           {expense.category.emoji}
@@ -592,10 +726,30 @@ export default function ExpensesPage() {
                       </div>
                     </div>
                     <div className="ml-4 flex-shrink-0 flex items-center space-x-4">
-                      {/* Payment Type Badge */}
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPaymentTypeColor(expense.paymentType)}`}>
-                        {getPaymentTypeLabel(expense.paymentType)}
-                      </span>
+                      {/* Inline Payment Assignment */}
+                      <div className="min-w-[140px]">
+                        <select
+                          value={expense.paymentType === 'COMPANY_ACCOUNT' ? 'COMPANY' : expense.staff?.id || ''}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            const value = e.target.value;
+                            if (value === 'COMPANY') {
+                              handlePaymentAssignment(expense.id, 'COMPANY');
+                            } else {
+                              handlePaymentAssignment(expense.id, 'EMPLOYEE', value);
+                            }
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-xs border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                        >
+                          <option value="COMPANY">Company</option>
+                          {staff.map((s) => (
+                            <option key={s.id} value={s.id}>
+                              {s.firstName}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
 
                       {/* Status Badge */}
                       <span
@@ -606,7 +760,7 @@ export default function ExpensesPage() {
                       </span>
 
                       {/* Amount */}
-                      <div className="text-right">
+                      <div className="text-right min-w-[100px]">
                         <p className="text-sm font-semibold text-gray-900">
                           {formatCurrency(expense.amount, expense.currency)}
                         </p>
@@ -952,6 +1106,200 @@ export default function ExpensesPage() {
                       className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-blue-300"
                     >
                       {isSubmitting ? 'Creating...' : 'Create Expense'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Expense Modal */}
+        {isEditModalOpen && selectedExpense && (
+          <div className="fixed z-10 inset-0 overflow-y-auto">
+            <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+              <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={closeEditModal}></div>
+
+              <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
+                <form onSubmit={handleEditSubmit}>
+                  <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg leading-6 font-medium text-gray-900">
+                        Edit Expense
+                      </h3>
+                      <button
+                        type="button"
+                        onClick={closeEditModal}
+                        className="text-gray-400 hover:text-gray-500"
+                      >
+                        <X className="h-6 w-6" />
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      {/* Date */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Date</label>
+                        <input
+                          type="date"
+                          value={editFormData.date}
+                          onChange={(e) => handleEditInputChange('date', e.target.value)}
+                          className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                          required
+                        />
+                      </div>
+
+                      {/* Amount */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Amount</label>
+                        <input
+                          type="number"
+                          value={editFormData.amount}
+                          onChange={(e) => handleEditInputChange('amount', e.target.value)}
+                          step="0.01"
+                          className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                          required
+                        />
+                      </div>
+
+                      {/* Supplier */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Supplier</label>
+                        <input
+                          type="text"
+                          value={editFormData.supplier}
+                          onChange={(e) => handleEditInputChange('supplier', e.target.value)}
+                          className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                          required
+                        />
+                      </div>
+
+                      {/* Category */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Category</label>
+                        <select
+                          value={editFormData.categoryId}
+                          onChange={(e) => handleEditInputChange('categoryId', e.target.value)}
+                          className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                          required
+                        >
+                          {categories.map((cat) => (
+                            <option key={cat.id} value={cat.id}>
+                              {cat.emoji} {cat.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Description */}
+                      <div className="sm:col-span-2">
+                        <label className="block text-sm font-medium text-gray-700">Description</label>
+                        <input
+                          type="text"
+                          value={editFormData.description}
+                          onChange={(e) => handleEditInputChange('description', e.target.value)}
+                          className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                          required
+                        />
+                      </div>
+
+                      {/* Payment Type - CRITICAL FIELD */}
+                      <div className="sm:col-span-2">
+                        <label className="block text-sm font-medium text-gray-700">Paid By</label>
+                        <select
+                          value={editFormData.paymentType === 'COMPANY_ACCOUNT' ? 'COMPANY' : editFormData.staffId}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            if (value === 'COMPANY') {
+                              handleEditInputChange('paymentType', 'COMPANY_ACCOUNT');
+                              handleEditInputChange('staffId', '');
+                            } else {
+                              handleEditInputChange('paymentType', 'EMPLOYEE_PAID');
+                              handleEditInputChange('staffId', value);
+                            }
+                          }}
+                          className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                          required
+                        >
+                          <option value="COMPANY">Company Account</option>
+                          {staff.map((s) => (
+                            <option key={s.id} value={s.id}>
+                              {s.firstName} {s.lastName}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Status */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Status</label>
+                        <select
+                          value={editFormData.statusId}
+                          onChange={(e) => handleEditInputChange('statusId', e.target.value)}
+                          className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                          required
+                        >
+                          {statuses.map((status) => (
+                            <option key={status.id} value={status.id}>
+                              {status.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Currency */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Currency</label>
+                        <select
+                          value={editFormData.currency}
+                          onChange={(e) => handleEditInputChange('currency', e.target.value)}
+                          className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                        >
+                          <option value="CLP">CLP (Chilean Peso)</option>
+                          <option value="USD">USD (US Dollar)</option>
+                          <option value="EUR">EUR (Euro)</option>
+                        </select>
+                      </div>
+
+                      {/* Receipt Image */}
+                      {selectedExpense.receiptImageUrl && (
+                        <div className="sm:col-span-2">
+                          <label className="block text-sm font-medium text-gray-700 mb-2">Receipt Image</label>
+                          <div className="border border-gray-300 rounded-lg p-4">
+                            <img
+                              src={selectedExpense.receiptImageUrl}
+                              alt="Receipt"
+                              className="max-h-64 mx-auto rounded"
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Document Info */}
+                      {selectedExpense.taxDocument && (
+                        <div className="sm:col-span-2 bg-blue-50 p-3 rounded-md">
+                          <p className="text-sm text-gray-700">
+                            <strong>Linked to Invoice:</strong> {selectedExpense.taxDocument.type} {selectedExpense.taxDocument.folio}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                    <button
+                      type="submit"
+                      disabled={isSubmitting}
+                      className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm disabled:bg-blue-300"
+                    >
+                      {isSubmitting ? 'Saving...' : 'Save Changes'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={closeEditModal}
+                      className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                    >
+                      Cancel
                     </button>
                   </div>
                 </form>

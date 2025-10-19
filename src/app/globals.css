@@ -3,16 +3,25 @@
 @tailwind utilities;
 
 @layer base {
-  /* Force all inputs to have dark, readable text */
+  /* Force all inputs and labels to have dark, readable text */
+  /* This applies regardless of light/dark mode since inputs have light backgrounds */
   input,
   select,
   textarea {
     @apply text-gray-900;
+    color: #111827 !important;
+    -webkit-text-fill-color: #111827 !important;
   }
 
   input::placeholder,
   textarea::placeholder {
     @apply text-gray-500;
+  }
+
+  label {
+    @apply text-gray-900;
+    color: #111827 !important;
+    font-weight: 500 !important;
   }
 }
 
@@ -33,72 +42,9 @@ body {
   color: var(--foreground);
 }
 
-/* Ensure all form inputs and labels have dark, readable text */
-input[type="text"],
-input[type="email"],
-input[type="password"],
-input[type="number"],
-input[type="date"],
-input[type="datetime-local"],
-input[type="search"],
-input[type="tel"],
-input[type="url"],
-select,
-textarea {
-  color: #111827 !important; /* gray-900 - even darker for maximum readability */
-  -webkit-text-fill-color: #111827 !important; /* Safari fix */
-}
-
-input::placeholder,
-textarea::placeholder {
-  color: #6b7280 !important; /* gray-500 - darker placeholder */
-  -webkit-text-fill-color: #6b7280 !important;
-}
-
-label {
-  color: #111827 !important; /* gray-900 - ensure labels are always readable */
-  font-weight: 500 !important;
-}
-
-/* Disabled inputs should still be somewhat readable */
+/* Disabled inputs should still be readable */
 input:disabled,
 select:disabled,
 textarea:disabled {
-  color: #4b5563 !important; /* gray-600 */
-  -webkit-text-fill-color: #4b5563 !important;
-}
-
-/* Keep dark text even in dark mode - inputs have white backgrounds */
-@media (prefers-color-scheme: dark) {
-  input[type="text"],
-  input[type="email"],
-  input[type="password"],
-  input[type="number"],
-  input[type="date"],
-  input[type="datetime-local"],
-  input[type="search"],
-  input[type="tel"],
-  input[type="url"],
-  select,
-  textarea {
-    color: #111827 !important; /* gray-900 - keep dark even in dark mode */
-    -webkit-text-fill-color: #111827 !important;
-  }
-
-  input::placeholder,
-  textarea::placeholder {
-    color: #6b7280 !important; /* gray-500 */
-    -webkit-text-fill-color: #6b7280 !important;
-  }
-
-  label {
-    color: #111827 !important; /* gray-900 - keep labels dark too */
-  }
-
-  input:disabled,
-  select:disabled,
-  textarea:disabled {
-    color: #6b7280 !important; /* gray-500 */
-    -webkit-text-fill-color: #6b7280 !important;
-  }
+  opacity: 0.6;
 }

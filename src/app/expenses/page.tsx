@@ -741,6 +741,7 @@ export default function ExpensesPage() {
                           }}
                           onClick={(e) => e.stopPropagation()}
                           className="text-xs border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                          style={{ color: '#111827' }}
                         >
                           <option value="COMPANY">Company</option>
                           {staff.map((s) => (
@@ -804,7 +805,7 @@ export default function ExpensesPage() {
                         type="date"
                         value={formData.date}
                         onChange={(e) => handleInputChange('date', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900" style={{ color: '#111827' }}
                         required
                       />
                     </div>
@@ -846,7 +847,7 @@ export default function ExpensesPage() {
                       type="text"
                       value={formData.supplier}
                       onChange={(e) => handleInputChange('supplier', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900" style={{ color: '#111827' }}
                       placeholder="Enter supplier name"
                       required
                     />
@@ -861,7 +862,7 @@ export default function ExpensesPage() {
                       type="text"
                       value={formData.description}
                       onChange={(e) => handleInputChange('description', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900" style={{ color: '#111827' }}
                       placeholder="Describe the expense"
                       required
                     />
@@ -876,7 +877,7 @@ export default function ExpensesPage() {
                       <select
                         value={formData.categoryId}
                         onChange={(e) => handleInputChange('categoryId', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900" style={{ color: '#111827' }}
                         required
                       >
                         <option value="">Select a category</option>
@@ -896,7 +897,7 @@ export default function ExpensesPage() {
                       <select
                         value={formData.statusId}
                         onChange={(e) => handleInputChange('statusId', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900" style={{ color: '#111827' }}
                         required
                       >
                         <option value="">Select a status</option>
@@ -923,7 +924,7 @@ export default function ExpensesPage() {
                           handleInputChange('staffId', '');
                         }
                       }}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900" style={{ color: '#111827' }}
                       required
                     >
                       <option value="COMPANY_ACCOUNT">Company Account</option>
@@ -942,7 +943,7 @@ export default function ExpensesPage() {
                       <select
                         value={formData.paymentAccountId}
                         onChange={(e) => handleInputChange('paymentAccountId', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900" style={{ color: '#111827' }}
                         required
                       >
                         <option value="">Select a payment account</option>
@@ -964,7 +965,7 @@ export default function ExpensesPage() {
                       <select
                         value={formData.staffId}
                         onChange={(e) => handleInputChange('staffId', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900" style={{ color: '#111827' }}
                         required
                       >
                         <option value="">Select a staff member</option>
@@ -986,7 +987,7 @@ export default function ExpensesPage() {
                       <select
                         value={formData.documentType}
                         onChange={(e) => handleInputChange('documentType', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900" style={{ color: '#111827' }}
                       >
                         <option value="FACTURA">Factura</option>
                         <option value="BOLETA">Boleta</option>
@@ -1005,7 +1006,7 @@ export default function ExpensesPage() {
                         type="text"
                         value={formData.documentNumber}
                         onChange={(e) => handleInputChange('documentNumber', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900" style={{ color: '#111827' }}
                         placeholder="Enter document number"
                       />
                     </div>
@@ -1033,7 +1034,7 @@ export default function ExpensesPage() {
                     <textarea
                       value={formData.notes}
                       onChange={(e) => handleInputChange('notes', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900" style={{ color: '#111827' }}
                       rows={3}
                       placeholder="Additional notes (optional)"
                     />
@@ -1145,6 +1146,7 @@ export default function ExpensesPage() {
                           value={editFormData.date}
                           onChange={(e) => handleEditInputChange('date', e.target.value)}
                           className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm text-gray-900"
+                          style={{ color: '#111827' }}
                           required
                         />
                       </div>
@@ -1158,6 +1160,7 @@ export default function ExpensesPage() {
                           onChange={(e) => handleEditInputChange('amount', e.target.value)}
                           step="0.01"
                           className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm text-gray-900"
+                          style={{ color: '#111827' }}
                           required
                         />
                       </div>
@@ -1170,6 +1173,7 @@ export default function ExpensesPage() {
                           value={editFormData.supplier}
                           onChange={(e) => handleEditInputChange('supplier', e.target.value)}
                           className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm text-gray-900"
+                          style={{ color: '#111827' }}
                           required
                         />
                       </div>
@@ -1181,6 +1185,7 @@ export default function ExpensesPage() {
                           value={editFormData.categoryId}
                           onChange={(e) => handleEditInputChange('categoryId', e.target.value)}
                           className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm text-gray-900"
+                          style={{ color: '#111827' }}
                           required
                         >
                           {categories.map((cat) => (
@@ -1199,6 +1204,7 @@ export default function ExpensesPage() {
                           value={editFormData.description}
                           onChange={(e) => handleEditInputChange('description', e.target.value)}
                           className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm text-gray-900"
+                          style={{ color: '#111827' }}
                           required
                         />
                       </div>
@@ -1219,6 +1225,7 @@ export default function ExpensesPage() {
                             }
                           }}
                           className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm text-gray-900"
+                          style={{ color: '#111827' }}
                           required
                         >
                           <option value="COMPANY">Company Account</option>
@@ -1237,6 +1244,7 @@ export default function ExpensesPage() {
                           value={editFormData.statusId}
                           onChange={(e) => handleEditInputChange('statusId', e.target.value)}
                           className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm text-gray-900"
+                          style={{ color: '#111827' }}
                           required
                         >
                           {statuses.map((status) => (
@@ -1254,6 +1262,7 @@ export default function ExpensesPage() {
                           value={editFormData.currency}
                           onChange={(e) => handleEditInputChange('currency', e.target.value)}
                           className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm text-gray-900"
+                          style={{ color: '#111827' }}
                         >
                           <option value="CLP">CLP (Chilean Peso)</option>
                           <option value="USD">USD (US Dollar)</option>

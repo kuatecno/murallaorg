@@ -20,35 +20,71 @@ body {
 }
 
 /* Ensure all form inputs and labels have dark, readable text */
-input,
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+input[type="date"],
+input[type="datetime-local"],
+input[type="search"],
+input[type="tel"],
+input[type="url"],
 select,
 textarea {
-  color: #1f2937 !important; /* gray-800 */
+  color: #111827 !important; /* gray-900 - even darker for maximum readability */
+  -webkit-text-fill-color: #111827 !important; /* Safari fix */
 }
 
 input::placeholder,
 textarea::placeholder {
-  color: #9ca3af !important; /* gray-400 */
+  color: #6b7280 !important; /* gray-500 - darker placeholder */
+  -webkit-text-fill-color: #6b7280 !important;
 }
 
 label {
-  color: #374151 !important; /* gray-700 - ensure labels are always readable */
+  color: #111827 !important; /* gray-900 - ensure labels are always readable */
+  font-weight: 500 !important;
+}
+
+/* Disabled inputs should still be somewhat readable */
+input:disabled,
+select:disabled,
+textarea:disabled {
+  color: #4b5563 !important; /* gray-600 */
+  -webkit-text-fill-color: #4b5563 !important;
 }
 
 /* Maintain readability in dark mode */
 @media (prefers-color-scheme: dark) {
-  input,
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="number"],
+  input[type="date"],
+  input[type="datetime-local"],
+  input[type="search"],
+  input[type="tel"],
+  input[type="url"],
   select,
   textarea {
-    color: #f3f4f6 !important; /* gray-100 */
+    color: #f9fafb !important; /* gray-50 */
+    -webkit-text-fill-color: #f9fafb !important;
   }
 
   input::placeholder,
   textarea::placeholder {
     color: #6b7280 !important; /* gray-500 */
+    -webkit-text-fill-color: #6b7280 !important;
   }
 
   label {
-    color: #e5e7eb !important; /* gray-200 */
+    color: #f3f4f6 !important; /* gray-100 */
+  }
+
+  input:disabled,
+  select:disabled,
+  textarea:disabled {
+    color: #9ca3af !important; /* gray-400 */
+    -webkit-text-fill-color: #9ca3af !important;
   }
 }

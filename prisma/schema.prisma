@@ -33,6 +33,13 @@ model Staff {
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
 
+  // Salary & Payroll fields
+  salary            Decimal?   @db.Decimal(12, 2)
+  salaryType        SalaryType @default(MONTHLY)
+  hourlyRate        Decimal?   @db.Decimal(10, 2)
+  vacationDaysTotal Int        @default(15)
+  vacationDaysUsed  Int        @default(0)
+
   // Relations
   tenant Tenant @relation(fields: [tenantId], references: [id])
 
@@ -47,6 +54,12 @@ model Staff {
   // Expense Management Relations
   expenses       Expense[]
   reimbursements EmployeeReimbursement[]
+
+  // Staff Management & Attendance Relations
+  shifts      Shift[]
+  attendances Attendance[]
+  payrollRuns PayrollRun[]
+  ptoRequests PTORequest[]
 
   @@index([tenantId])
   @@map("staff")
@@ -814,6 +827,12 @@ model Tenant {
   contactTypeConfigs  ContactTypeConfig[]
   contactFieldConfigs ContactFieldConfig[]
 
+  // Staff Management & Attendance Relations
+  shifts       Shift[]
+  attendances  Attendance[]
+  payrollRuns  PayrollRun[]
+  ptoRequests  PTORequest[]
+
   @@map("tenants")
 }
 
@@ -966,4 +985,131 @@ enum RecipeDifficulty {
   MEDIUM
   HARD
   EXPERT
+}
+
+enum SalaryType {
+  HOURLY
+  MONTHLY
+}
+
+enum AttendanceStatus {
+  ON_TIME           // Checked in within 15 min grace period
+  LATE              // Checked in after grace period
+  ABSENT            // No check-in
+  EARLY_DEPARTURE   // Left before shift end
+  APPROVED_PTO      // Scheduled time off
+}
+
+enum PayrollStatus {
+  PENDING
+  APPROVED
+  PAID
+}
+
+enum PTOStatus {
+  PENDING
+  APPROVED
+  DENIED
+}
+
+// ==========================================
+// STAFF MANAGEMENT & ATTENDANCE
+// ==========================================
+
+model Shift {
+  id           String   @id @default(cuid())
+  name         String   // e.g., "Morning Shift" or "Dec 25 Extra"
+  startTime    DateTime // Time component used for recurring, full datetime for one-time
+  endTime      DateTime
+  dayOfWeek    Int?     // 0-6 (Sun-Sat) for recurring shifts, null for one-time
+  isRecurring  Boolean  @default(false)
+  specificDate DateTime? // For one-time shifts only
+  staffId      String
+  tenantId     String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  staff       Staff        @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  tenant      Tenant       @relation(fields: [tenantId], references: [id])
+  attendances Attendance[]
+
+  @@index([tenantId, staffId])
+  @@index([specificDate])
+  @@map("shifts")
+}
+
+model Attendance {
+  id             String           @id @default(cuid())
+  shiftId        String
+  staffId        String
+  date           DateTime         // Which day this attendance is for
+  scheduledStart DateTime         // When shift was supposed to start
+  scheduledEnd   DateTime         // When shift was supposed to end
+  actualCheckIn  DateTime?        // When they actually checked in
+  actualCheckOut DateTime?        // When they actually checked out
+  status         AttendanceStatus // ON_TIME, LATE, ABSENT, etc.
+  minutesLate    Int?             // Minutes late (beyond 15 min grace)
+  totalHours     Decimal?         @db.Decimal(5, 2) // Actual hours worked
+  notes          String?          // Admin notes only
+  tenantId       String
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  shift  Shift  @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+  staff  Staff  @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([shiftId, date])
+  @@index([tenantId, staffId, date])
+  @@index([date])
+  @@map("attendances")
+}
+
+model PayrollRun {
+  id          String        @id @default(cuid())
+  periodStart DateTime      // Start of pay period
+  periodEnd   DateTime      // End of pay period
+  staffId     String
+  hoursWorked Decimal       @db.Decimal(8, 2) // Total hours in period
+  regularPay  Decimal       @db.Decimal(12, 2) // Base pay
+  overtimePay Decimal?      @db.Decimal(12, 2) // Overtime if applicable
+  deductions  Decimal?      @db.Decimal(12, 2) // Optional deductions
+  totalPay    Decimal       @db.Decimal(12, 2) // Gross pay
+  netPay      Decimal       @db.Decimal(12, 2) // After deductions
+  status      PayrollStatus @default(PENDING)
+  paidAt      DateTime?     // When payment was made
+  notes       String?
+  tenantId    String
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  staff  Staff  @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, staffId])
+  @@index([periodStart, periodEnd])
+  @@map("payroll_runs")
+}
+
+model PTORequest {
+  id          String    @id @default(cuid())
+  staffId     String
+  startDate   DateTime  // First day of PTO
+  endDate     DateTime  // Last day of PTO
+  days        Int       // Number of days requested
+  reason      String?   // Optional reason
+  status      PTOStatus @default(PENDING)
+  requestedAt DateTime  @default(now())
+  reviewedAt  DateTime? // When approved/denied
+  reviewedBy  String?   // Staff ID of reviewer (admin)
+  tenantId    String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  staff  Staff  @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, staffId])
+  @@index([status])
+  @@map("pto_requests")
 }

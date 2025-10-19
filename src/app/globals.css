@@ -18,3 +18,37 @@ body {
   background: var(--background);
   color: var(--foreground);
 }
+
+/* Ensure all form inputs and labels have dark, readable text */
+input,
+select,
+textarea {
+  color: #1f2937 !important; /* gray-800 */
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #9ca3af !important; /* gray-400 */
+}
+
+label {
+  color: #374151 !important; /* gray-700 - ensure labels are always readable */
+}
+
+/* Maintain readability in dark mode */
+@media (prefers-color-scheme: dark) {
+  input,
+  select,
+  textarea {
+    color: #f3f4f6 !important; /* gray-100 */
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: #6b7280 !important; /* gray-500 */
+  }
+
+  label {
+    color: #e5e7eb !important; /* gray-200 */
+  }
+}

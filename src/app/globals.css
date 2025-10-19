@@ -92,7 +92,7 @@ textarea:disabled {
   }
 
   label {
-    color: #f3f4f6 !important; /* gray-100 - labels can be light in dark mode */
+    color: #111827 !important; /* gray-900 - keep labels dark too */
   }
 
   input:disabled,

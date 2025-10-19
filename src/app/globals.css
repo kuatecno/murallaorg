@@ -68,7 +68,7 @@ textarea:disabled {
   -webkit-text-fill-color: #4b5563 !important;
 }
 
-/* Maintain readability in dark mode */
+/* Keep dark text even in dark mode - inputs have white backgrounds */
 @media (prefers-color-scheme: dark) {
   input[type="text"],
   input[type="email"],
@@ -81,8 +81,8 @@ textarea:disabled {
   input[type="url"],
   select,
   textarea {
-    color: #f9fafb !important; /* gray-50 */
-    -webkit-text-fill-color: #f9fafb !important;
+    color: #111827 !important; /* gray-900 - keep dark even in dark mode */
+    -webkit-text-fill-color: #111827 !important;
   }
 
   input::placeholder,
@@ -92,13 +92,13 @@ textarea:disabled {
   }
 
   label {
-    color: #f3f4f6 !important; /* gray-100 */
+    color: #f3f4f6 !important; /* gray-100 - labels can be light in dark mode */
   }
 
   input:disabled,
   select:disabled,
   textarea:disabled {
-    color: #9ca3af !important; /* gray-400 */
-    -webkit-text-fill-color: #9ca3af !important;
+    color: #6b7280 !important; /* gray-500 */
+    -webkit-text-fill-color: #6b7280 !important;
   }
 }

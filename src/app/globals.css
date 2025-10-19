@@ -2,6 +2,20 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  /* Force all inputs to have dark, readable text */
+  input,
+  select,
+  textarea {
+    @apply text-gray-900;
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    @apply text-gray-500;
+  }
+}
+
 :root {
   --background: #ffffff;
   --foreground: #171717;

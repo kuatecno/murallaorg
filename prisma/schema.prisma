@@ -61,6 +61,10 @@ model Staff {
   payrollRuns PayrollRun[]
   ptoRequests PTORequest[]
 
+  // Events Relations
+  eventsCreated Event[]
+  eventAttendances EventAttendee[]
+
   @@index([tenantId])
   @@map("staff")
 }
@@ -214,6 +218,9 @@ model Contact {
   products       ProductSupplier[]
   movements      ProductMovement[]
   purchaseOrders PurchaseOrder[]
+
+  // Events Relations
+  eventAttendances EventAttendee[]
 
   @@unique([tenantId, code])
   @@unique([tenantId, rut])
@@ -833,6 +840,10 @@ model Tenant {
   payrollRuns  PayrollRun[]
   ptoRequests  PTORequest[]
 
+  // Events Relations
+  events          Event[]
+  eventAttendees  EventAttendee[]
+
   @@map("tenants")
 }
 
@@ -1112,4 +1123,87 @@ model PTORequest {
   @@index([tenantId, staffId])
   @@index([status])
   @@map("pto_requests")
+}
+
+// ==========================================
+// EVENTS & CALENDAR
+// ==========================================
+
+model Event {
+  id          String        @id @default(cuid())
+  title       String
+  description String?
+  startDate   DateTime
+  endDate     DateTime
+  location    String?
+  imageUrl    String? // Featured image for the event
+  imagePublicId String? // Cloudinary public ID
+  category    EventCategory @default(GENERAL)
+  status      EventStatus   @default(UPCOMING)
+  maxAttendees Int?
+  isPublic    Boolean       @default(true)
+  tenantId    String
+  createdById String // Staff who created the event
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  tenant      Tenant           @relation(fields: [tenantId], references: [id])
+  createdBy   Staff            @relation(fields: [createdById], references: [id])
+  attendees   EventAttendee[]
+
+  @@index([tenantId, startDate])
+  @@index([status, startDate])
+  @@map("events")
+}
+
+model EventAttendee {
+  id        String   @id @default(cuid())
+  eventId   String
+  staffId   String?
+  contactId String? // For external attendees (customers/partners)
+  name      String? // For external attendees without contact record
+  email     String?
+  phone     String?
+  status    AttendeeStatus @default(PENDING)
+  notes     String?
+  tenantId  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  event   Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  staff   Staff?   @relation(fields: [staffId], references: [id])
+  contact Contact? @relation(fields: [contactId], references: [id])
+  tenant  Tenant   @relation(fields: [tenantId], references: [id])
+
+  @@index([eventId])
+  @@index([tenantId, staffId])
+  @@map("event_attendees")
+}
+
+enum EventCategory {
+  GENERAL
+  WORKSHOP
+  MEETING
+  CONFERENCE
+  TRAINING
+  SOCIAL
+  PRODUCT_LAUNCH
+  NETWORKING
+  CELEBRATION
+  OTHER
+}
+
+enum EventStatus {
+  UPCOMING
+  ONGOING
+  COMPLETED
+  CANCELLED
+}
+
+enum AttendeeStatus {
+  PENDING
+  CONFIRMED
+  DECLINED
+  ATTENDED
+  NO_SHOW
 }

@@ -61,7 +61,14 @@ export default function ProductsPage() {
 
       if (response.ok) {
         const data = await response.json();
-        setProducts(data);
+        if (data.data && Array.isArray(data.data)) {
+          setProducts(data.data);
+        } else if (Array.isArray(data)) {
+          setProducts(data);
+        } else {
+          console.error('Invalid products data format:', data);
+          setProducts([]);
+        }
       }
     } catch (error) {
       console.error('Error loading products:', error);

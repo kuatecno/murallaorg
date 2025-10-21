@@ -172,6 +172,7 @@ export async function POST(request: NextRequest) {
         firstName,
         lastName,
         email,
+        password: 'temp123', // Temporary password - should be changed on first login
         phone: phone || null,
         role: role || 'EMPLOYEE',
         isActive: true,

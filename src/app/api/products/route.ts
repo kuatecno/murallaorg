@@ -27,25 +27,14 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
 
-    // Get tenant from query parameter or use first available tenant
-    // TODO: Replace with authenticated user's tenant when auth is implemented
-    let tenantId = searchParams.get('tenantId');
+    // Get tenant from header first, then query parameter, then use first available tenant
+    let tenantId = request.headers.get('x-tenant-id') || searchParams.get('tenantId');
 
     if (!tenantId) {
-      // Find the first available tenant
-      const firstTenant = await prisma.tenant.findFirst({
-        where: { isActive: true },
-        select: { id: true, name: true, slug: true }
-      });
-
-      if (!firstTenant) {
-        return NextResponse.json(
-          { error: 'No active tenant found. Please contact administrator.' },
-          { status: 404 }
-        );
-      }
-
-      tenantId = firstTenant.id;
+      return NextResponse.json(
+        { error: 'Tenant ID is required' },
+        { status: 400 }
+      );
     }
 
     const params: ProductParams = {
@@ -143,6 +132,7 @@ export async function GET(request: NextRequest) {
     const transformedProducts = products.map(product => ({
       id: product.id,
       sku: product.sku,
+      ean: product.ean,
       name: product.name,
       description: product.description,
       type: product.type,
@@ -150,6 +140,8 @@ export async function GET(request: NextRequest) {
       brand: product.brand,
       unitPrice: Number(product.unitPrice),
       costPrice: product.costPrice ? Number(product.costPrice) : null,
+      wholesalePrice: product.wholesalePrice ? Number(product.wholesalePrice) : null,
+      retailPrice: product.retailPrice ? Number(product.retailPrice) : null,
       currentStock: product.currentStock,
       minStock: product.minStock,
       maxStock: product.maxStock,
@@ -223,26 +215,16 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    // Get tenant from request body or use first available tenant
-    // TODO: Replace with authenticated user's tenant when auth is implemented
     const body = await request.json();
-    let tenantId = body.tenantId;
+
+    // Get tenant from header first, then body
+    const tenantId = request.headers.get('x-tenant-id') || body.tenantId;
 
     if (!tenantId) {
-      // Find the first available tenant
-      const firstTenant = await prisma.tenant.findFirst({
-        where: { isActive: true },
-        select: { id: true, name: true, slug: true }
-      });
-
-      if (!firstTenant) {
-        return NextResponse.json(
-          { error: 'No active tenant found. Please contact administrator.' },
-          { status: 404 }
-        );
-      }
-
-      tenantId = firstTenant.id;
+      return NextResponse.json(
+        { error: 'Tenant ID is required' },
+        { status: 400 }
+      );
     }
 
     // Validate required fields

@@ -142,6 +142,8 @@ export async function GET(request: NextRequest) {
       costPrice: product.costPrice ? Number(product.costPrice) : null,
       wholesalePrice: product.wholesalePrice ? Number(product.wholesalePrice) : null,
       retailPrice: product.retailPrice ? Number(product.retailPrice) : null,
+      menuSection: product.menuSection,
+      hoy: product.hoy,
       currentStock: product.currentStock,
       minStock: product.minStock,
       maxStock: product.maxStock,

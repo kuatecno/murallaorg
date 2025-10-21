@@ -82,13 +82,9 @@ model Product {
   unit         String      @default("UNIT")
   hasRecipe    Boolean     @default(false)
 
-  // Pricing fields
-  wholesalePriceWithTax Decimal? @db.Decimal(12, 2) // PRECIO MAYORISTA C/IVA
-  wholesalePriceNoTax   Decimal? @db.Decimal(12, 2) // PRECIO MAYORISTA S/IVA
-  discount              Decimal? @db.Decimal(12, 2) // DESCUENTO S/IVA
-  netPrice              Decimal? @db.Decimal(12, 2) // PRECIO NETO
-  retailPriceWithTax    Decimal? @db.Decimal(12, 2) // PRECIO VENTA IVA INCLUIDO
-  margin                Decimal? @db.Decimal(5, 2) // MARGEN (percentage)
+  // Pricing fields (input only wholesalePrice, others are calculated)
+  wholesalePrice Decimal? @db.Decimal(12, 2) // Base wholesale price without tax (PRECIO MAYORISTA S/IVA)
+  retailPrice    Decimal? @db.Decimal(12, 2) // Retail price including tax (PRECIO VENTA IVA INCLUIDO)
 
   // Platform integration
   cafePrice      Decimal? @db.Decimal(12, 2)

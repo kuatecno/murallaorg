@@ -74,8 +74,11 @@ export default function StaffPage() {
 
       if (response.ok) {
         const data = await response.json();
-        if (data.success) {
+        if (data.success && Array.isArray(data.data)) {
           setStaff(data.data);
+        } else {
+          console.error('Invalid staff data format:', data);
+          setStaff([]);
         }
       }
     } catch (error) {

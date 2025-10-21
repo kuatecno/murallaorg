@@ -15,20 +15,13 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const includeExpenseSummary = searchParams.get('includeExpenseSummary') === 'true';
 
-    // TODO: Get tenantId from authentication context
-    // For now, using the first available tenant or create a default one
-    let firstTenant = await prisma.tenant.findFirst();
-    if (!firstTenant) {
-      // Create a default tenant if none exists
-      firstTenant = await prisma.tenant.create({
-        data: {
-          name: 'Default Tenant',
-          slug: 'default',
-          isActive: true
-        }
-      });
+    const tenantId = request.headers.get('x-tenant-id');
+    if (!tenantId) {
+      return NextResponse.json(
+        { success: false, error: 'Tenant ID is required' },
+        { status: 400 }
+      );
     }
-    const tenantId = firstTenant.id;
 
     const staff = await prisma.staff.findMany({
       where: {

@@ -7,8 +7,9 @@ import prisma from '@/lib/prisma';
  */
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
+  const params = await context.params;
   try {
     const tenantId = request.headers.get('x-tenant-id');
     if (!tenantId) {
@@ -72,8 +73,9 @@ export async function PUT(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
+  const params = await context.params;
   try {
     const tenantId = request.headers.get('x-tenant-id');
     if (!tenantId) {

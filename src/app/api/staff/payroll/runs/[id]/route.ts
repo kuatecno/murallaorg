@@ -6,8 +6,9 @@ const prisma = new PrismaClient();
 // PUT /api/staff/payroll/runs/[id] - Update payroll run status
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
+  const params = await context.params;
   try {
     const tenantId = request.headers.get('x-tenant-id');
     if (!tenantId) {
@@ -72,8 +73,9 @@ export async function PUT(
 // DELETE /api/staff/payroll/runs/[id] - Delete payroll run (admin only)
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
+  const params = await context.params;
   try {
     const tenantId = request.headers.get('x-tenant-id');
     if (!tenantId) {

@@ -6,8 +6,9 @@ const prisma = new PrismaClient();
 // PUT /api/staff/pto/[id]/deny - Deny PTO request
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
+  const params = await context.params;
   try {
     const tenantId = request.headers.get('x-tenant-id');
     if (!tenantId) {

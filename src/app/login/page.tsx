@@ -47,7 +47,7 @@ export default function LoginPage() {
           firstName: 'Admin',
           lastName: 'User',
           role: 'ADMIN',
-          tenantId: 'demo-tenant'
+          tenantId: 'cmh15af4x0000suqejgnkl860' // Muralla Café tenant
         }));
         router.push('/dashboard');
       } else {

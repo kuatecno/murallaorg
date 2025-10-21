@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
         }
       },
       orderBy: {
-        requestedDate: 'desc'
+        requestedAt: 'desc'
       }
     });
 
@@ -94,15 +94,15 @@ export async function POST(request: NextRequest) {
     const start = new Date(startDate);
     const end = new Date(endDate);
     const diffTime = Math.abs(end.getTime() - start.getTime());
-    const daysRequested = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // Include both start and end day
+    const days = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // Include both start and end day
 
     // Check if staff has enough vacation days
     const availableDays = staff.vacationDaysTotal - staff.vacationDaysUsed;
-    if (daysRequested > availableDays) {
+    if (days > availableDays) {
       return NextResponse.json(
         {
           success: false,
-          error: `Insufficient vacation days. Requested: ${daysRequested}, Available: ${availableDays}`
+          error: `Insufficient vacation days. Requested: ${days}, Available: ${availableDays}`
         },
         { status: 400 }
       );
@@ -114,9 +114,9 @@ export async function POST(request: NextRequest) {
         tenantId,
         startDate: start,
         endDate: end,
-        daysRequested,
+        days,
         reason: reason || null,
-        requestedDate: new Date(),
+        requestedAt: new Date(),
         status: 'PENDING'
       },
       include: {

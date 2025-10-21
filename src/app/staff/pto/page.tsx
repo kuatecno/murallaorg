@@ -17,12 +17,12 @@ interface PTORequest {
   id: string;
   startDate: string;
   endDate: string;
-  daysRequested: number;
+  days: number;
   reason?: string;
   status: 'PENDING' | 'APPROVED' | 'DENIED';
-  requestedDate: string;
-  approvedDate?: string;
-  approvedBy?: string;
+  requestedAt: string;
+  reviewedAt?: string;
+  reviewedBy?: string;
   staff: Staff;
 }
 
@@ -358,7 +358,7 @@ export default function PTOPage() {
                               {new Date(request.startDate).toLocaleDateString()} - {new Date(request.endDate).toLocaleDateString()}
                             </span>
                             <span>•</span>
-                            <span>{request.daysRequested} days</span>
+                            <span>{request.days} days</span>
                             {request.reason && (
                               <>
                                 <span>•</span>
@@ -367,7 +367,7 @@ export default function PTOPage() {
                             )}
                           </div>
                           <p className="text-xs text-gray-400 mt-1">
-                            Requested {new Date(request.requestedDate).toLocaleDateString()}
+                            Requested {new Date(request.requestedAt).toLocaleDateString()}
                           </p>
                         </div>
                       </div>
@@ -450,7 +450,7 @@ export default function PTOPage() {
                               {new Date(request.startDate).toLocaleDateString()} - {new Date(request.endDate).toLocaleDateString()}
                             </span>
                             <span>•</span>
-                            <span>{request.daysRequested} days</span>
+                            <span>{request.days} days</span>
                           </div>
                           {request.reason && (
                             <p className="text-xs text-gray-500 italic mt-1">"{request.reason}"</p>
@@ -462,11 +462,11 @@ export default function PTOPage() {
                     <div className="flex items-center gap-6">
                       <div className="text-right min-w-[100px]">
                         <p className="text-xs text-gray-500">
-                          Requested {new Date(request.requestedDate).toLocaleDateString()}
+                          Requested {new Date(request.requestedAt).toLocaleDateString()}
                         </p>
-                        {request.approvedDate && (
+                        {request.reviewedAt && (
                           <p className="text-xs text-gray-500">
-                            {request.status === 'APPROVED' ? 'Approved' : 'Denied'} {new Date(request.approvedDate).toLocaleDateString()}
+                            {request.status === 'APPROVED' ? 'Approved' : 'Denied'} {new Date(request.reviewedAt).toLocaleDateString()}
                           </p>
                         )}
                       </div>

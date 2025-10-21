@@ -50,7 +50,7 @@ export async function PUT(
     // Check if staff still has enough days
     const staff = ptoRequest.staff;
     const availableDays = staff.vacationDaysTotal - staff.vacationDaysUsed;
-    if (ptoRequest.daysRequested > availableDays) {
+    if (ptoRequest.days > availableDays) {
       return NextResponse.json(
         { success: false, error: 'Staff no longer has enough vacation days' },
         { status: 400 }
@@ -63,8 +63,8 @@ export async function PUT(
         where: { id },
         data: {
           status: 'APPROVED',
-          approvedDate: new Date(),
-          approvedBy: approvedBy || null
+          reviewedAt: new Date(),
+          reviewedBy: approvedBy || null
         },
         include: {
           staff: {
@@ -84,7 +84,7 @@ export async function PUT(
         where: { id: ptoRequest.staffId },
         data: {
           vacationDaysUsed: {
-            increment: ptoRequest.daysRequested
+            increment: ptoRequest.days
           }
         }
       })

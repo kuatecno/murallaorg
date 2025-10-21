@@ -48,8 +48,8 @@ export async function PUT(
       where: { id },
       data: {
         status: 'DENIED',
-        approvedDate: new Date(), // Use this field for denial date too
-        approvedBy: deniedBy || null,
+        reviewedAt: new Date(), // Use this field for denial date too
+        reviewedBy: deniedBy || null,
         reason: denialReason || ptoRequest.reason // Optionally update reason with denial reason
       },
       include: {

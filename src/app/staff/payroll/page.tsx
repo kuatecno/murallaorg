@@ -17,11 +17,12 @@ interface PayrollRun {
   periodStart: string;
   periodEnd: string;
   hoursWorked?: number;
-  grossAmount: number;
+  regularPay: number;
+  totalPay: number;
   deductions: number;
-  netAmount: number;
+  netPay: number;
   status: 'PENDING' | 'APPROVED' | 'PAID';
-  paidDate?: string;
+  paidAt?: string;
   staff: Staff;
 }
 
@@ -395,10 +396,10 @@ export default function PayrollPage() {
                       {/* Amounts */}
                       <div className="text-right min-w-[120px]">
                         <p className="text-sm font-semibold text-gray-900">
-                          ${run.netAmount.toLocaleString()}
+                          ${run.netPay.toLocaleString()}
                         </p>
                         <p className="text-xs text-gray-500">
-                          Gross: ${run.grossAmount.toLocaleString()}
+                          Gross: ${run.totalPay.toLocaleString()}
                         </p>
                       </div>
 
@@ -425,9 +426,9 @@ export default function PayrollPage() {
                             Mark Paid
                           </button>
                         )}
-                        {run.status === 'PAID' && run.paidDate && (
+                        {run.status === 'PAID' && run.paidAt && (
                           <p className="text-xs text-gray-500">
-                            Paid {new Date(run.paidDate).toLocaleDateString()}
+                            Paid {new Date(run.paidAt).toLocaleDateString()}
                           </p>
                         )}
                       </div>

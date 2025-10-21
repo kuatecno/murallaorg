@@ -39,7 +39,7 @@ export async function PUT(
 
     const updateData: any = {};
     if (status) updateData.status = status as PayrollStatus;
-    if (paidDate) updateData.paidDate = new Date(paidDate);
+    if (paidDate) updateData.paidAt = new Date(paidDate);
     if (notes !== undefined) updateData.notes = notes;
 
     const payrollRun = await prisma.payrollRun.update({

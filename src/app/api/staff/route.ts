@@ -44,6 +44,13 @@ export async function GET(request: NextRequest) {
         rut: true,
         position: true,
         department: true,
+        role: true,
+        isActive: true,
+        salary: true,
+        salaryType: true,
+        hourlyRate: true,
+        vacationDaysTotal: true,
+        vacationDaysUsed: true,
         createdAt: true,
         // Include expense-related data if requested
         ...(includeExpenseSummary && {
@@ -120,6 +127,70 @@ export async function GET(request: NextRequest) {
         error: 'Failed to fetch staff',
         details: error instanceof Error ? error.message : 'Unknown error'
       },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * POST /api/staff
+ * Create a new staff member
+ */
+export async function POST(request: NextRequest) {
+  try {
+    const tenantId = request.headers.get('x-tenant-id');
+    if (!tenantId) {
+      return NextResponse.json(
+        { success: false, error: 'Tenant ID is required' },
+        { status: 400 }
+      );
+    }
+
+    const body = await request.json();
+    const {
+      firstName,
+      lastName,
+      email,
+      phone,
+      role,
+      salary,
+      salaryType,
+      hourlyRate,
+      vacationDaysTotal
+    } = body;
+
+    if (!firstName || !lastName || !email) {
+      return NextResponse.json(
+        { success: false, error: 'firstName, lastName, and email are required' },
+        { status: 400 }
+      );
+    }
+
+    const staff = await prisma.staff.create({
+      data: {
+        tenantId,
+        firstName,
+        lastName,
+        email,
+        phone: phone || null,
+        role: role || 'EMPLOYEE',
+        isActive: true,
+        salary: salary ? parseFloat(salary) : null,
+        salaryType: salaryType || 'MONTHLY',
+        hourlyRate: hourlyRate ? parseFloat(hourlyRate) : null,
+        vacationDaysTotal: vacationDaysTotal ? parseInt(vacationDaysTotal) : 15,
+        vacationDaysUsed: 0
+      }
+    });
+
+    return NextResponse.json({
+      success: true,
+      data: staff
+    }, { status: 201 });
+  } catch (error) {
+    console.error('Error creating staff:', error);
+    return NextResponse.json(
+      { success: false, error: 'Failed to create staff member' },
       { status: 500 }
     );
   }

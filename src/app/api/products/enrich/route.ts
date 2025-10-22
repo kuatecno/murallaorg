@@ -238,6 +238,37 @@ BUSCA EN GOOGLE AHORA y devuelve SOLO el objeto JSON con información real encon
 
     console.log('🤝 Merged suggestions from both AI models');
 
+    // Fetch additional real images from Google Custom Search API
+    let googleImages: string[] = [];
+    if (process.env.GOOGLE_CUSTOM_SEARCH_API_KEY && process.env.GOOGLE_SEARCH_ENGINE_ID) {
+      try {
+        const searchQuery = `${suggestions.brand || productData.brand || ''} ${suggestions.name || productData.name}`.trim();
+        console.log('🔍 Searching Google Images for:', searchQuery);
+
+        const googleSearchUrl = `https://www.googleapis.com/customsearch/v1?key=${process.env.GOOGLE_CUSTOM_SEARCH_API_KEY}&cx=${process.env.GOOGLE_SEARCH_ENGINE_ID}&q=${encodeURIComponent(searchQuery)}&searchType=image&num=3&imgSize=medium`;
+
+        const googleResponse = await fetch(googleSearchUrl);
+
+        if (googleResponse.ok) {
+          const googleData = await googleResponse.json();
+          googleImages = googleData.items?.map((item: any) => item.link).filter((link: string) => link) || [];
+          console.log('✅ Google Images found:', googleImages.length);
+        } else {
+          console.log('⚠️ Google Custom Search not configured or failed');
+        }
+      } catch (error) {
+        console.error('❌ Google Custom Search error:', error);
+      }
+    }
+
+    // Combine all image sources: Google Search > Gemini > OpenAI
+    const allImages = [...googleImages, ...(Array.isArray(suggestions.images) ? suggestions.images : [])]
+      .filter(img => img && img.startsWith('http'))
+      .slice(0, 6); // Up to 6 images total
+
+    suggestions.images = allImages;
+    console.log('🖼️ Total images from all sources:', allImages.length);
+
     // Validate and clean suggestions
     const enrichedData: EnrichmentSuggestion = {
       name: suggestions.name || productData.name,
@@ -262,10 +293,12 @@ BUSCA EN GOOGLE AHORA y devuelve SOLO el objeto JSON con información real encon
       success: true,
       currentData: productData,
       suggestions: enrichedData,
-      message: 'Product data enriched using Gemini (Google Search) + OpenAI',
+      message: 'Product data enriched using Google Custom Search + Gemini + OpenAI',
       sources: {
+        googleImages: googleImages.length,
         gemini: !!geminiResult,
         openai: !!openaiResult,
+        totalImages: enrichedData.images?.length || 0,
       },
     });
 

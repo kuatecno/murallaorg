@@ -10,10 +10,12 @@ import ProductEnrichmentModal from '@/components/products/ProductEnrichmentModal
 interface Product {
   id: string;
   sku: string;
+  ean?: string;
   name: string;
   description?: string;
   type: 'INPUT' | 'READY_PRODUCT' | 'MANUFACTURED' | 'MADE_TO_ORDER' | 'SERVICE';
   category?: string;
+  brand?: string;
   unitPrice: number;
   costPrice?: number;
   currentStock: number;
@@ -21,6 +23,8 @@ interface Product {
   unit: string;
   hasRecipe: boolean;
   isActive: boolean;
+  menuSection?: string;
+  hoy?: boolean;
   cafePrice?: number;
   rappiPrice?: number;
   pedidosyaPrice?: number;

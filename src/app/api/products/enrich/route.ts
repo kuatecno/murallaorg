@@ -182,16 +182,16 @@ Example format:
     // Validate and clean suggestions
     const enrichedData: EnrichmentSuggestion = {
       name: suggestions.name || productData.name,
-      description: suggestions.description || null,
-      category: suggestions.category || null,
-      brand: suggestions.brand || null,
-      ean: suggestions.ean || productData.ean || null,
+      description: suggestions.description || undefined,
+      category: suggestions.category || undefined,
+      brand: suggestions.brand || undefined,
+      ean: suggestions.ean || productData.ean || undefined,
       type: PRODUCT_TYPES.includes(suggestions.type || '')
         ? suggestions.type
         : 'READY_PRODUCT',
       menuSection: MENU_SECTIONS.includes(suggestions.menuSection || '')
         ? suggestions.menuSection
-        : null,
+        : undefined,
       images: Array.isArray(suggestions.images)
         ? suggestions.images.slice(0, 3)
         : [],

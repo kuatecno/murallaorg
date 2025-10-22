@@ -9,6 +9,7 @@
     "vercel-build": "prisma generate && prisma db push --accept-data-loss && next build"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@prisma/client": "^6.16.2",
     "@tanstack/react-query": "^5.89.0",
     "@types/bcryptjs": "^2.4.6",

@@ -1,15 +1,13 @@
 /**
  * Product Enrichment API
- * POST /api/products/enrich - Enrich product data using OpenAI
+ * POST /api/products/enrich - Enrich product data using Google Gemini with Search
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import OpenAI from 'openai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import prisma from '@/lib/prisma';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
 // Available menu sections for categorization
 const MENU_SECTIONS = [
@@ -101,125 +99,90 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Build OpenAI prompt
-    const prompt = `Eres un asistente de enriquecimiento de datos de productos para un sistema de inventario de café/restaurante en Chile.
+    // Build Gemini prompt with search grounding
+    const prompt = `Eres un asistente experto en productos chilenos y latinoamericanos. Busca información REAL del siguiente producto usando Google Search.
 
-INFORMACIÓN DEL PRODUCTO:
+PRODUCTO A INVESTIGAR:
 ${productData.name ? `- Nombre: ${productData.name}` : ''}
-${productData.ean ? `- Código EAN/Código de barras: ${productData.ean}` : ''}
-${productData.description ? `- Descripción actual: ${productData.description}` : ''}
-${productData.category ? `- Categoría actual: ${productData.category}` : ''}
-${productData.brand ? `- Marca actual: ${productData.brand}` : ''}
+${productData.ean ? `- Código EAN: ${productData.ean}` : ''}
+${productData.brand ? `- Marca: ${productData.brand}` : ''}
 
 INSTRUCCIONES IMPORTANTES:
-1. PRIORIZA información REAL y VERIFICABLE de la marca oficial del producto
-2. Si reconoces la marca, busca información actual de su sitio web o redes sociales oficiales
-3. Para productos chilenos, verifica información de marcas locales conocidas
-4. Si no estás seguro, indica "información no verificada" en la descripción
-5. TODAS las respuestas deben estar en ESPAÑOL
+1. USA GOOGLE SEARCH para encontrar información REAL y VERIFICABLE de la marca oficial
+2. Busca el sitio web oficial, Instagram, Facebook, o e-commerce chileno del producto
+3. Prioriza información de fuentes chilenas conocidas
+4. Para las imágenes, busca URLs REALES de:
+   - Sitio web oficial de la marca
+   - Instagram de la marca
+   - E-commerce chileno (Jumbo, Lider, Santa Isabel, etc.)
+   - Páginas de productos verificadas
+5. TODAS las respuestas en ESPAÑOL
 
-CAMPOS A COMPLETAR:
+CAMPOS A COMPLETAR (devuelve SOLO JSON válido):
 
-1. **name**: Nombre claro y conciso del producto (mejora si es necesario)
-2. **description**: Descripción detallada en español (2-3 oraciones) con características reales del producto, ingredientes, o usos. PRIORIZA información oficial de la marca.
-3. **category**: Categoría del producto (ej: "Repostería", "Bebidas", "Snacks", "Ingredientes", etc.)
-4. **brand**: Nombre de la marca (si es identificable del nombre o EAN)
-5. **ean**: Código EAN/código de barras (si puedes identificarlo del nombre del producto)
-6. **type**: Uno de estos: ${PRODUCT_TYPES.join(', ')}
-   - INPUT: Ingredientes/insumos crudos
-   - READY_PRODUCT: Productos pre-hechos listos para vender
-   - MANUFACTURED: Productos hechos en casa
-   - MADE_TO_ORDER: Productos hechos por pedido
-   - SERVICE: Artículos de servicio
-7. **menuSection**: Mejor sección coincidente de: ${MENU_SECTIONS.join(', ')}
-8. **images**: Array de 2-3 URLs de imágenes REALES del producto. IMPORTANTE:
-   - Busca imágenes del producto REAL en sitios oficiales de la marca
-   - Usa URLs directas de imágenes (.jpg, .png, .webp)
-   - Verifica que las URLs sean accesibles públicamente
-   - Prioriza: Sitio web oficial > Instagram/Redes sociales > E-commerce chileno
-   - Ejemplos de fuentes confiables: https://images.unsplash.com/, sitios oficiales de marcas
-
-FORMATO DE RESPUESTA (JSON):
-Devuelve SOLO un objeto JSON válido con estos campos. Si un campo no se puede determinar, usa null.
-
-Ejemplo:
 {
-  "name": "Muffin de Chocolate",
-  "description": "Delicioso muffin vegano con chispas de chocolate de Mis Amigos Veganos. Hecho con ingredientes naturales y sin productos de origen animal. Perfecto para el desayuno o merienda.",
-  "category": "Repostería",
+  "name": "Nombre mejorado del producto en español",
+  "description": "Descripción detallada en español (2-3 oraciones) con información REAL de la marca. Si no encuentras info verificada, indica 'Información genérica'",
+  "category": "Categoría (Repostería, Bebidas, Snacks, Ingredientes, etc.)",
+  "brand": "Nombre oficial de la marca",
+  "ean": "Código EAN si lo encuentras",
+  "type": "Uno de: ${PRODUCT_TYPES.join(', ')}",
+  "menuSection": "Mejor coincidencia de: ${MENU_SECTIONS.join(', ')}",
+  "images": [
+    "URL REAL de imagen del producto desde sitio oficial o e-commerce",
+    "Segunda URL REAL (opcional)",
+    "Tercera URL REAL (opcional)"
+  ]
+}
+
+EJEMPLO de respuesta para "Muffin de zanahoria - Mis Amigos Veganos":
+{
+  "name": "Muffin de Zanahoria Vegano",
+  "description": "Muffin vegano de zanahoria elaborado por Mis Amigos Veganos, marca chilena especializada en productos plant-based. Hecho con ingredientes naturales, sin productos de origen animal.",
+  "category": "Repostería Vegana",
   "brand": "Mis Amigos Veganos",
-  "ean": "7804123456789",
+  "ean": null,
   "type": "READY_PRODUCT",
   "menuSection": "Dulces",
-  "images": ["https://images.unsplash.com/photo-1607958996333-41aef7caefaa", "https://images.unsplash.com/photo-1426869884541-df7117556757"]
-}`;
+  "images": ["[URL real del producto]"]
+}
 
-    // Call OpenAI API
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        {
-          role: 'system',
-          content: 'Eres un asistente experto en productos chilenos y latinoamericanos que enriquece datos de productos para sistemas de inventario. SIEMPRE respondes en ESPAÑOL con información REAL y VERIFICABLE de las marcas. Prioriza datos oficiales de sitios web, redes sociales y e-commerce de las marcas. Incluye URLs de imágenes reales y accesibles. Responde SOLO con JSON válido.',
-        },
-        {
-          role: 'user',
-          content: prompt,
-        },
-      ],
-      temperature: 0.3, // Lower temperature for more factual responses
-      response_format: { type: 'json_object' },
+BUSCA EN GOOGLE AHORA y devuelve SOLO el objeto JSON con información real encontrada.`;
+
+    console.log('🔍 Sending request to Gemini with search grounding...');
+
+    // Call Gemini API with search grounding
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-2.0-flash-exp',
+      generationConfig: {
+        temperature: 0.3,
+        responseMimeType: 'application/json',
+      }
     });
 
-    const responseContent = completion.choices[0]?.message?.content;
+    const result = await model.generateContent(prompt);
+    const responseText = result.response.text();
 
-    if (!responseContent) {
+    console.log('✅ Gemini response received');
+
+    if (!responseText) {
       return NextResponse.json(
         { error: 'No response from AI' },
         { status: 500 }
       );
     }
 
-    // Parse AI response
+    // Parse Gemini response
     let suggestions: EnrichmentSuggestion;
     try {
-      suggestions = JSON.parse(responseContent);
+      suggestions = JSON.parse(responseText);
+      console.log('📊 Parsed suggestions:', suggestions);
     } catch (error) {
-      console.error('Failed to parse AI response:', responseContent);
+      console.error('Failed to parse Gemini response:', responseText);
       return NextResponse.json(
         { error: 'Invalid AI response format' },
         { status: 500 }
       );
-    }
-
-    // Fetch real images from Unsplash if available
-    let productImages: string[] = [];
-    if (suggestions.name || productData.name) {
-      try {
-        const searchQuery = `${suggestions.brand || productData.brand || ''} ${suggestions.name || productData.name}`.trim();
-        const unsplashResponse = await fetch(
-          `https://api.unsplash.com/search/photos?query=${encodeURIComponent(searchQuery)}&per_page=3&orientation=landscape`,
-          {
-            headers: {
-              'Authorization': `Client-ID ${process.env.UNSPLASH_ACCESS_KEY || 'your-unsplash-access-key'}`,
-            },
-          }
-        );
-
-        if (unsplashResponse.ok) {
-          const unsplashData = await unsplashResponse.json();
-          productImages = unsplashData.results?.map((photo: any) => photo.urls.regular).slice(0, 3) || [];
-        }
-      } catch (error) {
-        console.error('Error fetching images from Unsplash:', error);
-        // Fallback to AI-suggested images if Unsplash fails
-        productImages = Array.isArray(suggestions.images) ? suggestions.images.slice(0, 3) : [];
-      }
-    }
-
-    // If no images from Unsplash or AI, use AI suggestions as fallback
-    if (productImages.length === 0 && Array.isArray(suggestions.images)) {
-      productImages = suggestions.images.slice(0, 3);
     }
 
     // Validate and clean suggestions
@@ -235,25 +198,22 @@ Ejemplo:
       menuSection: MENU_SECTIONS.includes(suggestions.menuSection || '')
         ? suggestions.menuSection
         : undefined,
-      images: productImages,
+      images: Array.isArray(suggestions.images)
+        ? suggestions.images.filter(img => img && img.startsWith('http')).slice(0, 3)
+        : [],
     };
+
+    console.log('🖼️ Final enriched data:', enrichedData);
 
     return NextResponse.json({
       success: true,
       currentData: productData,
       suggestions: enrichedData,
-      message: 'Product data enriched successfully',
+      message: 'Product data enriched successfully with Google Search',
     });
 
   } catch (error: any) {
     console.error('Error enriching product:', error);
-
-    if (error?.error?.type === 'invalid_request_error') {
-      return NextResponse.json(
-        { error: 'Invalid OpenAI API request', details: error.message },
-        { status: 400 }
-      );
-    }
 
     return NextResponse.json(
       { error: 'Failed to enrich product data', details: error.message },

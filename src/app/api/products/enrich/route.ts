@@ -309,7 +309,7 @@ BUSCA EN GOOGLE AHORA y devuelve SOLO el objeto JSON con información real encon
         ? suggestions.menuSection
         : undefined,
       images: Array.isArray(suggestions.images)
-        ? suggestions.images.filter(img => img && img.startsWith('http')).slice(0, 3)
+        ? suggestions.images.filter(img => img && img.startsWith('http'))
         : [],
     };
 

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import CreateProductModal from '@/components/products/CreateProductModal';
 import ProductNavigation from '@/components/products/ProductNavigation';
+import ProductEnrichmentModal from '@/components/products/ProductEnrichmentModal';
 
 interface Product {
   id: string;
@@ -36,6 +37,8 @@ export default function ProductsPage() {
   const [filterType, setFilterType] = useState<FilterType>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isEnrichModalOpen, setIsEnrichModalOpen] = useState(false);
+  const [selectedProductForEnrich, setSelectedProductForEnrich] = useState<Product | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -106,6 +109,44 @@ export default function ProductsPage() {
     if (currentStock === 0) return { label: 'Out of Stock', color: 'text-red-600' };
     if (currentStock <= minStock) return { label: 'Low Stock', color: 'text-yellow-600' };
     return { label: 'In Stock', color: 'text-green-600' };
+  };
+
+  const handleEnrichProduct = (product: Product) => {
+    setSelectedProductForEnrich(product);
+    setIsEnrichModalOpen(true);
+  };
+
+  const handleApplyEnrichment = async (approvedData: any) => {
+    if (!selectedProductForEnrich) return;
+
+    try {
+      const userData = localStorage.getItem('user');
+      if (!userData) return;
+
+      const user = JSON.parse(userData);
+
+      // Update product with approved data
+      const response = await fetch(`/api/products/${selectedProductForEnrich.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-tenant-id': user.tenantId,
+        },
+        body: JSON.stringify(approvedData),
+      });
+
+      if (response.ok) {
+        // Reload products to show updated data
+        loadProducts();
+        alert('Product enriched successfully!');
+      } else {
+        const error = await response.json();
+        alert(`Failed to update product: ${error.error}`);
+      }
+    } catch (error) {
+      console.error('Error applying enrichment:', error);
+      alert('Failed to apply enrichment');
+    }
   };
 
   if (loading) {
@@ -232,9 +273,18 @@ export default function ProductsPage() {
                     ) : (
                       <span className="text-lg font-bold text-gray-900">${product.unitPrice.toFixed(0)}</span>
                     )}
-                    <button className="text-blue-600 hover:text-blue-700 text-sm font-medium">
-                      Edit →
-                    </button>
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => handleEnrichProduct(product)}
+                        className="text-purple-600 hover:text-purple-700 text-sm font-medium"
+                        title="Enrich with AI"
+                      >
+                        ✨ AI
+                      </button>
+                      <button className="text-blue-600 hover:text-blue-700 text-sm font-medium">
+                        Edit →
+                      </button>
+                    </div>
                   </div>
                 </div>
               );
@@ -298,9 +348,18 @@ export default function ProductsPage() {
                         )}
                       </td>
                       <td className="px-6 py-4 text-sm">
-                        <button className="text-blue-600 hover:text-blue-700 font-medium">
-                          Edit
-                        </button>
+                        <div className="flex items-center space-x-3">
+                          <button
+                            onClick={() => handleEnrichProduct(product)}
+                            className="text-purple-600 hover:text-purple-700 font-medium"
+                            title="Enrich with AI"
+                          >
+                            ✨ AI
+                          </button>
+                          <button className="text-blue-600 hover:text-blue-700 font-medium">
+                            Edit
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -325,6 +384,19 @@ export default function ProductsPage() {
           loadProducts();
           setIsCreateModalOpen(false);
         }}
+      />
+
+      {/* Product Enrichment Modal */}
+      <ProductEnrichmentModal
+        isOpen={isEnrichModalOpen}
+        onClose={() => {
+          setIsEnrichModalOpen(false);
+          setSelectedProductForEnrich(null);
+        }}
+        productId={selectedProductForEnrich?.id}
+        productName={selectedProductForEnrich?.name}
+        productEan={selectedProductForEnrich?.ean}
+        onApprove={handleApplyEnrichment}
       />
     </div>
   );

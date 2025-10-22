@@ -97,6 +97,9 @@ model Product {
   pedidosyaPrice Decimal? @db.Decimal(12, 2)
   uberPrice      Decimal? @db.Decimal(12, 2)
 
+  // Product images
+  images    Json     @default("[]") // Array of image URLs
+
   isActive  Boolean  @default(true)
   metadata  Json     @default("{}")
   tenantId  String

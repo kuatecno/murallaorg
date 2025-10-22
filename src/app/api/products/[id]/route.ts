@@ -323,10 +323,13 @@ export async function PUT(
 
     // Only update fields that are provided
     if (body.sku !== undefined) updateData.sku = body.sku;
+    if (body.ean !== undefined) updateData.ean = body.ean;
     if (body.name !== undefined) updateData.name = body.name;
     if (body.description !== undefined) updateData.description = body.description;
     if (body.category !== undefined) updateData.category = body.category;
     if (body.brand !== undefined) updateData.brand = body.brand;
+    if (body.type !== undefined) updateData.type = body.type;
+    if (body.menuSection !== undefined) updateData.menuSection = body.menuSection;
     if (body.unitPrice !== undefined) updateData.unitPrice = new Prisma.Decimal(body.unitPrice);
     if (body.costPrice !== undefined) {
       updateData.costPrice = body.costPrice ? new Prisma.Decimal(body.costPrice) : null;
@@ -335,6 +338,7 @@ export async function PUT(
     if (body.minStock !== undefined) updateData.minStock = body.minStock;
     if (body.maxStock !== undefined) updateData.maxStock = body.maxStock;
     if (body.unit !== undefined) updateData.unit = body.unit;
+    if (body.images !== undefined) updateData.images = body.images;
     if (body.isActive !== undefined) updateData.isActive = body.isActive;
     if (body.metadata !== undefined) updateData.metadata = body.metadata;
 

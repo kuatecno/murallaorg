@@ -102,43 +102,56 @@ export async function POST(request: NextRequest) {
     }
 
     // Build OpenAI prompt
-    const prompt = `You are a product data enrichment assistant for a cafe/restaurant inventory system.
+    const prompt = `Eres un asistente de enriquecimiento de datos de productos para un sistema de inventario de café/restaurante en Chile.
 
-Given the following product information:
-${productData.name ? `- Name: ${productData.name}` : ''}
-${productData.ean ? `- EAN/Barcode: ${productData.ean}` : ''}
-${productData.description ? `- Current Description: ${productData.description}` : ''}
-${productData.category ? `- Current Category: ${productData.category}` : ''}
-${productData.brand ? `- Current Brand: ${productData.brand}` : ''}
+INFORMACIÓN DEL PRODUCTO:
+${productData.name ? `- Nombre: ${productData.name}` : ''}
+${productData.ean ? `- Código EAN/Código de barras: ${productData.ean}` : ''}
+${productData.description ? `- Descripción actual: ${productData.description}` : ''}
+${productData.category ? `- Categoría actual: ${productData.category}` : ''}
+${productData.brand ? `- Marca actual: ${productData.brand}` : ''}
 
-Please provide enriched product data with the following fields:
+INSTRUCCIONES IMPORTANTES:
+1. PRIORIZA información REAL y VERIFICABLE de la marca oficial del producto
+2. Si reconoces la marca, busca información actual de su sitio web o redes sociales oficiales
+3. Para productos chilenos, verifica información de marcas locales conocidas
+4. Si no estás seguro, indica "información no verificada" en la descripción
+5. TODAS las respuestas deben estar en ESPAÑOL
 
-1. **name**: A clear, concise product name (if not provided or needs improvement)
-2. **description**: A detailed description (2-3 sentences) highlighting key features, ingredients, or uses
-3. **category**: Product category (e.g., "Pastries", "Beverages", "Snacks", "Ingredients", etc.)
-4. **brand**: Brand name (if identifiable from name or EAN)
-5. **ean**: EAN/barcode (if you can identify it from the product name)
-6. **type**: One of these: ${PRODUCT_TYPES.join(', ')}
-   - INPUT: Raw ingredients/supplies
-   - READY_PRODUCT: Pre-made products ready to sell
-   - MANUFACTURED: Products made in-house
-   - MADE_TO_ORDER: Custom-made products
-   - SERVICE: Service items
-7. **menuSection**: Best matching section from: ${MENU_SECTIONS.join(', ')}
-8. **images**: Array of 2-3 relevant image URLs (use Unsplash or similar free stock photo services)
+CAMPOS A COMPLETAR:
 
-Return ONLY a valid JSON object with these fields. If a field cannot be determined, use null.
+1. **name**: Nombre claro y conciso del producto (mejora si es necesario)
+2. **description**: Descripción detallada en español (2-3 oraciones) con características reales del producto, ingredientes, o usos. PRIORIZA información oficial de la marca.
+3. **category**: Categoría del producto (ej: "Repostería", "Bebidas", "Snacks", "Ingredientes", etc.)
+4. **brand**: Nombre de la marca (si es identificable del nombre o EAN)
+5. **ean**: Código EAN/código de barras (si puedes identificarlo del nombre del producto)
+6. **type**: Uno de estos: ${PRODUCT_TYPES.join(', ')}
+   - INPUT: Ingredientes/insumos crudos
+   - READY_PRODUCT: Productos pre-hechos listos para vender
+   - MANUFACTURED: Productos hechos en casa
+   - MADE_TO_ORDER: Productos hechos por pedido
+   - SERVICE: Artículos de servicio
+7. **menuSection**: Mejor sección coincidente de: ${MENU_SECTIONS.join(', ')}
+8. **images**: Array de 2-3 URLs de imágenes REALES del producto. IMPORTANTE:
+   - Busca imágenes del producto REAL en sitios oficiales de la marca
+   - Usa URLs directas de imágenes (.jpg, .png, .webp)
+   - Verifica que las URLs sean accesibles públicamente
+   - Prioriza: Sitio web oficial > Instagram/Redes sociales > E-commerce chileno
+   - Ejemplos de fuentes confiables: https://images.unsplash.com/, sitios oficiales de marcas
 
-Example format:
+FORMATO DE RESPUESTA (JSON):
+Devuelve SOLO un objeto JSON válido con estos campos. Si un campo no se puede determinar, usa null.
+
+Ejemplo:
 {
-  "name": "Chocolate Chip Muffin",
-  "description": "Delicious muffin with chocolate chips. Perfect for breakfast or a sweet snack.",
-  "category": "Pastries",
+  "name": "Muffin de Chocolate",
+  "description": "Delicioso muffin vegano con chispas de chocolate de Mis Amigos Veganos. Hecho con ingredientes naturales y sin productos de origen animal. Perfecto para el desayuno o merienda.",
+  "category": "Repostería",
   "brand": "Mis Amigos Veganos",
   "ean": "7804123456789",
   "type": "READY_PRODUCT",
   "menuSection": "Dulces",
-  "images": ["https://example.com/image1.jpg", "https://example.com/image2.jpg"]
+  "images": ["https://images.unsplash.com/photo-1607958996333-41aef7caefaa", "https://images.unsplash.com/photo-1426869884541-df7117556757"]
 }`;
 
     // Call OpenAI API
@@ -147,14 +160,14 @@ Example format:
       messages: [
         {
           role: 'system',
-          content: 'You are a helpful assistant that enriches product data for inventory systems. Always respond with valid JSON only.',
+          content: 'Eres un asistente experto en productos chilenos y latinoamericanos que enriquece datos de productos para sistemas de inventario. SIEMPRE respondes en ESPAÑOL con información REAL y VERIFICABLE de las marcas. Prioriza datos oficiales de sitios web, redes sociales y e-commerce de las marcas. Incluye URLs de imágenes reales y accesibles. Responde SOLO con JSON válido.',
         },
         {
           role: 'user',
           content: prompt,
         },
       ],
-      temperature: 0.7,
+      temperature: 0.3, // Lower temperature for more factual responses
       response_format: { type: 'json_object' },
     });
 

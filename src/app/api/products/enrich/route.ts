@@ -192,6 +192,36 @@ Ejemplo:
       );
     }
 
+    // Fetch real images from Unsplash if available
+    let productImages: string[] = [];
+    if (suggestions.name || productData.name) {
+      try {
+        const searchQuery = `${suggestions.brand || productData.brand || ''} ${suggestions.name || productData.name}`.trim();
+        const unsplashResponse = await fetch(
+          `https://api.unsplash.com/search/photos?query=${encodeURIComponent(searchQuery)}&per_page=3&orientation=landscape`,
+          {
+            headers: {
+              'Authorization': `Client-ID ${process.env.UNSPLASH_ACCESS_KEY || 'your-unsplash-access-key'}`,
+            },
+          }
+        );
+
+        if (unsplashResponse.ok) {
+          const unsplashData = await unsplashResponse.json();
+          productImages = unsplashData.results?.map((photo: any) => photo.urls.regular).slice(0, 3) || [];
+        }
+      } catch (error) {
+        console.error('Error fetching images from Unsplash:', error);
+        // Fallback to AI-suggested images if Unsplash fails
+        productImages = Array.isArray(suggestions.images) ? suggestions.images.slice(0, 3) : [];
+      }
+    }
+
+    // If no images from Unsplash or AI, use AI suggestions as fallback
+    if (productImages.length === 0 && Array.isArray(suggestions.images)) {
+      productImages = suggestions.images.slice(0, 3);
+    }
+
     // Validate and clean suggestions
     const enrichedData: EnrichmentSuggestion = {
       name: suggestions.name || productData.name,
@@ -205,9 +235,7 @@ Ejemplo:
       menuSection: MENU_SECTIONS.includes(suggestions.menuSection || '')
         ? suggestions.menuSection
         : undefined,
-      images: Array.isArray(suggestions.images)
-        ? suggestions.images.slice(0, 3)
-        : [],
+      images: productImages,
     };
 
     return NextResponse.json({

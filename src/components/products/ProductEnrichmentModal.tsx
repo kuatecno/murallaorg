@@ -14,6 +14,18 @@ interface EnrichmentSuggestion {
   images?: string[];
 }
 
+interface EnrichmentResponse {
+  suggestions: EnrichmentSuggestion;
+  currentData: any;
+  sources?: {
+    googleImagesByName?: number;
+    googleImagesByBarcode?: number;
+    gemini?: boolean;
+    openai?: boolean;
+    totalImages?: number;
+  };
+}
+
 interface ProductEnrichmentModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -36,11 +48,15 @@ export default function ProductEnrichmentModal({
   onApprove,
 }: ProductEnrichmentModalProps) {
   const [loading, setLoading] = useState(false);
+  const [loadingMoreImages, setLoadingMoreImages] = useState(false);
+  const [uploadingImages, setUploadingImages] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<EnrichmentSuggestion | null>(null);
   const [currentData, setCurrentData] = useState<any>(null);
+  const [imageSources, setImageSources] = useState<any>(null);
   const [approvals, setApprovals] = useState<FieldApproval>({});
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
+  const [cloudinaryUrls, setCloudinaryUrls] = useState<Map<string, string>>(new Map());
 
   const fetchEnrichment = async () => {
     setLoading(true);
@@ -74,6 +90,7 @@ export default function ProductEnrichmentModal({
       const data = await response.json();
       setSuggestions(data.suggestions);
       setCurrentData(data.currentData);
+      setImageSources(data.sources);
 
       // Initialize all fields as approved by default
       const initialApprovals: FieldApproval = {};
@@ -109,9 +126,11 @@ export default function ProductEnrichmentModal({
       }
     });
 
-    // Add approved images
+    // Add approved images - use Cloudinary URLs if available
     if (selectedImages.length > 0) {
-      approvedData.images = selectedImages;
+      approvedData.images = selectedImages.map(originalUrl =>
+        cloudinaryUrls.get(originalUrl) || originalUrl
+      );
     }
 
     onApprove(approvedData);
@@ -134,14 +153,100 @@ export default function ProductEnrichmentModal({
     }));
   };
 
-  const toggleImageSelection = (imageUrl: string) => {
-    setSelectedImages(prev => {
-      if (prev.includes(imageUrl)) {
-        return prev.filter(url => url !== imageUrl);
-      } else {
-        return [...prev, imageUrl];
+  const toggleImageSelection = async (imageUrl: string) => {
+    const isSelected = selectedImages.includes(imageUrl);
+
+    if (isSelected) {
+      // Deselect
+      setSelectedImages(prev => prev.filter(url => url !== imageUrl));
+    } else {
+      // Select and upload to Cloudinary
+      setSelectedImages(prev => [...prev, imageUrl]);
+
+      // Upload to Cloudinary in background
+      if (!cloudinaryUrls.has(imageUrl)) {
+        setUploadingImages(prev => new Set(prev).add(imageUrl));
+
+        try {
+          const response = await fetch('/api/cloudinary/upload', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              imageUrl,
+              productName: suggestions?.name || productName,
+              folder: 'products',
+            }),
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            setCloudinaryUrls(prev => new Map(prev).set(imageUrl, data.cloudinaryUrl));
+            console.log('✅ Image uploaded to Cloudinary:', data.cloudinaryUrl);
+          }
+        } catch (error) {
+          console.error('Failed to upload to Cloudinary:', error);
+        } finally {
+          setUploadingImages(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(imageUrl);
+            return newSet;
+          });
+        }
       }
-    });
+    }
+  };
+
+  const fetchMoreImages = async () => {
+    setLoadingMoreImages(true);
+    try {
+      const userData = localStorage.getItem('user');
+      if (!userData) return;
+
+      const user = JSON.parse(userData);
+
+      const response = await fetch('/api/products/enrich', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-tenant-id': user.tenantId,
+        },
+        body: JSON.stringify({
+          productId,
+          name: productName,
+          ean: productEan,
+          tenantId: user.tenantId,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.suggestions.images) {
+          // Merge new images with existing ones (avoiding duplicates)
+          setSuggestions(prev => ({
+            ...prev!,
+            images: [
+              ...(prev?.images || []),
+              ...data.suggestions.images.filter((img: string) => !prev?.images?.includes(img))
+            ],
+          }));
+
+          // Update image sources for new images
+          if (data.sources) {
+            setImageSources((prev: any) => ({
+              googleImagesByName: (prev?.googleImagesByName || 0) + (data.sources.googleImagesByName || 0),
+              googleImagesByBarcode: (prev?.googleImagesByBarcode || 0) + (data.sources.googleImagesByBarcode || 0),
+              gemini: prev?.gemini || data.sources.gemini,
+              openai: prev?.openai || data.sources.openai,
+              totalImages: (prev?.totalImages || 0) + (data.sources.totalImages || 0),
+            }));
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching more images:', error);
+    } finally {
+      setLoadingMoreImages(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -283,38 +388,112 @@ export default function ProductEnrichmentModal({
               {/* Images */}
               {suggestions.images && suggestions.images.length > 0 && (
                 <div className="bg-gray-50 rounded-lg p-4">
-                  <h4 className="font-medium text-gray-900 mb-3">Suggested Images</h4>
-                  <p className="text-sm text-gray-600 mb-3">
-                    Select images to add to the product (click to toggle)
+                  <h4 className="font-medium text-gray-900 mb-3">Imágenes Sugeridas</h4>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Selecciona imágenes para agregar al producto (click para seleccionar)
                   </p>
-                  <div className="grid grid-cols-3 gap-3">
-                    {suggestions.images.map((imageUrl, index) => (
-                      <div
-                        key={index}
-                        onClick={() => toggleImageSelection(imageUrl)}
-                        className={`relative cursor-pointer rounded-lg overflow-hidden border-2 transition-all ${
-                          selectedImages.includes(imageUrl)
-                            ? 'border-green-500 ring-2 ring-green-200'
-                            : 'border-gray-200 hover:border-blue-300'
-                        }`}
-                      >
-                        <img
-                          src={imageUrl}
-                          alt={`Suggestion ${index + 1}`}
-                          className="w-full h-32 object-cover"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).src = 'https://via.placeholder.com/300x200?text=Image+Not+Available';
-                          }}
-                        />
-                        {selectedImages.includes(imageUrl) && (
-                          <div className="absolute inset-0 bg-green-500 bg-opacity-20 flex items-center justify-center">
-                            <div className="bg-green-500 rounded-full p-1">
-                              <Check className="w-5 h-5 text-white" />
-                            </div>
-                          </div>
-                        )}
+
+                  {/* Barcode Search Results */}
+                  {imageSources?.googleImagesByBarcode > 0 && (
+                    <div className="mb-4">
+                      <div className="flex items-center space-x-2 mb-2">
+                        <div className="h-px flex-1 bg-gray-300"></div>
+                        <p className="text-xs font-medium text-gray-500 uppercase">
+                          Búsqueda por Código de Barras ({imageSources.googleImagesByBarcode} resultados)
+                        </p>
+                        <div className="h-px flex-1 bg-gray-300"></div>
                       </div>
-                    ))}
+                      <div className="grid grid-cols-3 gap-3">
+                        {suggestions.images.slice(0, imageSources.googleImagesByBarcode).map((imageUrl, index) => (
+                          <ImageCard
+                            key={`barcode-${index}`}
+                            imageUrl={imageUrl}
+                            index={index}
+                            isSelected={selectedImages.includes(imageUrl)}
+                            isUploading={uploadingImages.has(imageUrl)}
+                            onToggle={() => toggleImageSelection(imageUrl)}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Name/Brand Search Results */}
+                  {imageSources?.googleImagesByName > 0 && (
+                    <div className="mb-4">
+                      <div className="flex items-center space-x-2 mb-2">
+                        <div className="h-px flex-1 bg-gray-300"></div>
+                        <p className="text-xs font-medium text-gray-500 uppercase">
+                          Búsqueda por Nombre/Marca ({imageSources.googleImagesByName} resultados)
+                        </p>
+                        <div className="h-px flex-1 bg-gray-300"></div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-3">
+                        {suggestions.images
+                          .slice(
+                            imageSources.googleImagesByBarcode || 0,
+                            (imageSources.googleImagesByBarcode || 0) + imageSources.googleImagesByName
+                          )
+                          .map((imageUrl, index) => (
+                            <ImageCard
+                              key={`name-${index}`}
+                              imageUrl={imageUrl}
+                              index={index}
+                              isSelected={selectedImages.includes(imageUrl)}
+                              isUploading={uploadingImages.has(imageUrl)}
+                              onToggle={() => toggleImageSelection(imageUrl)}
+                            />
+                          ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* AI-Generated Results (Gemini/OpenAI) */}
+                  {suggestions.images.length > (imageSources?.googleImagesByBarcode || 0) + (imageSources?.googleImagesByName || 0) && (
+                    <div className="mb-4">
+                      <div className="flex items-center space-x-2 mb-2">
+                        <div className="h-px flex-1 bg-gray-300"></div>
+                        <p className="text-xs font-medium text-gray-500 uppercase">
+                          Sugerencias de IA (Gemini/OpenAI)
+                        </p>
+                        <div className="h-px flex-1 bg-gray-300"></div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-3">
+                        {suggestions.images
+                          .slice((imageSources?.googleImagesByBarcode || 0) + (imageSources?.googleImagesByName || 0))
+                          .map((imageUrl, index) => (
+                            <ImageCard
+                              key={`ai-${index}`}
+                              imageUrl={imageUrl}
+                              index={index}
+                              isSelected={selectedImages.includes(imageUrl)}
+                              isUploading={uploadingImages.has(imageUrl)}
+                              onToggle={() => toggleImageSelection(imageUrl)}
+                            />
+                          ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Search for More Images Button */}
+                  <div className="mt-4 text-center">
+                    <button
+                      onClick={fetchMoreImages}
+                      disabled={loadingMoreImages}
+                      className="inline-flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg font-medium transition-colors"
+                    >
+                      {loadingMoreImages ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>Buscando...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-4 h-4" />
+                          <span>🔍 Buscar Más Imágenes</span>
+                        </>
+                      )}
+                    </button>
                   </div>
                 </div>
               )}
@@ -399,6 +578,49 @@ function FieldSuggestion({
           </p>
         </div>
       </div>
+    </div>
+  );
+}
+
+interface ImageCardProps {
+  imageUrl: string;
+  index: number;
+  isSelected: boolean;
+  isUploading: boolean;
+  onToggle: () => void;
+}
+
+function ImageCard({ imageUrl, index, isSelected, isUploading, onToggle }: ImageCardProps) {
+  return (
+    <div
+      onClick={onToggle}
+      className={`relative cursor-pointer rounded-lg overflow-hidden border-2 transition-all ${
+        isSelected
+          ? 'border-green-500 ring-2 ring-green-200'
+          : 'border-gray-200 hover:border-blue-300'
+      }`}
+    >
+      <img
+        src={imageUrl}
+        alt={`Sugerencia ${index + 1}`}
+        className="w-full h-32 object-cover"
+        onError={(e) => {
+          (e.target as HTMLImageElement).src = 'https://via.placeholder.com/300x200?text=Image+Not+Available';
+        }}
+      />
+      {isSelected && (
+        <div className="absolute inset-0 bg-green-500 bg-opacity-20 flex items-center justify-center">
+          {isUploading ? (
+            <div className="bg-blue-500 rounded-full p-1">
+              <Loader2 className="w-5 h-5 text-white animate-spin" />
+            </div>
+          ) : (
+            <div className="bg-green-500 rounded-full p-1">
+              <Check className="w-5 h-5 text-white" />
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

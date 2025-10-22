@@ -239,32 +239,58 @@ BUSCA EN GOOGLE AHORA y devuelve SOLO el objeto JSON con información real encon
     console.log('🤝 Merged suggestions from both AI models');
 
     // Fetch additional real images from Google Custom Search API
-    let googleImages: string[] = [];
+    let googleImagesByName: string[] = [];
+    let googleImagesByBarcode: string[] = [];
+
     if (process.env.GOOGLE_CUSTOM_SEARCH_API_KEY && process.env.GOOGLE_SEARCH_ENGINE_ID) {
       try {
-        const searchQuery = `${suggestions.brand || productData.brand || ''} ${suggestions.name || productData.name}`.trim();
-        console.log('🔍 Searching Google Images for:', searchQuery);
+        // Search 1: Brand + Name
+        const nameQuery = `${suggestions.brand || productData.brand || ''} ${suggestions.name || productData.name}`.trim();
+        console.log('🔍 Searching Google Images by name:', nameQuery);
 
-        const googleSearchUrl = `https://www.googleapis.com/customsearch/v1?key=${process.env.GOOGLE_CUSTOM_SEARCH_API_KEY}&cx=${process.env.GOOGLE_SEARCH_ENGINE_ID}&q=${encodeURIComponent(searchQuery)}&searchType=image&num=3&imgSize=medium`;
+        const nameSearchUrl = `https://www.googleapis.com/customsearch/v1?key=${process.env.GOOGLE_CUSTOM_SEARCH_API_KEY}&cx=${process.env.GOOGLE_SEARCH_ENGINE_ID}&q=${encodeURIComponent(nameQuery)}&searchType=image&num=6&imgSize=XLARGE&imgType=photo&safe=active`;
 
-        const googleResponse = await fetch(googleSearchUrl);
-
-        if (googleResponse.ok) {
-          const googleData = await googleResponse.json();
-          googleImages = googleData.items?.map((item: any) => item.link).filter((link: string) => link) || [];
-          console.log('✅ Google Images found:', googleImages.length);
-        } else {
-          console.log('⚠️ Google Custom Search not configured or failed');
+        // Search 2: Barcode/EAN (if available)
+        let barcodeSearchUrl = '';
+        const ean = suggestions.ean || productData.ean;
+        if (ean) {
+          console.log('🔍 Searching Google Images by barcode:', ean);
+          barcodeSearchUrl = `https://www.googleapis.com/customsearch/v1?key=${process.env.GOOGLE_CUSTOM_SEARCH_API_KEY}&cx=${process.env.GOOGLE_SEARCH_ENGINE_ID}&q=${encodeURIComponent(ean)}&searchType=image&num=6&imgSize=XLARGE&imgType=photo&safe=active`;
         }
+
+        // Fetch both searches in parallel
+        const searchPromises = [fetch(nameSearchUrl)];
+        if (barcodeSearchUrl) {
+          searchPromises.push(fetch(barcodeSearchUrl));
+        }
+
+        const [nameResponse, barcodeResponse] = await Promise.all(searchPromises);
+
+        if (nameResponse.ok) {
+          const nameData = await nameResponse.json();
+          googleImagesByName = nameData.items?.map((item: any) => item.link).filter((link: string) => link) || [];
+          console.log('✅ Google Images by name found:', googleImagesByName.length);
+        }
+
+        if (barcodeResponse && barcodeResponse.ok) {
+          const barcodeData = await barcodeResponse.json();
+          googleImagesByBarcode = barcodeData.items?.map((item: any) => item.link).filter((link: string) => link) || [];
+          console.log('✅ Google Images by barcode found:', googleImagesByBarcode.length);
+        }
+
       } catch (error) {
         console.error('❌ Google Custom Search error:', error);
       }
     }
 
-    // Combine all image sources: Google Search > Gemini > OpenAI
-    const allImages = [...googleImages, ...(Array.isArray(suggestions.images) ? suggestions.images : [])]
+    // Combine all image sources: Barcode search > Name search > Gemini > OpenAI
+    const allImages = [
+      ...googleImagesByBarcode,
+      ...googleImagesByName,
+      ...(Array.isArray(suggestions.images) ? suggestions.images : [])
+    ]
       .filter(img => img && img.startsWith('http'))
-      .slice(0, 6); // Up to 6 images total
+      .slice(0, 12); // Up to 12 images total (6 per row)
 
     suggestions.images = allImages;
     console.log('🖼️ Total images from all sources:', allImages.length);
@@ -295,7 +321,8 @@ BUSCA EN GOOGLE AHORA y devuelve SOLO el objeto JSON con información real encon
       suggestions: enrichedData,
       message: 'Product data enriched using Google Custom Search + Gemini + OpenAI',
       sources: {
-        googleImages: googleImages.length,
+        googleImagesByName: googleImagesByName.length,
+        googleImagesByBarcode: googleImagesByBarcode.length,
         gemini: !!geminiResult,
         openai: !!openaiResult,
         totalImages: enrichedData.images?.length || 0,

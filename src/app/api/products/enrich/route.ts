@@ -1,13 +1,15 @@
 /**
  * Product Enrichment API
- * POST /api/products/enrich - Enrich product data using Google Gemini with Search
+ * POST /api/products/enrich - Enrich product data using BOTH Google Gemini (with Search) and OpenAI
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import OpenAI from 'openai';
 import prisma from '@/lib/prisma';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 // Available menu sections for categorization
 const MENU_SECTIONS = [
@@ -149,41 +151,92 @@ EJEMPLO de respuesta para "Muffin de zanahoria - Mis Amigos Veganos":
 
 BUSCA EN GOOGLE AHORA y devuelve SOLO el objeto JSON con información real encontrada.`;
 
-    console.log('🔍 Sending request to Gemini with search grounding...');
+    console.log('🔍 Sending parallel requests to Gemini and OpenAI...');
 
-    // Call Gemini API with search grounding
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-2.0-flash-exp',
-      generationConfig: {
-        temperature: 0.3,
-        responseMimeType: 'application/json',
+    // Call BOTH APIs in parallel for better results
+    const [geminiResult, openaiResult] = await Promise.all([
+      // Gemini with Google Search
+      (async () => {
+        try {
+          const model = genAI.getGenerativeModel({
+            model: 'gemini-2.0-flash-exp',
+            generationConfig: {
+              temperature: 0.3,
+              responseMimeType: 'application/json',
+            }
+          });
+          const result = await model.generateContent(prompt);
+          const responseText = result.response.text();
+          console.log('✅ Gemini response received');
+          return JSON.parse(responseText);
+        } catch (error) {
+          console.error('❌ Gemini error:', error);
+          return null;
+        }
+      })(),
+
+      // OpenAI for additional insights
+      (async () => {
+        try {
+          const completion = await openai.chat.completions.create({
+            model: 'gpt-4o-mini',
+            messages: [
+              {
+                role: 'system',
+                content: 'Eres un asistente experto en productos chilenos y latinoamericanos. Respondes en ESPAÑOL con información verificable. Responde SOLO con JSON válido.',
+              },
+              {
+                role: 'user',
+                content: prompt,
+              },
+            ],
+            temperature: 0.3,
+            response_format: { type: 'json_object' },
+          });
+          const responseContent = completion.choices[0]?.message?.content;
+          console.log('✅ OpenAI response received');
+          return responseContent ? JSON.parse(responseContent) : null;
+        } catch (error) {
+          console.error('❌ OpenAI error:', error);
+          return null;
+        }
+      })(),
+    ]);
+
+    // Merge results: Gemini (with search) takes priority, OpenAI fills gaps
+    let suggestions: EnrichmentSuggestion = {};
+
+    if (geminiResult) {
+      console.log('📊 Gemini suggestions:', geminiResult);
+      suggestions = { ...geminiResult };
+    }
+
+    if (openaiResult) {
+      console.log('📊 OpenAI suggestions:', openaiResult);
+      // Fill in missing fields from OpenAI
+      if (!suggestions.description && openaiResult.description) {
+        suggestions.description = openaiResult.description;
       }
-    });
+      if (!suggestions.category && openaiResult.category) {
+        suggestions.category = openaiResult.category;
+      }
+      if (!suggestions.brand && openaiResult.brand) {
+        suggestions.brand = openaiResult.brand;
+      }
+      // Merge images (Gemini first, then OpenAI)
+      const geminiImages = Array.isArray(suggestions.images) ? suggestions.images : [];
+      const openaiImages = Array.isArray(openaiResult.images) ? openaiResult.images : [];
+      suggestions.images = [...geminiImages, ...openaiImages].filter(img => img && img.startsWith('http')).slice(0, 5);
+    }
 
-    const result = await model.generateContent(prompt);
-    const responseText = result.response.text();
-
-    console.log('✅ Gemini response received');
-
-    if (!responseText) {
+    if (!suggestions || (!geminiResult && !openaiResult)) {
       return NextResponse.json(
-        { error: 'No response from AI' },
+        { error: 'Both AI services failed to respond' },
         { status: 500 }
       );
     }
 
-    // Parse Gemini response
-    let suggestions: EnrichmentSuggestion;
-    try {
-      suggestions = JSON.parse(responseText);
-      console.log('📊 Parsed suggestions:', suggestions);
-    } catch (error) {
-      console.error('Failed to parse Gemini response:', responseText);
-      return NextResponse.json(
-        { error: 'Invalid AI response format' },
-        { status: 500 }
-      );
-    }
+    console.log('🤝 Merged suggestions from both AI models');
 
     // Validate and clean suggestions
     const enrichedData: EnrichmentSuggestion = {
@@ -209,7 +262,11 @@ BUSCA EN GOOGLE AHORA y devuelve SOLO el objeto JSON con información real encon
       success: true,
       currentData: productData,
       suggestions: enrichedData,
-      message: 'Product data enriched successfully with Google Search',
+      message: 'Product data enriched using Gemini (Google Search) + OpenAI',
+      sources: {
+        gemini: !!geminiResult,
+        openai: !!openaiResult,
+      },
     });
 
   } catch (error: any) {

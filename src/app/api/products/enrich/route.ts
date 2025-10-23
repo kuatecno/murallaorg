@@ -256,9 +256,15 @@ BUSCA EN GOOGLE AHORA y devuelve SOLO el objeto JSON con información real encon
         // Search 2: Barcode/EAN (if available)
         let barcodeSearchUrl = '';
         const ean = suggestions.ean || productData.ean;
+        console.log('📦 Product EAN from AI:', suggestions.ean);
+        console.log('📦 Product EAN from DB:', productData.ean);
+        console.log('📦 Final EAN for search:', ean);
+
         if (ean) {
           console.log('🔍 Searching Google Images by barcode:', ean);
           barcodeSearchUrl = `https://www.googleapis.com/customsearch/v1?key=${process.env.GOOGLE_CUSTOM_SEARCH_API_KEY}&cx=${process.env.GOOGLE_SEARCH_ENGINE_ID}&q=${encodeURIComponent(ean)}&searchType=image&num=10&safe=active`;
+        } else {
+          console.log('⚠️ No EAN available - skipping barcode search');
         }
 
         // Fetch both searches in parallel

@@ -300,9 +300,12 @@ export default function ProductsPage() {
                       >
                         ✨ AI
                       </button>
-                      <button className="text-blue-600 hover:text-blue-700 text-sm font-medium">
+                      <Link
+                        href={`/products/${product.id}`}
+                        className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+                      >
                         Edit →
-                      </button>
+                      </Link>
                     </div>
                   </div>
                 </div>
@@ -392,9 +395,12 @@ export default function ProductsPage() {
                           >
                             ✨ AI
                           </button>
-                          <button className="text-blue-600 hover:text-blue-700 font-medium">
+                          <Link
+                            href={`/products/${product.id}`}
+                            className="text-blue-600 hover:text-blue-700 font-medium"
+                          >
                             Edit
-                          </button>
+                          </Link>
                         </div>
                       </td>
                     </tr>

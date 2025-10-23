@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { X, Check, Loader2, Sparkles, AlertCircle } from 'lucide-react';
 
 interface EnrichmentSuggestion {
@@ -591,6 +591,8 @@ interface ImageCardProps {
 }
 
 function ImageCard({ imageUrl, index, isSelected, isUploading, onToggle }: ImageCardProps) {
+  const [dimensions, setDimensions] = React.useState<{ width: number; height: number } | null>(null);
+
   return (
     <div
       onClick={onToggle}
@@ -600,14 +602,28 @@ function ImageCard({ imageUrl, index, isSelected, isUploading, onToggle }: Image
           : 'border-gray-200 hover:border-blue-300'
       }`}
     >
-      <img
-        src={imageUrl}
-        alt={`Sugerencia ${index + 1}`}
-        className="w-full h-32 object-cover"
-        onError={(e) => {
-          (e.target as HTMLImageElement).src = 'https://via.placeholder.com/300x200?text=Image+Not+Available';
-        }}
-      />
+      <div className="aspect-square w-full">
+        <img
+          src={imageUrl}
+          alt={`Sugerencia ${index + 1}`}
+          className="w-full h-full object-cover"
+          onLoad={(e) => {
+            const img = e.target as HTMLImageElement;
+            setDimensions({ width: img.naturalWidth, height: img.naturalHeight });
+          }}
+          onError={(e) => {
+            (e.target as HTMLImageElement).src = 'https://via.placeholder.com/300x200?text=Image+Not+Available';
+          }}
+        />
+      </div>
+
+      {/* Dimensions overlay */}
+      {dimensions && (
+        <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-60 text-white text-xs py-1 px-2 text-center">
+          {dimensions.width} × {dimensions.height}
+        </div>
+      )}
+
       {isSelected && (
         <div className="absolute inset-0 bg-green-500 bg-opacity-20 flex items-center justify-center">
           {isUploading ? (

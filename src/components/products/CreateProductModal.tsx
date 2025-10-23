@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import ProductEnrichmentModal from './ProductEnrichmentModal';
 
 interface CreateProductModalProps {
   isOpen: boolean;
@@ -17,11 +18,14 @@ interface ProductFormData {
   type: ProductType;
   category: string;
   brand: string;
+  ean: string;
+  menuSection: string;
   unitPrice: string;
   costPrice: string;
   minStock: string;
   maxStock: string;
   unit: string;
+  images: string[];
   // Platform pricing
   cafePrice: string;
   rappiPrice: string;
@@ -37,11 +41,14 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess }: Creat
     type: 'INPUT',
     category: '',
     brand: '',
+    ean: '',
+    menuSection: '',
     unitPrice: '',
     costPrice: '',
     minStock: '0',
     maxStock: '',
     unit: 'UNIT',
+    images: [],
     cafePrice: '',
     rappiPrice: '',
     pedidosyaPrice: '',
@@ -51,6 +58,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess }: Creat
   const [showPlatformConfig, setShowPlatformConfig] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [isEnrichModalOpen, setIsEnrichModalOpen] = useState(false);
 
   const productTypes: { value: ProductType; label: string; description: string; icon: string }[] = [
     {
@@ -96,6 +104,20 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess }: Creat
     setError('');
   };
 
+  const handleEnrichmentApprove = (enrichedData: any) => {
+    setFormData((prev) => ({
+      ...prev,
+      name: enrichedData.name || prev.name,
+      description: enrichedData.description || prev.description,
+      category: enrichedData.category || prev.category,
+      brand: enrichedData.brand || prev.brand,
+      ean: enrichedData.ean || prev.ean,
+      type: enrichedData.type || prev.type,
+      menuSection: enrichedData.menuSection || prev.menuSection,
+      images: enrichedData.images || prev.images,
+    }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -119,11 +141,14 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess }: Creat
         type: formData.type,
         category: formData.category || undefined,
         brand: formData.brand || undefined,
+        ean: formData.ean || undefined,
+        menuSection: formData.menuSection || undefined,
         unitPrice: parseFloat(formData.unitPrice) || 0,
         costPrice: formData.costPrice ? parseFloat(formData.costPrice) : undefined,
         minStock: parseInt(formData.minStock) || 0,
         maxStock: formData.maxStock ? parseInt(formData.maxStock) : undefined,
         unit: formData.unit || 'UNIT',
+        images: formData.images.length > 0 ? formData.images : undefined,
         cafePrice: formData.cafePrice ? parseFloat(formData.cafePrice) : undefined,
         rappiPrice: formData.rappiPrice ? parseFloat(formData.rappiPrice) : undefined,
         pedidosyaPrice: formData.pedidosyaPrice ? parseFloat(formData.pedidosyaPrice) : undefined,
@@ -162,11 +187,14 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess }: Creat
       type: 'INPUT',
       category: '',
       brand: '',
+      ean: '',
+      menuSection: '',
       unitPrice: '',
       costPrice: '',
       minStock: '0',
       maxStock: '',
       unit: 'UNIT',
+      images: [],
       cafePrice: '',
       rappiPrice: '',
       pedidosyaPrice: '',
@@ -238,6 +266,28 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess }: Creat
             )}
           </div>
 
+          {/* AI Enrichment Button */}
+          <div className="bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-medium text-gray-900 flex items-center">
+                  <span className="text-xl mr-2">✨</span>
+                  AI Product Enrichment
+                </h3>
+                <p className="text-sm text-gray-600 mt-1">
+                  Auto-fill product details using AI (name, description, category, images, etc.)
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsEnrichModalOpen(true)}
+                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors"
+              >
+                ✨ Enrich Product
+              </button>
+            </div>
+          </div>
+
           {/* Basic Information */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -283,7 +333,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess }: Creat
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
               <input
@@ -309,22 +359,46 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess }: Creat
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Unit</label>
-              <select
-                name="unit"
-                value={formData.unit}
+              <label className="block text-sm font-medium text-gray-700 mb-1">EAN / Barcode</label>
+              <input
+                type="text"
+                name="ean"
+                value={formData.ean}
                 onChange={handleChange}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="UNIT">Unit</option>
-                <option value="KG">Kilogram</option>
-                <option value="G">Gram</option>
-                <option value="L">Liter</option>
-                <option value="ML">Milliliter</option>
-                <option value="BOX">Box</option>
-                <option value="PACK">Pack</option>
-              </select>
+                placeholder="e.g., 7791234567890"
+              />
             </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Menu Section</label>
+              <input
+                type="text"
+                name="menuSection"
+                value={formData.menuSection}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="e.g., Comidas, Dulces, Bebidas"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Unit</label>
+            <select
+              name="unit"
+              value={formData.unit}
+              onChange={handleChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="UNIT">Unit</option>
+              <option value="KG">Kilogram</option>
+              <option value="G">Gram</option>
+              <option value="L">Liter</option>
+              <option value="ML">Milliliter</option>
+              <option value="BOX">Box</option>
+              <option value="PACK">Pack</option>
+            </select>
           </div>
 
           {/* Pricing */}
@@ -474,6 +548,41 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess }: Creat
             </div>
           )}
 
+          {/* Product Images */}
+          {formData.images.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Product Images</label>
+              <div className="grid grid-cols-4 gap-3">
+                {formData.images.map((imageUrl, index) => (
+                  <div key={index} className="relative aspect-square rounded-lg overflow-hidden border-2 border-gray-200">
+                    <img
+                      src={imageUrl}
+                      alt={`Product ${index + 1}`}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = 'https://via.placeholder.com/200?text=Error';
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFormData(prev => ({
+                          ...prev,
+                          images: prev.images.filter((_, i) => i !== index)
+                        }));
+                      }}
+                      className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Actions */}
           <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
             <button
@@ -494,6 +603,15 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess }: Creat
           </div>
         </form>
       </div>
+
+      {/* AI Enrichment Modal */}
+      <ProductEnrichmentModal
+        isOpen={isEnrichModalOpen}
+        onClose={() => setIsEnrichModalOpen(false)}
+        productName={formData.name}
+        productEan={formData.ean}
+        onApprove={handleEnrichmentApprove}
+      />
     </div>
   );
 }

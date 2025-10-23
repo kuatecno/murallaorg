@@ -29,6 +29,7 @@ interface Product {
   rappiPrice?: number;
   pedidosyaPrice?: number;
   uberPrice?: number;
+  images?: string[];
 }
 
 type ViewMode = 'grid' | 'table';
@@ -252,6 +253,20 @@ export default function ProductsPage() {
               const stockStatus = getStockStatus(product.currentStock, product.minStock);
               return (
                 <div key={product.id} className="bg-white rounded-lg shadow hover:shadow-lg transition-shadow p-6">
+                  {/* Product Image */}
+                  {product.images && Array.isArray(product.images) && product.images.length > 0 && (
+                    <div className="mb-4 rounded-lg overflow-hidden bg-gray-100">
+                      <img
+                        src={product.images[0]}
+                        alt={product.name}
+                        className="w-full h-48 object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none';
+                        }}
+                      />
+                    </div>
+                  )}
+
                   <div className="flex justify-between items-start mb-4">
                     {getProductTypeBadge(product.type)}
                     {product.hasRecipe && (
@@ -322,7 +337,24 @@ export default function ProductsPage() {
                   return (
                     <tr key={product.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4">
-                        <div className="flex items-center">
+                        <div className="flex items-center space-x-3">
+                          {/* Product Image */}
+                          {product.images && Array.isArray(product.images) && product.images.length > 0 ? (
+                            <div className="flex-shrink-0 h-12 w-12 rounded-lg overflow-hidden bg-gray-100">
+                              <img
+                                src={product.images[0]}
+                                alt={product.name}
+                                className="h-12 w-12 object-cover"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).style.display = 'none';
+                                }}
+                              />
+                            </div>
+                          ) : (
+                            <div className="flex-shrink-0 h-12 w-12 rounded-lg bg-gray-200 flex items-center justify-center">
+                              <span className="text-gray-400 text-xs">No img</span>
+                            </div>
+                          )}
                           <div>
                             <div className="text-sm font-medium text-gray-900">{product.name}</div>
                             <div className="text-sm text-gray-500">{product.sku}</div>

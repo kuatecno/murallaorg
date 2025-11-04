@@ -11,15 +11,55 @@ import prisma from '@/lib/prisma';
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-// Available menu sections for categorization
-const MENU_SECTIONS = [
-  'Comidas',
-  'Dulces',
-  'Bebidas Calientes',
-  'Ice Coffee',
-  'Frapés',
-  'Mocktails',
-  'Jugos y Limonadas',
+// Available categories with hierarchical structure
+const CATEGORIES = {
+  'Barra': {
+    emoji: '☕',
+    subcategories: {
+      'Café': {
+        emoji: '☕',
+        items: ['☕🔥 Café Caliente', '☕❄️ Café Frío', '☕🌀 Café Frapeado']
+      },
+      'Matcha': {
+        emoji: '🍵',
+        items: ['🍵🔥 Matcha Caliente', '🍵❄️ Matcha Frío', '🍵🌀 Matcha Frapeado']
+      },
+      'Té': {
+        emoji: '🫖',
+        items: ['🫖🔥 Té Caliente', '🫖❄️ Té Frío', '🫖🌀 Té Frapeado']
+      },
+      'Jugos Naturales y Limonadas': { emoji: '🍋', items: [] },
+      'Frapés': { emoji: '🥤', items: [] },
+      'Mocktails': { emoji: '🍹', items: [] }
+    }
+  },
+  'Comida': { emoji: '🍜', subcategories: {} },
+  'Antojitos': { emoji: '🍰', subcategories: {} },
+  'Arte': { emoji: '🎨', subcategories: {} }
+};
+
+// Flattened list for AI prompt
+const CATEGORY_LIST = [
+  // Barra - Café
+  '☕🔥 Café Caliente',
+  '☕❄️ Café Frío',
+  '☕🌀 Café Frapeado',
+  // Barra - Matcha
+  '🍵🔥 Matcha Caliente',
+  '🍵❄️ Matcha Frío',
+  '🍵🌀 Matcha Frapeado',
+  // Barra - Té
+  '🫖🔥 Té Caliente',
+  '🫖❄️ Té Frío',
+  '🫖🌀 Té Frapeado',
+  // Barra - Otros
+  '🍋 Jugos Naturales y Limonadas',
+  '🥤 Frapés',
+  '🍹 Mocktails',
+  // Otras categorías principales
+  '🍜 Comida',
+  '🍰 Antojitos',
+  '🎨 Arte'
 ];
 
 // Product types
@@ -46,7 +86,21 @@ interface EnrichmentSuggestion {
   ean?: string;
   type?: string;
   images?: string[];
-  menuSection?: string;
+}
+
+interface FieldMetadata {
+  value: any;
+  source: 'gemini' | 'openai' | 'google_search' | 'fallback';
+  confidence: 'high' | 'medium' | 'low';
+}
+
+interface EnrichmentWithMetadata {
+  name?: FieldMetadata;
+  description?: FieldMetadata;
+  category?: FieldMetadata;
+  brand?: FieldMetadata;
+  ean?: FieldMetadata;
+  type?: FieldMetadata;
 }
 
 export async function POST(request: NextRequest) {
@@ -125,11 +179,10 @@ CAMPOS A COMPLETAR (devuelve SOLO JSON válido):
 {
   "name": "Nombre mejorado del producto en español",
   "description": "Descripción detallada en español (2-3 oraciones) con información REAL de la marca. Si no encuentras info verificada, indica 'Información genérica'",
-  "category": "Categoría (Repostería, Bebidas, Snacks, Ingredientes, etc.)",
+  "category": "Mejor coincidencia de estas categorías: ${CATEGORY_LIST.join(', ')}",
   "brand": "Nombre oficial de la marca",
   "ean": "Código EAN si lo encuentras",
   "type": "Uno de: ${PRODUCT_TYPES.join(', ')}",
-  "menuSection": "Mejor coincidencia de: ${MENU_SECTIONS.join(', ')}",
   "images": [
     "URL REAL de imagen del producto desde sitio oficial o e-commerce",
     "Segunda URL REAL (opcional)",
@@ -141,11 +194,10 @@ EJEMPLO de respuesta para "Muffin de zanahoria - Mis Amigos Veganos":
 {
   "name": "Muffin de Zanahoria Vegano",
   "description": "Muffin vegano de zanahoria elaborado por Mis Amigos Veganos, marca chilena especializada en productos plant-based. Hecho con ingredientes naturales, sin productos de origen animal.",
-  "category": "Repostería Vegana",
+  "category": "🍰 Antojitos",
   "brand": "Mis Amigos Veganos",
   "ean": null,
   "type": "READY_PRODUCT",
-  "menuSection": "Dulces",
   "images": ["[URL real del producto]"]
 }
 
@@ -203,31 +255,40 @@ BUSCA EN GOOGLE AHORA y devuelve SOLO el objeto JSON con información real encon
       })(),
     ]);
 
-    // Merge results: Gemini (with search) takes priority, OpenAI fills gaps
+    // Helper function to calculate confidence
+    const calculateConfidence = (value: any, hasGemini: boolean, hasOpenai: boolean): 'high' | 'medium' | 'low' => {
+      if (!value || value === '') return 'low';
+      if (hasGemini && hasOpenai) return 'high'; // Both AIs agree
+      if (hasGemini || hasOpenai) return 'medium'; // One AI provided it
+      return 'low';
+    };
+
+    // Merge results with metadata tracking
     let suggestions: EnrichmentSuggestion = {};
+    let metadata: EnrichmentWithMetadata = {};
 
-    if (geminiResult) {
-      console.log('📊 Gemini suggestions:', geminiResult);
-      suggestions = { ...geminiResult };
-    }
+    const fields = ['name', 'description', 'category', 'brand', 'ean', 'type'];
 
-    if (openaiResult) {
-      console.log('📊 OpenAI suggestions:', openaiResult);
-      // Fill in missing fields from OpenAI
-      if (!suggestions.description && openaiResult.description) {
-        suggestions.description = openaiResult.description;
+    fields.forEach(field => {
+      const geminiValue = geminiResult?.[field];
+      const openaiValue = openaiResult?.[field];
+
+      if (geminiValue) {
+        suggestions[field] = geminiValue;
+        metadata[field] = {
+          value: geminiValue,
+          source: 'gemini',
+          confidence: calculateConfidence(geminiValue, true, !!openaiValue && openaiValue === geminiValue),
+        };
+      } else if (openaiValue) {
+        suggestions[field] = openaiValue;
+        metadata[field] = {
+          value: openaiValue,
+          source: 'openai',
+          confidence: calculateConfidence(openaiValue, false, true),
+        };
       }
-      if (!suggestions.category && openaiResult.category) {
-        suggestions.category = openaiResult.category;
-      }
-      if (!suggestions.brand && openaiResult.brand) {
-        suggestions.brand = openaiResult.brand;
-      }
-      // Don't use AI images - we'll only use Google Custom Search images
-      // const geminiImages = Array.isArray(suggestions.images) ? suggestions.images : [];
-      // const openaiImages = Array.isArray(openaiResult.images) ? openaiResult.images : [];
-      // suggestions.images = [...geminiImages, ...openaiImages].filter(img => img && img.startsWith('http')).slice(0, 5);
-    }
+    });
 
     // Clear any AI-generated images - we only want Google Custom Search results
     suggestions.images = [];
@@ -314,9 +375,6 @@ BUSCA EN GOOGLE AHORA y devuelve SOLO el objeto JSON con información real encon
       type: PRODUCT_TYPES.includes(suggestions.type || '')
         ? suggestions.type
         : 'READY_PRODUCT',
-      menuSection: MENU_SECTIONS.includes(suggestions.menuSection || '')
-        ? suggestions.menuSection
-        : undefined,
       images: Array.isArray(suggestions.images)
         ? suggestions.images.filter(img => img && img.startsWith('http'))
         : [],
@@ -328,6 +386,8 @@ BUSCA EN GOOGLE AHORA y devuelve SOLO el objeto JSON con información real encon
       success: true,
       currentData: productData,
       suggestions: enrichedData,
+      metadata: metadata,
+      enrichmentMethod: 'standard',
       message: 'Product data enriched using Google Custom Search + Gemini + OpenAI',
       sources: {
         googleImagesByName: googleImagesByName.length,

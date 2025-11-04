@@ -10,13 +10,22 @@ interface EnrichmentSuggestion {
   brand?: string;
   ean?: string;
   type?: string;
-  menuSection?: string;
   images?: string[];
+}
+
+interface FieldMetadata {
+  value: any;
+  source: 'gemini' | 'openai' | 'google_search' | 'fallback';
+  confidence: 'high' | 'medium' | 'low';
 }
 
 interface EnrichmentResponse {
   suggestions: EnrichmentSuggestion;
   currentData: any;
+  metadata?: {
+    [key: string]: FieldMetadata;
+  };
+  enrichmentMethod?: 'standard' | 'web_extraction' | 'grounded';
   sources?: {
     googleImagesByName?: number;
     googleImagesByBarcode?: number;
@@ -24,6 +33,13 @@ interface EnrichmentResponse {
     openai?: boolean;
     totalImages?: number;
   };
+  grounding?: {
+    searchQueriesUsed?: string[];
+    sourcesFound?: number;
+    sourceUrls?: string[];
+    verified?: boolean;
+  };
+  cost?: number;
 }
 
 interface ProductEnrichmentModalProps {
@@ -54,6 +70,9 @@ export default function ProductEnrichmentModal({
   const [suggestions, setSuggestions] = useState<EnrichmentSuggestion | null>(null);
   const [currentData, setCurrentData] = useState<any>(null);
   const [imageSources, setImageSources] = useState<any>(null);
+  const [metadata, setMetadata] = useState<any>(null);
+  const [enrichmentMethod, setEnrichmentMethod] = useState<string>('standard');
+  const [groundingInfo, setGroundingInfo] = useState<any>(null);
   const [approvals, setApprovals] = useState<FieldApproval>({});
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
   const [cloudinaryUrls, setCloudinaryUrls] = useState<Map<string, string>>(new Map());
@@ -91,6 +110,9 @@ export default function ProductEnrichmentModal({
       setSuggestions(data.suggestions);
       setCurrentData(data.currentData);
       setImageSources(data.sources);
+      setMetadata(data.metadata);
+      setEnrichmentMethod(data.enrichmentMethod || 'standard');
+      setGroundingInfo(data.grounding);
 
       // Initialize all fields as approved by default
       const initialApprovals: FieldApproval = {};
@@ -193,6 +215,109 @@ export default function ProductEnrichmentModal({
           });
         }
       }
+    }
+  };
+
+  const fetchWebExtraction = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const userData = localStorage.getItem('user');
+      if (!userData) throw new Error('User not authenticated');
+
+      const user = JSON.parse(userData);
+
+      const response = await fetch('/api/products/extract-web-metadata', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-tenant-id': user.tenantId,
+        },
+        body: JSON.stringify({
+          productName: productName || suggestions?.name,
+          productEan: productEan || suggestions?.ean,
+          productBrand: suggestions?.brand,
+          tenantId: user.tenantId,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to extract web metadata');
+      }
+
+      const data = await response.json();
+      setSuggestions(prev => ({ ...prev, ...data.suggestions }));
+      setMetadata(data.metadata);
+      setEnrichmentMethod('web_extraction');
+
+      // Re-initialize approvals
+      const initialApprovals: FieldApproval = {};
+      Object.keys(data.suggestions).forEach(key => {
+        if (key !== 'images') {
+          initialApprovals[key] = true;
+        }
+      });
+      setApprovals(initialApprovals);
+
+    } catch (err: any) {
+      console.error('Web extraction error:', err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchGroundedEnrichment = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const userData = localStorage.getItem('user');
+      if (!userData) throw new Error('User not authenticated');
+
+      const user = JSON.parse(userData);
+
+      const response = await fetch('/api/products/enrich-grounded', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-tenant-id': user.tenantId,
+        },
+        body: JSON.stringify({
+          productName: productName || suggestions?.name,
+          productEan: productEan || suggestions?.ean,
+          productBrand: suggestions?.brand,
+          tenantId: user.tenantId,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to perform grounded enrichment');
+      }
+
+      const data = await response.json();
+      setSuggestions(prev => ({ ...prev, ...data.suggestions }));
+      setMetadata(data.metadata);
+      setEnrichmentMethod('grounded');
+      setGroundingInfo(data.grounding);
+
+      // Re-initialize approvals
+      const initialApprovals: FieldApproval = {};
+      Object.keys(data.suggestions).forEach(key => {
+        if (key !== 'images') {
+          initialApprovals[key] = true;
+        }
+      });
+      setApprovals(initialApprovals);
+
+    } catch (err: any) {
+      console.error('Grounded enrichment error:', err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -307,6 +432,56 @@ export default function ProductEnrichmentModal({
 
           {suggestions && (
             <div className="space-y-6">
+              {/* Enrichment Method Indicator */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    {enrichmentMethod === 'standard' && (
+                      <>
+                        <span className="text-2xl">🤖</span>
+                        <div>
+                          <p className="font-medium text-blue-900">Standard AI Enrichment</p>
+                          <p className="text-sm text-blue-700">Gemini + OpenAI + Google Images</p>
+                        </div>
+                      </>
+                    )}
+                    {enrichmentMethod === 'web_extraction' && (
+                      <>
+                        <span className="text-2xl">📄</span>
+                        <div>
+                          <p className="font-medium text-blue-900">Web Results Extraction</p>
+                          <p className="text-sm text-blue-700">Real data from Google Search</p>
+                        </div>
+                      </>
+                    )}
+                    {enrichmentMethod === 'grounded' && (
+                      <>
+                        <span className="text-2xl">⚡</span>
+                        <div>
+                          <p className="font-medium text-blue-900">Premium Google Search Grounding</p>
+                          <p className="text-sm text-blue-700">Verified sources with citations</p>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Grounding Info */}
+              {groundingInfo && groundingInfo.sourceUrls && groundingInfo.sourceUrls.length > 0 && (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                  <h4 className="font-medium text-green-900 mb-2">✓ Verified Sources</h4>
+                  <ul className="text-sm text-green-700 space-y-1">
+                    {groundingInfo.sourceUrls.slice(0, 3).map((url: string, idx: number) => (
+                      <li key={idx}>• {url}</li>
+                    ))}
+                  </ul>
+                  <p className="text-xs text-green-600 mt-2">
+                    {groundingInfo.searchQueriesUsed?.length || 0} search queries used
+                  </p>
+                </div>
+              )}
+
               {/* Product Name */}
               {suggestions.name && (
                 <FieldSuggestion
@@ -315,6 +490,7 @@ export default function ProductEnrichmentModal({
                   suggestedValue={suggestions.name}
                   approved={approvals.name}
                   onToggle={() => toggleApproval('name')}
+                  metadata={metadata?.name}
                 />
               )}
 
@@ -326,6 +502,7 @@ export default function ProductEnrichmentModal({
                   suggestedValue={suggestions.description}
                   approved={approvals.description}
                   onToggle={() => toggleApproval('description')}
+                  metadata={metadata?.description}
                   multiline
                 />
               )}
@@ -338,6 +515,7 @@ export default function ProductEnrichmentModal({
                   suggestedValue={suggestions.brand}
                   approved={approvals.brand}
                   onToggle={() => toggleApproval('brand')}
+                  metadata={metadata?.brand}
                 />
               )}
 
@@ -349,17 +527,7 @@ export default function ProductEnrichmentModal({
                   suggestedValue={suggestions.category}
                   approved={approvals.category}
                   onToggle={() => toggleApproval('category')}
-                />
-              )}
-
-              {/* Menu Section */}
-              {suggestions.menuSection && (
-                <FieldSuggestion
-                  label="Menu Section"
-                  currentValue={currentData?.menuSection}
-                  suggestedValue={suggestions.menuSection}
-                  approved={approvals.menuSection}
-                  onToggle={() => toggleApproval('menuSection')}
+                  metadata={metadata?.category}
                 />
               )}
 
@@ -371,6 +539,7 @@ export default function ProductEnrichmentModal({
                   suggestedValue={suggestions.type}
                   approved={approvals.type}
                   onToggle={() => toggleApproval('type')}
+                  metadata={metadata?.type}
                 />
               )}
 
@@ -382,7 +551,63 @@ export default function ProductEnrichmentModal({
                   suggestedValue={suggestions.ean}
                   approved={approvals.ean}
                   onToggle={() => toggleApproval('ean')}
+                  metadata={metadata?.ean}
                 />
+              )}
+
+              {/* Progressive Enhancement Actions */}
+              {enrichmentMethod === 'standard' && (
+                <div className="bg-gradient-to-r from-gray-50 to-blue-50 border-2 border-dashed border-gray-300 rounded-lg p-6">
+                  <h3 className="font-semibold text-gray-900 mb-3 text-center">Not satisfied with these results?</h3>
+                  <p className="text-sm text-gray-600 mb-4 text-center">Try these alternative enrichment methods:</p>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {/* Web Extraction */}
+                    <button
+                      onClick={fetchWebExtraction}
+                      disabled={loading}
+                      className="flex items-center justify-center space-x-2 px-4 py-3 bg-white hover:bg-blue-50 border-2 border-blue-200 text-blue-700 rounded-lg font-medium transition-all hover:shadow-md disabled:opacity-50"
+                    >
+                      <span className="text-xl">📄</span>
+                      <div className="text-left">
+                        <p className="text-sm font-semibold">Extract from Web</p>
+                        <p className="text-xs text-gray-600">Real Google results • FREE</p>
+                      </div>
+                    </button>
+
+                    {/* Premium Grounding */}
+                    <button
+                      onClick={fetchGroundedEnrichment}
+                      disabled={loading}
+                      className="flex items-center justify-center space-x-2 px-4 py-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-lg font-medium transition-all hover:shadow-lg disabled:opacity-50"
+                    >
+                      <span className="text-xl">⚡</span>
+                      <div className="text-left">
+                        <p className="text-sm font-semibold">Premium Grounding</p>
+                        <p className="text-xs opacity-90">Verified sources • +$0.035</p>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {enrichmentMethod === 'web_extraction' && (
+                <div className="bg-gradient-to-r from-purple-50 to-blue-50 border-2 border-purple-200 rounded-lg p-4">
+                  <p className="text-sm text-gray-700 mb-3 text-center">
+                    Still want more accuracy? Try premium grounding:
+                  </p>
+                  <button
+                    onClick={fetchGroundedEnrichment}
+                    disabled={loading}
+                    className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-lg font-medium transition-all hover:shadow-lg disabled:opacity-50"
+                  >
+                    <span className="text-xl">⚡</span>
+                    <div>
+                      <p className="text-sm font-semibold">Upgrade to Premium Grounding</p>
+                      <p className="text-xs opacity-90">Get verified sources with citations • +$0.035</p>
+                    </div>
+                  </button>
+                </div>
               )}
 
               {/* Images */}
@@ -530,6 +755,7 @@ interface FieldSuggestionProps {
   suggestedValue: any;
   approved: boolean;
   onToggle: () => void;
+  metadata?: FieldMetadata;
   multiline?: boolean;
 }
 
@@ -539,14 +765,58 @@ function FieldSuggestion({
   suggestedValue,
   approved,
   onToggle,
+  metadata,
   multiline = false,
 }: FieldSuggestionProps) {
+  const getSourceBadge = (source?: string) => {
+    switch (source) {
+      case 'gemini':
+        return { icon: '🤖', label: 'Gemini', color: 'bg-blue-100 text-blue-700' };
+      case 'openai':
+        return { icon: '🤖', label: 'OpenAI', color: 'bg-green-100 text-green-700' };
+      case 'google_search':
+        return { icon: '🔍', label: 'Google', color: 'bg-purple-100 text-purple-700' };
+      default:
+        return { icon: '💡', label: 'AI', color: 'bg-gray-100 text-gray-700' };
+    }
+  };
+
+  const getConfidenceBadge = (confidence?: string) => {
+    switch (confidence) {
+      case 'high':
+        return { label: 'High', color: 'bg-green-100 text-green-700' };
+      case 'medium':
+        return { label: 'Medium', color: 'bg-yellow-100 text-yellow-700' };
+      case 'low':
+        return { label: 'Low', color: 'bg-red-100 text-red-700' };
+      default:
+        return null;
+    }
+  };
+
+  const sourceBadge = getSourceBadge(metadata?.source);
+  const confidenceBadge = getConfidenceBadge(metadata?.confidence);
+
   return (
     <div className={`border rounded-lg p-4 transition-all ${
       approved ? 'border-green-300 bg-green-50' : 'border-gray-200 bg-white'
     }`}>
       <div className="flex justify-between items-start mb-2">
-        <h4 className="font-medium text-gray-900">{label}</h4>
+        <div className="flex items-center space-x-2">
+          <h4 className="font-medium text-gray-900">{label}</h4>
+          {metadata && (
+            <div className="flex items-center space-x-1">
+              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${sourceBadge.color}`}>
+                {sourceBadge.icon} {sourceBadge.label}
+              </span>
+              {confidenceBadge && (
+                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${confidenceBadge.color}`}>
+                  {confidenceBadge.label}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
         <button
           onClick={onToggle}
           className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${

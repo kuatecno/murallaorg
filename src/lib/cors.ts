@@ -7,6 +7,7 @@ import { NextResponse } from 'next/server';
 
 const ALLOWED_ORIGINS = [
   'https://qr.murallacafe.cl',
+  'https://murallacafe.cl',
   'http://localhost:3000',
   'http://localhost:8000',
 ];

@@ -120,8 +120,8 @@ BUSCA EN GOOGLE AHORA y devuelve el JSON con la información más precisa que en
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       tools: [
         {
-          googleSearch: {},
-        },
+          googleSearch: {} as any,
+        } as any,
       ],
     });
 

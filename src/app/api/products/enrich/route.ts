@@ -86,6 +86,7 @@ interface EnrichmentSuggestion {
   ean?: string;
   type?: string;
   images?: string[];
+  [key: string]: any; // Allow dynamic field access
 }
 
 interface FieldMetadata {
@@ -101,6 +102,7 @@ interface EnrichmentWithMetadata {
   brand?: FieldMetadata;
   ean?: FieldMetadata;
   type?: FieldMetadata;
+  [key: string]: FieldMetadata | undefined; // Allow dynamic field access
 }
 
 export async function POST(request: NextRequest) {

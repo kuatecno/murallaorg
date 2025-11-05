@@ -9,17 +9,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { validateApiKey } from '@/lib/auth';
 
-interface RouteParams {
-  params: {
-    id: string;
-  };
-}
-
 /**
  * GET /api/categories/[id]
  * Get a single category with product count
  */
-export async function GET(request: NextRequest, { params }: RouteParams) {
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
     // Validate API key and get tenant ID
     const auth = await validateApiKey(request);
@@ -31,7 +28,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     }
     const tenantId = auth.tenantId!;
 
-    const { id } = params;
+    const { id } = await params;
 
     const category = await prisma.category.findFirst({
       where: {
@@ -77,7 +74,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
  * PUT /api/categories/[id]
  * Update a category (and optionally rename it in all products)
  */
-export async function PUT(request: NextRequest, { params }: RouteParams) {
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
     // Validate API key and get tenant ID
     const auth = await validateApiKey(request);
@@ -89,7 +89,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     }
     const tenantId = auth.tenantId!;
 
-    const { id } = params;
+    const { id } = await params;
 
     const body = await request.json();
     const { name, description, emoji, color, isActive } = body;
@@ -180,7 +180,10 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
  * DELETE /api/categories/[id]
  * Delete a category (removes category from all products)
  */
-export async function DELETE(request: NextRequest, { params }: RouteParams) {
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
     // Validate API key and get tenant ID
     const auth = await validateApiKey(request);
@@ -192,7 +195,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     }
     const tenantId = auth.tenantId!;
 
-    const { id } = params;
+    const { id } = await params;
 
     // Find category
     const category = await prisma.category.findFirst({

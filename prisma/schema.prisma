@@ -134,17 +134,99 @@ model Product {
   ingredientConsumptions IngredientConsumption[] @relation("ConsumedIngredients")
 
   // M:M Relationships
-  suppliers         ProductSupplier[]
-  staffOwners       StaffProduct[]       @relation("ProductOwnedByStaff")
-  movements         ProductMovement[]
-  transactionItems  TransactionItem[]
+  suppliers          ProductSupplier[]
+  staffOwners        StaffProduct[]       @relation("ProductOwnedByStaff")
+  movements          ProductMovement[]
+  transactionItems   TransactionItem[]
   purchaseOrderItems PurchaseOrderItem[]
-  inventoryRecords  InventoryRecord[]
+  inventoryRecords   InventoryRecord[]
+
+  // Variants and Modifiers
+  variants       ProductVariant[]
+  modifierGroups ModifierGroup[]
 
   @@unique([tenantId, sku])
   @@index([tenantId, type])
   @@index([tenantId, category])
   @@map("products")
+}
+
+// Product Variants (e.g., Small/Medium/Large, or Flavor variants)
+model ProductVariant {
+  id          String   @id @default(cuid())
+  productId   String
+  name        String // e.g., "Small", "Medium", "Large", "Strawberry", "Mango"
+  sku         String? // Optional variant-specific SKU
+  priceAdjustment Decimal @default(0) @db.Decimal(12, 2) // Price difference from base product
+  sortOrder   Int      @default(0)
+  isDefault   Boolean  @default(false) // Mark one variant as default
+  isActive    Boolean  @default(true)
+  metadata    Json     @default("{}") // Store additional variant data
+  tenantId    String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  tenant  Tenant  @relation(fields: [tenantId], references: [id])
+
+  @@index([productId])
+  @@index([tenantId])
+  @@map("product_variants")
+}
+
+// Modifier Groups (e.g., "Milk Options", "Ice Options", "Extras")
+model ModifierGroup {
+  id              String   @id @default(cuid())
+  productId       String?  // If null, it's a global modifier group
+  name            String // e.g., "Milk Options", "Ice Options"
+  description     String?
+  isRequired      Boolean  @default(false) // Must customer select at least one?
+  allowMultiple   Boolean  @default(true) // Can select multiple modifiers?
+  minSelections   Int      @default(0) // Minimum number of selections required
+  maxSelections   Int?     // Maximum number of selections allowed
+  sortOrder       Int      @default(0)
+  isActive        Boolean  @default(true)
+  tenantId        String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  product   Product?          @relation(fields: [productId], references: [id], onDelete: Cascade)
+  tenant    Tenant            @relation(fields: [tenantId], references: [id])
+  modifiers ProductModifier[]
+
+  @@index([productId])
+  @@index([tenantId])
+  @@map("modifier_groups")
+}
+
+// Product Modifiers (individual add-ons or removals)
+model ProductModifier {
+  id              String        @id @default(cuid())
+  modifierGroupId String
+  name            String // e.g., "Coconut Milk", "Remove Ice", "Extra Shot"
+  type            ModifierType  @default(ADD)
+  priceAdjustment Decimal       @default(0) @db.Decimal(12, 2) // Price change (positive for add-ons, negative for removals)
+  sortOrder       Int           @default(0)
+  isActive        Boolean       @default(true)
+  tenantId        String
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  // Relations
+  modifierGroup ModifierGroup             @relation(fields: [modifierGroupId], references: [id], onDelete: Cascade)
+  tenant        Tenant                    @relation(fields: [tenantId], references: [id])
+  transactionItems TransactionItemModifier[]
+
+  @@index([modifierGroupId])
+  @@index([tenantId])
+  @@map("product_modifiers")
+}
+
+enum ModifierType {
+  ADD    // Add-on (e.g., Extra shot, Coconut milk)
+  REMOVE // Removal (e.g., No ice, No sugar)
 }
 
 // Contact Type Configuration (allows custom contact types)
@@ -395,16 +477,37 @@ model TransactionItem {
   transactionId String
   productId     String?
   productName   String
+  variantId     String? // Selected variant (if any)
+  variantName   String? // Variant name at time of purchase
   quantity      Int
   unitPrice     Decimal @db.Decimal(12, 2)
   discount      Decimal @default(0) @db.Decimal(12, 2)
   totalPrice    Decimal @db.Decimal(12, 2)
 
   // Relations
-  transaction Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
-  product     Product?    @relation(fields: [productId], references: [id])
+  transaction Transaction               @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  product     Product?                  @relation(fields: [productId], references: [id])
+  modifiers   TransactionItemModifier[] // Selected modifiers
 
   @@map("transaction_items")
+}
+
+// Track modifiers selected for each transaction item
+model TransactionItemModifier {
+  id                String   @id @default(cuid())
+  transactionItemId String
+  modifierId        String
+  modifierName      String // Name at time of purchase
+  modifierType      ModifierType
+  priceAdjustment   Decimal  @db.Decimal(12, 2) // Price at time of purchase
+  createdAt         DateTime @default(now())
+
+  // Relations
+  transactionItem TransactionItem @relation(fields: [transactionItemId], references: [id], onDelete: Cascade)
+  modifier        ProductModifier @relation(fields: [modifierId], references: [id])
+
+  @@index([transactionItemId])
+  @@map("transaction_item_modifiers")
 }
 
 model PurchaseOrder {
@@ -837,6 +940,9 @@ model Tenant {
   staff          Staff[]
   products       Product[]
   categories     Category[]
+  productVariants ProductVariant[]
+  modifierGroups ModifierGroup[]
+  productModifiers ProductModifier[]
   contacts       Contact[] // Unified contacts (customers + suppliers)
   transactions   Transaction[]
   taxDocuments   TaxDocument[]

@@ -1,0 +1,119 @@
+/**
+ * Modifier Management API
+ * PUT /api/modifiers/[modifierId] - Update a modifier
+ * DELETE /api/modifiers/[modifierId] - Delete a modifier
+ */
+
+import { NextRequest, NextResponse } from 'next/server';
+import prisma from '@/lib/prisma';
+import { validateApiKey } from '@/lib/auth';
+
+/**
+ * PUT /api/modifiers/[modifierId]
+ * Update a modifier
+ */
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: { modifierId: string } }
+) {
+  try {
+    const auth = await validateApiKey(request);
+    if (!auth.success) {
+      return NextResponse.json({ error: auth.error }, { status: 401 });
+    }
+    const tenantId = auth.tenantId!;
+    const modifierId = params.modifierId;
+
+    const body = await request.json();
+    const { name, type, priceAdjustment, sortOrder, isActive } = body;
+
+    // Check if modifier exists and belongs to this tenant
+    const existingModifier = await prisma.productModifier.findFirst({
+      where: {
+        id: modifierId,
+        tenantId,
+      },
+    });
+
+    if (!existingModifier) {
+      return NextResponse.json(
+        { error: 'Modifier not found' },
+        { status: 404 }
+      );
+    }
+
+    const modifier = await prisma.productModifier.update({
+      where: {
+        id: modifierId,
+      },
+      data: {
+        ...(name !== undefined && { name }),
+        ...(type !== undefined && { type }),
+        ...(priceAdjustment !== undefined && { priceAdjustment }),
+        ...(sortOrder !== undefined && { sortOrder }),
+        ...(isActive !== undefined && { isActive }),
+      },
+    });
+
+    return NextResponse.json({
+      success: true,
+      data: modifier,
+    });
+  } catch (error: any) {
+    console.error('Error updating modifier:', error);
+    return NextResponse.json(
+      { error: 'Failed to update modifier', details: error.message },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * DELETE /api/modifiers/[modifierId]
+ * Delete a modifier
+ */
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { modifierId: string } }
+) {
+  try {
+    const auth = await validateApiKey(request);
+    if (!auth.success) {
+      return NextResponse.json({ error: auth.error }, { status: 401 });
+    }
+    const tenantId = auth.tenantId!;
+    const modifierId = params.modifierId;
+
+    // Check if modifier exists and belongs to this tenant
+    const existingModifier = await prisma.productModifier.findFirst({
+      where: {
+        id: modifierId,
+        tenantId,
+      },
+    });
+
+    if (!existingModifier) {
+      return NextResponse.json(
+        { error: 'Modifier not found' },
+        { status: 404 }
+      );
+    }
+
+    await prisma.productModifier.delete({
+      where: {
+        id: modifierId,
+      },
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: 'Modifier deleted successfully',
+    });
+  } catch (error: any) {
+    console.error('Error deleting modifier:', error);
+    return NextResponse.json(
+      { error: 'Failed to delete modifier', details: error.message },
+      { status: 500 }
+    );
+  }
+}

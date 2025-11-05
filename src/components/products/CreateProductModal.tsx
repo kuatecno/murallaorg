@@ -42,6 +42,28 @@ interface Category {
   productCount: number;
 }
 
+interface ProductVariant {
+  id?: string;
+  name: string;
+  priceAdjustment: number;
+  isDefault: boolean;
+}
+
+interface ProductModifier {
+  id?: string;
+  name: string;
+  type: 'ADD' | 'REMOVE';
+  priceAdjustment: number;
+}
+
+interface ModifierGroup {
+  id?: string;
+  name: string;
+  isRequired: boolean;
+  allowMultiple: boolean;
+  modifiers: ProductModifier[];
+}
+
 export default function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProductModalProps) {
   const [formData, setFormData] = useState<ProductFormData>({
     sku: '',
@@ -64,7 +86,11 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess }: Creat
   });
 
   const [categories, setCategories] = useState<Category[]>([]);
+  const [variants, setVariants] = useState<ProductVariant[]>([]);
+  const [modifierGroups, setModifierGroups] = useState<ModifierGroup[]>([]);
   const [showPlatformConfig, setShowPlatformConfig] = useState(false);
+  const [showVariants, setShowVariants] = useState(false);
+  const [showModifiers, setShowModifiers] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [isEnrichModalOpen, setIsEnrichModalOpen] = useState(false);
@@ -207,6 +233,37 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess }: Creat
         throw new Error(errorData.error || 'Failed to create product');
       }
 
+      const createdProduct = await response.json();
+      const productId = createdProduct.id;
+
+      // Create variants if any
+      if (variants.length > 0) {
+        for (const variant of variants) {
+          await fetch(`/api/products/${productId}/variants`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-tenant-id': user.tenantId,
+            },
+            body: JSON.stringify(variant),
+          });
+        }
+      }
+
+      // Create modifier groups and modifiers if any
+      if (modifierGroups.length > 0) {
+        for (const group of modifierGroups) {
+          await fetch(`/api/products/${productId}/modifier-groups`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-tenant-id': user.tenantId,
+            },
+            body: JSON.stringify(group),
+          });
+        }
+      }
+
       onSuccess();
       handleClose();
     } catch (err: any) {
@@ -236,9 +293,72 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess }: Creat
       pedidosyaPrice: '',
       uberPrice: '',
     });
+    setVariants([]);
+    setModifierGroups([]);
     setShowPlatformConfig(false);
+    setShowVariants(false);
+    setShowModifiers(false);
     setError('');
     onClose();
+  };
+
+  // Variant management functions
+  const addVariant = () => {
+    setVariants([...variants, { name: '', priceAdjustment: 0, isDefault: variants.length === 0 }]);
+  };
+
+  const updateVariant = (index: number, field: keyof ProductVariant, value: any) => {
+    const updated = [...variants];
+    updated[index] = { ...updated[index], [field]: value };
+    // If setting a variant as default, unset others
+    if (field === 'isDefault' && value === true) {
+      updated.forEach((v, i) => {
+        if (i !== index) v.isDefault = false;
+      });
+    }
+    setVariants(updated);
+  };
+
+  const removeVariant = (index: number) => {
+    const updated = variants.filter((_, i) => i !== index);
+    // If removing the default, set first as default
+    if (variants[index].isDefault && updated.length > 0) {
+      updated[0].isDefault = true;
+    }
+    setVariants(updated);
+  };
+
+  // Modifier group management functions
+  const addModifierGroup = () => {
+    setModifierGroups([...modifierGroups, { name: '', isRequired: false, allowMultiple: true, modifiers: [] }]);
+  };
+
+  const updateModifierGroup = (index: number, field: keyof ModifierGroup, value: any) => {
+    const updated = [...modifierGroups];
+    updated[index] = { ...updated[index], [field]: value };
+    setModifierGroups(updated);
+  };
+
+  const removeModifierGroup = (index: number) => {
+    setModifierGroups(modifierGroups.filter((_, i) => i !== index));
+  };
+
+  const addModifier = (groupIndex: number) => {
+    const updated = [...modifierGroups];
+    updated[groupIndex].modifiers.push({ name: '', type: 'ADD', priceAdjustment: 0 });
+    setModifierGroups(updated);
+  };
+
+  const updateModifier = (groupIndex: number, modIndex: number, field: keyof ProductModifier, value: any) => {
+    const updated = [...modifierGroups];
+    updated[groupIndex].modifiers[modIndex] = { ...updated[groupIndex].modifiers[modIndex], [field]: value };
+    setModifierGroups(updated);
+  };
+
+  const removeModifier = (groupIndex: number, modIndex: number) => {
+    const updated = [...modifierGroups];
+    updated[groupIndex].modifiers = updated[groupIndex].modifiers.filter((_, i) => i !== modIndex);
+    setModifierGroups(updated);
   };
 
   if (!isOpen) return null;
@@ -577,6 +697,205 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess }: Creat
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                   </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Product Variants (for sellable products) */}
+          {canSell && (
+            <div>
+              <button
+                type="button"
+                onClick={() => setShowVariants(!showVariants)}
+                className="flex items-center text-blue-600 hover:text-blue-700 font-medium"
+              >
+                {showVariants ? '▼' : '▶'} Product Variants (Optional)
+              </button>
+              <p className="text-xs text-gray-500 mt-1">
+                Add size or flavor variations (e.g., Small/Medium/Large, Strawberry/Mango)
+              </p>
+
+              {showVariants && (
+                <div className="mt-4 p-4 bg-gray-50 rounded-lg space-y-3">
+                  {variants.map((variant, index) => (
+                    <div key={index} className="flex gap-3 items-start bg-white p-3 rounded border">
+                      <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Variant Name *
+                          </label>
+                          <input
+                            type="text"
+                            value={variant.name}
+                            onChange={(e) => updateVariant(index, 'name', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                            placeholder="e.g., Medium, Strawberry"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Price Adjustment
+                          </label>
+                          <input
+                            type="number"
+                            value={variant.priceAdjustment}
+                            onChange={(e) => updateVariant(index, 'priceAdjustment', parseFloat(e.target.value))}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                            placeholder="0"
+                            step="0.01"
+                          />
+                        </div>
+                        <div className="flex items-center">
+                          <label className="flex items-center cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={variant.isDefault}
+                              onChange={(e) => updateVariant(index, 'isDefault', e.target.checked)}
+                              className="mr-2"
+                            />
+                            <span className="text-sm">Default</span>
+                          </label>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeVariant(index)}
+                        className="text-red-500 hover:text-red-700"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={addVariant}
+                    className="w-full px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:border-blue-500 hover:text-blue-600 transition-colors"
+                  >
+                    + Add Variant
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Product Modifiers (for sellable products) */}
+          {canSell && (
+            <div>
+              <button
+                type="button"
+                onClick={() => setShowModifiers(!showModifiers)}
+                className="flex items-center text-blue-600 hover:text-blue-700 font-medium"
+              >
+                {showModifiers ? '▼' : '▶'} Add-ons & Removals (Optional)
+              </button>
+              <p className="text-xs text-gray-500 mt-1">
+                Configure add-ons (e.g., Extra shot, Coconut milk) and removals (e.g., No ice, No sugar)
+              </p>
+
+              {showModifiers && (
+                <div className="mt-4 p-4 bg-gray-50 rounded-lg space-y-4">
+                  {modifierGroups.map((group, groupIndex) => (
+                    <div key={groupIndex} className="bg-white p-4 rounded border space-y-3">
+                      <div className="flex items-start gap-3">
+                        <div className="flex-1">
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Group Name *
+                          </label>
+                          <input
+                            type="text"
+                            value={group.name}
+                            onChange={(e) => updateModifierGroup(groupIndex, 'name', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                            placeholder="e.g., Milk Options, Ice Options"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeModifierGroup(groupIndex)}
+                          className="text-red-500 hover:text-red-700 mt-6"
+                        >
+                          ✕
+                        </button>
+                      </div>
+
+                      <div className="flex gap-4">
+                        <label className="flex items-center cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={group.isRequired}
+                            onChange={(e) => updateModifierGroup(groupIndex, 'isRequired', e.target.checked)}
+                            className="mr-2"
+                          />
+                          <span className="text-sm">Required</span>
+                        </label>
+                        <label className="flex items-center cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={group.allowMultiple}
+                            onChange={(e) => updateModifierGroup(groupIndex, 'allowMultiple', e.target.checked)}
+                            className="mr-2"
+                          />
+                          <span className="text-sm">Allow Multiple</span>
+                        </label>
+                      </div>
+
+                      {/* Modifiers in this group */}
+                      <div className="ml-4 space-y-2">
+                        <div className="text-sm font-medium text-gray-700">Modifiers:</div>
+                        {group.modifiers.map((modifier, modIndex) => (
+                          <div key={modIndex} className="flex gap-3 items-start bg-gray-50 p-2 rounded">
+                            <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-2">
+                              <input
+                                type="text"
+                                value={modifier.name}
+                                onChange={(e) => updateModifier(groupIndex, modIndex, 'name', e.target.value)}
+                                className="px-2 py-1 border border-gray-300 rounded text-sm"
+                                placeholder="Modifier name"
+                              />
+                              <select
+                                value={modifier.type}
+                                onChange={(e) => updateModifier(groupIndex, modIndex, 'type', e.target.value)}
+                                className="px-2 py-1 border border-gray-300 rounded text-sm"
+                              >
+                                <option value="ADD">Add-on (+)</option>
+                                <option value="REMOVE">Removal (-)</option>
+                              </select>
+                              <input
+                                type="number"
+                                value={modifier.priceAdjustment}
+                                onChange={(e) => updateModifier(groupIndex, modIndex, 'priceAdjustment', parseFloat(e.target.value))}
+                                className="px-2 py-1 border border-gray-300 rounded text-sm"
+                                placeholder="Price"
+                                step="0.01"
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => removeModifier(groupIndex, modIndex)}
+                              className="text-red-500 hover:text-red-700 text-sm"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() => addModifier(groupIndex)}
+                          className="w-full px-3 py-1 border border-dashed border-gray-300 rounded text-sm text-gray-600 hover:border-blue-500 hover:text-blue-600"
+                        >
+                          + Add Modifier
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={addModifierGroup}
+                    className="w-full px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:border-blue-500 hover:text-blue-600 transition-colors"
+                  >
+                    + Add Modifier Group
+                  </button>
                 </div>
               )}
             </div>

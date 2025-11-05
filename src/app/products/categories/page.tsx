@@ -15,30 +15,6 @@ interface Category {
   productCount?: number;
 }
 
-// Predefined categories from enrichment system
-const PREDEFINED_CATEGORIES: Category[] = [
-  // Barra - Café
-  { id: '☕🔥 Café Caliente', name: '☕🔥 Café Caliente', emoji: '☕🔥', color: '#92400E', isActive: true, productCount: 0 },
-  { id: '☕❄️ Café Frío', name: '☕❄️ Café Frío', emoji: '☕❄️', color: '#1E3A8A', isActive: true, productCount: 0 },
-  { id: '☕🌀 Café Frapeado', name: '☕🌀 Café Frapeado', emoji: '☕🌀', color: '#7C3AED', isActive: true, productCount: 0 },
-  // Barra - Matcha
-  { id: '🍵🔥 Matcha Caliente', name: '🍵🔥 Matcha Caliente', emoji: '🍵🔥', color: '#15803D', isActive: true, productCount: 0 },
-  { id: '🍵❄️ Matcha Frío', name: '🍵❄️ Matcha Frío', emoji: '🍵❄️', color: '#059669', isActive: true, productCount: 0 },
-  { id: '🍵🌀 Matcha Frapeado', name: '🍵🌀 Matcha Frapeado', emoji: '🍵🌀', color: '#10B981', isActive: true, productCount: 0 },
-  // Barra - Té
-  { id: '🫖🔥 Té Caliente', name: '🫖🔥 Té Caliente', emoji: '🫖🔥', color: '#B45309', isActive: true, productCount: 0 },
-  { id: '🫖❄️ Té Frío', name: '🫖❄️ Té Frío', emoji: '🫖❄️', color: '#0891B2', isActive: true, productCount: 0 },
-  { id: '🫖🌀 Té Frapeado', name: '🫖🌀 Té Frapeado', emoji: '🫖🌀', color: '#06B6D4', isActive: true, productCount: 0 },
-  // Barra - Otros
-  { id: '🍋 Jugos Naturales y Limonadas', name: '🍋 Jugos Naturales y Limonadas', emoji: '🍋', color: '#CA8A04', isActive: true, productCount: 0 },
-  { id: '🥤 Frapés', name: '🥤 Frapés', emoji: '🥤', color: '#EC4899', isActive: true, productCount: 0 },
-  { id: '🍹 Mocktails', name: '🍹 Mocktails', emoji: '🍹', color: '#F43F5E', isActive: true, productCount: 0 },
-  // Main categories
-  { id: '🍜 Comida', name: '🍜 Comida', emoji: '🍜', color: '#DC2626', isActive: true, productCount: 0 },
-  { id: '🍰 Antojitos', name: '🍰 Antojitos', emoji: '🍰', color: '#DB2777', isActive: true, productCount: 0 },
-  { id: '🎨 Arte', name: '🎨 Arte', emoji: '🎨', color: '#9333EA', isActive: true, productCount: 0 },
-];
-
 const DEFAULT_EMOJIS = [
   '🍔', '🍕', '🍰', '☕', '🍺', '🥗', '🍜', '🍣',
   '🥐', '🧁', '🍪', '🍩', '🥤', '🧃', '🍷', '🥃',
@@ -86,48 +62,31 @@ export default function CategoriesPage() {
 
       const user = JSON.parse(userData);
 
-      // Start with predefined categories
-      const categoryMap = new Map<string, Category>();
-
-      // Add predefined categories first
-      PREDEFINED_CATEGORIES.forEach(cat => {
-        categoryMap.set(cat.name, { ...cat });
-      });
-
-      // Get unique categories from products and update counts
-      const productsResponse = await fetch('/api/products', {
+      // Fetch categories from API
+      const response = await fetch('/api/categories', {
         headers: {
           'x-tenant-id': user.tenantId,
         },
       });
 
-      if (productsResponse.ok) {
-        const productsData = await productsResponse.json();
-        const products = productsData.data || productsData;
-
-        // Update product counts for existing categories
-        products.forEach((product: any) => {
-          if (product.category) {
-            if (categoryMap.has(product.category)) {
-              // Update existing predefined category count
-              const cat = categoryMap.get(product.category)!;
-              cat.productCount = (cat.productCount || 0) + 1;
-            } else {
-              // Add new custom category not in predefined list
-              categoryMap.set(product.category, {
-                id: product.category,
-                name: product.category,
-                color: '#3B82F6',
-                emoji: '📦',
-                isActive: true,
-                productCount: 1,
-              });
-            }
-          }
+      if (response.ok) {
+        const data = await response.json();
+        setCategories(data.data || []);
+      } else {
+        console.error('Failed to load categories');
+        // If no categories exist, seed them
+        const seedResponse = await fetch('/api/categories/seed', {
+          method: 'POST',
+          headers: {
+            'x-tenant-id': user.tenantId,
+          },
         });
-      }
 
-      setCategories(Array.from(categoryMap.values()));
+        if (seedResponse.ok) {
+          // Reload categories after seeding
+          loadCategories();
+        }
+      }
     } catch (error) {
       console.error('Error loading categories:', error);
     } finally {
@@ -173,52 +132,52 @@ export default function CategoriesPage() {
       return;
     }
 
-    // Check for duplicate name (excluding current category if editing)
-    const duplicate = categories.find(
-      (cat) => cat.name.toLowerCase() === formData.name.toLowerCase() &&
-      cat.id !== editingCategory?.id
-    );
-
-    if (duplicate) {
-      alert('A category with this name already exists');
-      return;
-    }
-
     setActionLoading(true);
     try {
+      const userData = localStorage.getItem('user');
+      if (!userData) return;
+
+      const user = JSON.parse(userData);
+
       if (editingCategory) {
-        // Update category (rename products)
-        const userData = localStorage.getItem('user');
-        if (!userData) return;
-
-        const user = JSON.parse(userData);
-
-        // Get all products with this category
-        const productsResponse = await fetch('/api/products', {
+        // Update category via API
+        const response = await fetch(`/api/categories/${editingCategory.id}`, {
+          method: 'PUT',
           headers: {
+            'Content-Type': 'application/json',
             'x-tenant-id': user.tenantId,
           },
+          body: JSON.stringify({
+            name: formData.name,
+            description: formData.description,
+            emoji: formData.emoji,
+            color: formData.color,
+          }),
         });
 
-        if (productsResponse.ok) {
-          const productsData = await productsResponse.json();
-          const products = (productsData.data || productsData).filter(
-            (p: any) => p.category === editingCategory.name
-          );
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to update category');
+        }
+      } else {
+        // Create new category via API
+        const response = await fetch('/api/categories', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-tenant-id': user.tenantId,
+          },
+          body: JSON.stringify({
+            name: formData.name,
+            description: formData.description,
+            emoji: formData.emoji,
+            color: formData.color,
+          }),
+        });
 
-          // Update each product's category
-          for (const product of products) {
-            await fetch(`/api/products/${product.id}`, {
-              method: 'PUT',
-              headers: {
-                'Content-Type': 'application/json',
-                'x-tenant-id': user.tenantId,
-              },
-              body: JSON.stringify({
-                category: formData.name,
-              }),
-            });
-          }
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to create category');
         }
       }
 
@@ -243,32 +202,17 @@ export default function CategoriesPage() {
 
       const user = JSON.parse(userData);
 
-      // Get all products with this category
-      const productsResponse = await fetch('/api/products', {
+      // Delete category via API (automatically removes from products)
+      const response = await fetch(`/api/categories/${category.id}`, {
+        method: 'DELETE',
         headers: {
           'x-tenant-id': user.tenantId,
         },
       });
 
-      if (productsResponse.ok) {
-        const productsData = await productsResponse.json();
-        const products = (productsData.data || productsData).filter(
-          (p: any) => p.category === category.name
-        );
-
-        // Remove category from each product
-        for (const product of products) {
-          await fetch(`/api/products/${product.id}`, {
-            method: 'PUT',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-tenant-id': user.tenantId,
-            },
-            body: JSON.stringify({
-              category: null,
-            }),
-          });
-        }
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete category');
       }
 
       loadCategories();

@@ -66,6 +66,25 @@ model Staff {
   @@map("staff")
 }
 
+model Category {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  emoji       String   @default("📦")
+  color       String   @default("#3B82F6")
+  isActive    Boolean  @default(true)
+  tenantId    String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([name, tenantId])
+  @@index([tenantId])
+  @@map("categories")
+}
+
 model Product {
   id           String      @id @default(cuid())
   sku          String
@@ -817,6 +836,7 @@ model Tenant {
   // Relations
   staff          Staff[]
   products       Product[]
+  categories     Category[]
   contacts       Contact[] // Unified contacts (customers + suppliers)
   transactions   Transaction[]
   taxDocuments   TaxDocument[]

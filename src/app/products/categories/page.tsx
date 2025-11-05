@@ -15,17 +15,43 @@ interface Category {
   productCount?: number;
 }
 
+// Predefined categories from enrichment system
+const PREDEFINED_CATEGORIES: Category[] = [
+  // Barra - Café
+  { id: '☕🔥 Café Caliente', name: '☕🔥 Café Caliente', emoji: '☕🔥', color: '#92400E', isActive: true, productCount: 0 },
+  { id: '☕❄️ Café Frío', name: '☕❄️ Café Frío', emoji: '☕❄️', color: '#1E3A8A', isActive: true, productCount: 0 },
+  { id: '☕🌀 Café Frapeado', name: '☕🌀 Café Frapeado', emoji: '☕🌀', color: '#7C3AED', isActive: true, productCount: 0 },
+  // Barra - Matcha
+  { id: '🍵🔥 Matcha Caliente', name: '🍵🔥 Matcha Caliente', emoji: '🍵🔥', color: '#15803D', isActive: true, productCount: 0 },
+  { id: '🍵❄️ Matcha Frío', name: '🍵❄️ Matcha Frío', emoji: '🍵❄️', color: '#059669', isActive: true, productCount: 0 },
+  { id: '🍵🌀 Matcha Frapeado', name: '🍵🌀 Matcha Frapeado', emoji: '🍵🌀', color: '#10B981', isActive: true, productCount: 0 },
+  // Barra - Té
+  { id: '🫖🔥 Té Caliente', name: '🫖🔥 Té Caliente', emoji: '🫖🔥', color: '#B45309', isActive: true, productCount: 0 },
+  { id: '🫖❄️ Té Frío', name: '🫖❄️ Té Frío', emoji: '🫖❄️', color: '#0891B2', isActive: true, productCount: 0 },
+  { id: '🫖🌀 Té Frapeado', name: '🫖🌀 Té Frapeado', emoji: '🫖🌀', color: '#06B6D4', isActive: true, productCount: 0 },
+  // Barra - Otros
+  { id: '🍋 Jugos Naturales y Limonadas', name: '🍋 Jugos Naturales y Limonadas', emoji: '🍋', color: '#CA8A04', isActive: true, productCount: 0 },
+  { id: '🥤 Frapés', name: '🥤 Frapés', emoji: '🥤', color: '#EC4899', isActive: true, productCount: 0 },
+  { id: '🍹 Mocktails', name: '🍹 Mocktails', emoji: '🍹', color: '#F43F5E', isActive: true, productCount: 0 },
+  // Main categories
+  { id: '🍜 Comida', name: '🍜 Comida', emoji: '🍜', color: '#DC2626', isActive: true, productCount: 0 },
+  { id: '🍰 Antojitos', name: '🍰 Antojitos', emoji: '🍰', color: '#DB2777', isActive: true, productCount: 0 },
+  { id: '🎨 Arte', name: '🎨 Arte', emoji: '🎨', color: '#9333EA', isActive: true, productCount: 0 },
+];
+
 const DEFAULT_EMOJIS = [
   '🍔', '🍕', '🍰', '☕', '🍺', '🥗', '🍜', '🍣',
   '🥐', '🧁', '🍪', '🍩', '🥤', '🧃', '🍷', '🥃',
   '🥘', '🍝', '🌮', '🌯', '🍱', '🥟', '🍛', '🍲',
-  '📦', '🧊', '🥫', '🧂', '🍯', '🧈'
+  '📦', '🧊', '🥫', '🧂', '🍯', '🧈', '🫖', '🍵', '🍋', '🍹', '🎨'
 ];
 
 const DEFAULT_COLORS = [
   '#EF4444', '#F59E0B', '#10B981', '#3B82F6', '#6366F1',
   '#8B5CF6', '#EC4899', '#F43F5E', '#84CC16', '#14B8A6',
-  '#06B6D4', '#0EA5E9', '#6366F1', '#A855F7', '#D946EF'
+  '#06B6D4', '#0EA5E9', '#6366F1', '#A855F7', '#D946EF',
+  '#92400E', '#1E3A8A', '#7C3AED', '#15803D', '#059669',
+  '#B45309', '#0891B2', '#CA8A04', '#DC2626', '#DB2777', '#9333EA'
 ];
 
 export default function CategoriesPage() {
@@ -60,7 +86,15 @@ export default function CategoriesPage() {
 
       const user = JSON.parse(userData);
 
-      // Get unique categories from products
+      // Start with predefined categories
+      const categoryMap = new Map<string, Category>();
+
+      // Add predefined categories first
+      PREDEFINED_CATEGORIES.forEach(cat => {
+        categoryMap.set(cat.name, { ...cat });
+      });
+
+      // Get unique categories from products and update counts
       const productsResponse = await fetch('/api/products', {
         headers: {
           'x-tenant-id': user.tenantId,
@@ -71,11 +105,15 @@ export default function CategoriesPage() {
         const productsData = await productsResponse.json();
         const products = productsData.data || productsData;
 
-        // Extract unique categories
-        const categoryMap = new Map<string, Category>();
+        // Update product counts for existing categories
         products.forEach((product: any) => {
           if (product.category) {
-            if (!categoryMap.has(product.category)) {
+            if (categoryMap.has(product.category)) {
+              // Update existing predefined category count
+              const cat = categoryMap.get(product.category)!;
+              cat.productCount = (cat.productCount || 0) + 1;
+            } else {
+              // Add new custom category not in predefined list
               categoryMap.set(product.category, {
                 id: product.category,
                 name: product.category,
@@ -84,15 +122,12 @@ export default function CategoriesPage() {
                 isActive: true,
                 productCount: 1,
               });
-            } else {
-              const cat = categoryMap.get(product.category)!;
-              cat.productCount = (cat.productCount || 0) + 1;
             }
           }
         });
-
-        setCategories(Array.from(categoryMap.values()));
       }
+
+      setCategories(Array.from(categoryMap.values()));
     } catch (error) {
       console.error('Error loading categories:', error);
     } finally {

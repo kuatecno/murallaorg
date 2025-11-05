@@ -9,6 +9,7 @@ import { productService } from './product.service';
 import { Prisma } from '@prisma/client';
 import prisma from '@/lib/prisma';
 import { validateApiKey } from '@/lib/auth';
+import { getCorsHeaders, corsResponse, corsError } from '@/lib/cors';
 
 interface ProductParams {
   page?: number;
@@ -21,18 +22,29 @@ interface ProductParams {
 }
 
 /**
+ * OPTIONS /api/products
+ * Handle CORS preflight requests
+ */
+export async function OPTIONS(request: NextRequest) {
+  const origin = request.headers.get('origin');
+  return new NextResponse(null, {
+    status: 204,
+    headers: getCorsHeaders(origin),
+  });
+}
+
+/**
  * GET /api/products
  * List products with pagination and filtering
  */
 export async function GET(request: NextRequest) {
+  const origin = request.headers.get('origin');
+  
   try {
     // Validate API key and get tenant ID
     const auth = await validateApiKey(request);
     if (!auth.success) {
-      return NextResponse.json(
-        { error: auth.error },
-        { status: 401 }
-      );
+      return corsError(auth.error || 'Unauthorized', 401, origin);
     }
     const tenantId = auth.tenantId!;
 
@@ -176,7 +188,7 @@ export async function GET(request: NextRequest) {
     const hasNextPage = params.page! < totalPages;
     const hasPrevPage = params.page! > 1;
 
-    return NextResponse.json({
+    return corsResponse({
       data: transformedProducts,
       pagination: {
         page: params.page,
@@ -193,22 +205,16 @@ export async function GET(request: NextRequest) {
         sortOrder: params.sortOrder,
         includeInactive: params.includeInactive,
       },
-    });
+    }, 200, origin);
 
   } catch (error) {
     console.error('Error fetching products:', error);
 
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      return NextResponse.json(
-        { error: 'Database error', details: error.message },
-        { status: 400 }
-      );
+      return corsError('Database error: ' + error.message, 400, origin);
     }
 
-    return NextResponse.json(
-      { error: 'Failed to fetch products' },
-      { status: 500 }
-    );
+    return corsError('Failed to fetch products', 500, origin);
   }
 }
 
@@ -217,14 +223,13 @@ export async function GET(request: NextRequest) {
  * Create new product
  */
 export async function POST(request: NextRequest) {
+  const origin = request.headers.get('origin');
+  
   try {
     // Validate API key and get tenant ID
     const auth = await validateApiKey(request);
     if (!auth.success) {
-      return NextResponse.json(
-        { error: auth.error },
-        { status: 401 }
-      );
+      return corsError(auth.error || 'Unauthorized', 401, origin);
     }
     const tenantId = auth.tenantId!;
 
@@ -235,35 +240,24 @@ export async function POST(request: NextRequest) {
     const missingFields = requiredFields.filter(field => !body[field]);
 
     if (missingFields.length > 0) {
-      return NextResponse.json(
-        {
-          error: 'Missing required fields',
-          details: missingFields.map(field => `${field} is required`)
-        },
-        { status: 400 }
+      return corsError(
+        'Missing required fields: ' + missingFields.join(', '),
+        400,
+        origin
       );
     }
 
     // Validate data types
     if (typeof body.unitPrice !== 'number' || body.unitPrice <= 0) {
-      return NextResponse.json(
-        { error: 'Unit price must be a positive number' },
-        { status: 400 }
-      );
+      return corsError('Unit price must be a positive number', 400, origin);
     }
 
     if (body.costPrice && (typeof body.costPrice !== 'number' || body.costPrice < 0)) {
-      return NextResponse.json(
-        { error: 'Cost price must be a non-negative number' },
-        { status: 400 }
-      );
+      return corsError('Cost price must be a non-negative number', 400, origin);
     }
 
     if (body.currentStock && (typeof body.currentStock !== 'number' || body.currentStock < 0)) {
-      return NextResponse.json(
-        { error: 'Current stock must be a non-negative number' },
-        { status: 400 }
-      );
+      return corsError('Current stock must be a non-negative number', 400, origin);
     }
 
     // Check if SKU already exists for this tenant
@@ -277,10 +271,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (existingProduct) {
-      return NextResponse.json(
-        { error: 'Product with this SKU already exists' },
-        { status: 409 }
-      );
+      return corsError('Product with this SKU already exists', 409, origin);
     }
 
     // Create the product
@@ -349,12 +340,13 @@ export async function POST(request: NextRequest) {
       staffOwners: [],
     };
 
-    return NextResponse.json(
+    return corsResponse(
       {
         message: 'Product created successfully',
         data: transformedProduct
       },
-      { status: 201 }
+      201,
+      origin
     );
 
   } catch (error) {
@@ -362,21 +354,12 @@ export async function POST(request: NextRequest) {
 
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       if (error.code === 'P2002') {
-        return NextResponse.json(
-          { error: 'Product with this SKU already exists' },
-          { status: 409 }
-        );
+        return corsError('Product with this SKU already exists', 409, origin);
       }
 
-      return NextResponse.json(
-        { error: 'Database error', details: error.message },
-        { status: 400 }
-      );
+      return corsError('Database error: ' + error.message, 400, origin);
     }
 
-    return NextResponse.json(
-      { error: 'Failed to create product' },
-      { status: 500 }
-    );
+    return corsError('Failed to create product', 500, origin);
   }
 }

@@ -7,20 +7,32 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { validateApiKey } from '@/lib/auth';
+import { getCorsHeaders, corsResponse, corsError } from '@/lib/cors';
+
+/**
+ * OPTIONS /api/categories
+ * Handle CORS preflight requests
+ */
+export async function OPTIONS(request: NextRequest) {
+  const origin = request.headers.get('origin');
+  return new NextResponse(null, {
+    status: 204,
+    headers: getCorsHeaders(origin),
+  });
+}
 
 /**
  * GET /api/categories
  * List all categories with computed product counts
  */
 export async function GET(request: NextRequest) {
+  const origin = request.headers.get('origin');
+  
   try {
     // Validate API key and get tenant ID
     const auth = await validateApiKey(request);
     if (!auth.success) {
-      return NextResponse.json(
-        { error: auth.error },
-        { status: 401 }
-      );
+      return corsError(auth.error || 'Unauthorized', 401, origin);
     }
     const tenantId = auth.tenantId!;
 
@@ -75,17 +87,14 @@ export async function GET(request: NextRequest) {
       })
     );
 
-    return NextResponse.json({
+    return corsResponse({
       success: true,
       data: categoriesWithCounts,
-    });
+    }, 200, origin);
 
   } catch (error: any) {
     console.error('Error fetching categories:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch categories', details: error.message },
-      { status: 500 }
-    );
+    return corsError('Failed to fetch categories: ' + error.message, 500, origin);
   }
 }
 
@@ -94,14 +103,13 @@ export async function GET(request: NextRequest) {
  * Create a new category
  */
 export async function POST(request: NextRequest) {
+  const origin = request.headers.get('origin');
+  
   try {
     // Validate API key and get tenant ID
     const auth = await validateApiKey(request);
     if (!auth.success) {
-      return NextResponse.json(
-        { error: auth.error },
-        { status: 401 }
-      );
+      return corsError(auth.error || 'Unauthorized', 401, origin);
     }
     const tenantId = auth.tenantId!;
 
@@ -109,10 +117,7 @@ export async function POST(request: NextRequest) {
     const { name, description, emoji, color } = body;
 
     if (!name || !name.trim()) {
-      return NextResponse.json(
-        { error: 'Category name is required' },
-        { status: 400 }
-      );
+      return corsError('Category name is required', 400, origin);
     }
 
     // Check if category already exists
@@ -124,10 +129,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (existing) {
-      return NextResponse.json(
-        { error: 'A category with this name already exists' },
-        { status: 409 }
-      );
+      return corsError('A category with this name already exists', 409, origin);
     }
 
     // Create category
@@ -141,19 +143,16 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json({
+    return corsResponse({
       success: true,
       data: {
         ...category,
         productCount: 0,
       },
-    }, { status: 201 });
+    }, 201, origin);
 
   } catch (error: any) {
     console.error('Error creating category:', error);
-    return NextResponse.json(
-      { error: 'Failed to create category', details: error.message },
-      { status: 500 }
-    );
+    return corsError('Failed to create category: ' + error.message, 500, origin);
   }
 }

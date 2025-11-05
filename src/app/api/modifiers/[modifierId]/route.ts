@@ -14,7 +14,7 @@ import { validateApiKey } from '@/lib/auth';
  */
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { modifierId: string } }
+  { params }: { params: Promise<{ modifierId: string }> }
 ) {
   try {
     const auth = await validateApiKey(request);
@@ -22,7 +22,7 @@ export async function PUT(
       return NextResponse.json({ error: auth.error }, { status: 401 });
     }
     const tenantId = auth.tenantId!;
-    const modifierId = params.modifierId;
+    const { modifierId } = await params;
 
     const body = await request.json();
     const { name, type, priceAdjustment, sortOrder, isActive } = body;
@@ -74,7 +74,7 @@ export async function PUT(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { modifierId: string } }
+  { params }: { params: Promise<{ modifierId: string }> }
 ) {
   try {
     const auth = await validateApiKey(request);
@@ -82,7 +82,7 @@ export async function DELETE(
       return NextResponse.json({ error: auth.error }, { status: 401 });
     }
     const tenantId = auth.tenantId!;
-    const modifierId = params.modifierId;
+    const { modifierId } = await params;
 
     // Check if modifier exists and belongs to this tenant
     const existingModifier = await prisma.productModifier.findFirst({

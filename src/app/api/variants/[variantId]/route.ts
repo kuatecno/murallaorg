@@ -14,7 +14,7 @@ import { validateApiKey } from '@/lib/auth';
  */
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { variantId: string } }
+  { params }: { params: Promise<{ variantId: string }> }
 ) {
   try {
     const auth = await validateApiKey(request);
@@ -22,7 +22,7 @@ export async function PUT(
       return NextResponse.json({ error: auth.error }, { status: 401 });
     }
     const tenantId = auth.tenantId!;
-    const variantId = params.variantId;
+    const { variantId } = await params;
 
     const body = await request.json();
     const { name, sku, priceAdjustment, sortOrder, isDefault, isActive } = body;
@@ -89,7 +89,7 @@ export async function PUT(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { variantId: string } }
+  { params }: { params: Promise<{ variantId: string }> }
 ) {
   try {
     const auth = await validateApiKey(request);
@@ -97,7 +97,7 @@ export async function DELETE(
       return NextResponse.json({ error: auth.error }, { status: 401 });
     }
     const tenantId = auth.tenantId!;
-    const variantId = params.variantId;
+    const { variantId } = await params;
 
     // Check if variant exists and belongs to this tenant
     const existingVariant = await prisma.productVariant.findFirst({

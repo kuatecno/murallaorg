@@ -13,7 +13,7 @@ import { validateApiKey } from '@/lib/auth';
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { groupId: string } }
+  { params }: { params: Promise<{ groupId: string }> }
 ) {
   try {
     const auth = await validateApiKey(request);
@@ -21,7 +21,7 @@ export async function POST(
       return NextResponse.json({ error: auth.error }, { status: 401 });
     }
     const tenantId = auth.tenantId!;
-    const groupId = params.groupId;
+    const { groupId } = await params;
 
     const body = await request.json();
     const { name, type, priceAdjustment, sortOrder } = body;

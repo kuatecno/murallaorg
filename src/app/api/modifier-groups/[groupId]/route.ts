@@ -14,7 +14,7 @@ import { validateApiKey } from '@/lib/auth';
  */
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { groupId: string } }
+  { params }: { params: Promise<{ groupId: string }> }
 ) {
   try {
     const auth = await validateApiKey(request);
@@ -22,7 +22,7 @@ export async function PUT(
       return NextResponse.json({ error: auth.error }, { status: 401 });
     }
     const tenantId = auth.tenantId!;
-    const groupId = params.groupId;
+    const { groupId } = await params;
 
     const body = await request.json();
     const {
@@ -92,7 +92,7 @@ export async function PUT(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { groupId: string } }
+  { params }: { params: Promise<{ groupId: string }> }
 ) {
   try {
     const auth = await validateApiKey(request);
@@ -100,7 +100,7 @@ export async function DELETE(
       return NextResponse.json({ error: auth.error }, { status: 401 });
     }
     const tenantId = auth.tenantId!;
-    const groupId = params.groupId;
+    const { groupId } = await params;
 
     // Check if group exists and belongs to this tenant
     const existingGroup = await prisma.modifierGroup.findFirst({

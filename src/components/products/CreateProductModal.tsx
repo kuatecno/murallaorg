@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import ProductEnrichmentModal from './ProductEnrichmentModal';
 
 interface CreateProductModalProps {
@@ -19,7 +19,6 @@ interface ProductFormData {
   category: string;
   brand: string;
   ean: string;
-  menuSection: string;
   unitPrice: string;
   costPrice: string;
   minStock: string;
@@ -33,6 +32,16 @@ interface ProductFormData {
   uberPrice: string;
 }
 
+interface Category {
+  id: string;
+  name: string;
+  description: string | null;
+  emoji: string;
+  color: string;
+  isActive: boolean;
+  productCount: number;
+}
+
 export default function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProductModalProps) {
   const [formData, setFormData] = useState<ProductFormData>({
     sku: '',
@@ -42,7 +51,6 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess }: Creat
     category: '',
     brand: '',
     ean: '',
-    menuSection: '',
     unitPrice: '',
     costPrice: '',
     minStock: '0',
@@ -55,10 +63,41 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess }: Creat
     uberPrice: '',
   });
 
+  const [categories, setCategories] = useState<Category[]>([]);
   const [showPlatformConfig, setShowPlatformConfig] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [isEnrichModalOpen, setIsEnrichModalOpen] = useState(false);
+
+  // Fetch categories when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      fetchCategories();
+    }
+  }, [isOpen]);
+
+  const fetchCategories = async () => {
+    try {
+      const userData = localStorage.getItem('user');
+      if (!userData) return;
+
+      const user = JSON.parse(userData);
+      const response = await fetch('/api/categories', {
+        headers: {
+          'x-tenant-id': user.tenantId,
+        },
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success && result.data) {
+          setCategories(result.data);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+    }
+  };
 
   const productTypes: { value: ProductType; label: string; description: string; icon: string }[] = [
     {
@@ -113,7 +152,6 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess }: Creat
       brand: enrichedData.brand || prev.brand,
       ean: enrichedData.ean || prev.ean,
       type: enrichedData.type || prev.type,
-      menuSection: enrichedData.menuSection || prev.menuSection,
       images: enrichedData.images || prev.images,
     }));
   };
@@ -142,7 +180,6 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess }: Creat
         category: formData.category || undefined,
         brand: formData.brand || undefined,
         ean: formData.ean || undefined,
-        menuSection: formData.menuSection || undefined,
         unitPrice: parseFloat(formData.unitPrice) || 0,
         costPrice: formData.costPrice ? parseFloat(formData.costPrice) : undefined,
         minStock: parseInt(formData.minStock) || 0,
@@ -188,7 +225,6 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess }: Creat
       category: '',
       brand: '',
       ean: '',
-      menuSection: '',
       unitPrice: '',
       costPrice: '',
       minStock: '0',
@@ -336,14 +372,24 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess }: Creat
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-              <input
-                type="text"
+              <select
                 name="category"
                 value={formData.category}
                 onChange={handleChange}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="e.g., Beverages"
-              />
+              >
+                <option value="">Select a category...</option>
+                {categories.map((cat) => (
+                  <option key={cat.id} value={cat.name}>
+                    {cat.emoji} {cat.name}
+                  </option>
+                ))}
+              </select>
+              {categories.length === 0 && (
+                <p className="mt-1 text-xs text-gray-500">
+                  No categories available. Create categories first in Settings.
+                </p>
+              )}
             </div>
 
             <div>
@@ -367,18 +413,6 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess }: Creat
                 onChange={handleChange}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="e.g., 7791234567890"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Menu Section</label>
-              <input
-                type="text"
-                name="menuSection"
-                value={formData.menuSection}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="e.g., Comidas, Dulces, Bebidas"
               />
             </div>
           </div>

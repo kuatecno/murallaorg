@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { productService } from './product.service';
 import { Prisma } from '@prisma/client';
 import prisma from '@/lib/prisma';
+import { validateApiKey } from '@/lib/auth';
 
 interface ProductParams {
   page?: number;
@@ -25,17 +26,17 @@ interface ProductParams {
  */
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-
-    // Get tenant from header first, then query parameter, then use first available tenant
-    let tenantId = request.headers.get('x-tenant-id') || searchParams.get('tenantId');
-
-    if (!tenantId) {
+    // Validate API key and get tenant ID
+    const auth = await validateApiKey(request);
+    if (!auth.success) {
       return NextResponse.json(
-        { error: 'Tenant ID is required' },
-        { status: 400 }
+        { error: auth.error },
+        { status: 401 }
       );
     }
+    const tenantId = auth.tenantId!;
+
+    const { searchParams } = new URL(request.url);
 
     const params: ProductParams = {
       page: parseInt(searchParams.get('page') || '1'),
@@ -217,17 +218,17 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-
-    // Get tenant from header first, then body
-    const tenantId = request.headers.get('x-tenant-id') || body.tenantId;
-
-    if (!tenantId) {
+    // Validate API key and get tenant ID
+    const auth = await validateApiKey(request);
+    if (!auth.success) {
       return NextResponse.json(
-        { error: 'Tenant ID is required' },
-        { status: 400 }
+        { error: auth.error },
+        { status: 401 }
       );
     }
+    const tenantId = auth.tenantId!;
+
+    const body = await request.json();
 
     // Validate required fields
     const requiredFields = ['sku', 'name', 'unitPrice'];

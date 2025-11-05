@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { Prisma } from '@prisma/client';
+import { validateApiKey } from '@/lib/auth';
 
 /**
  * GET /api/products/[id]
@@ -18,29 +19,17 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id: productId } = await params;
-
-    // Get tenant from query parameter or use first available tenant
-    // TODO: Replace with authenticated user's tenant when auth is implemented
-    const { searchParams } = new URL(request.url);
-    let tenantId = searchParams.get('tenantId');
-
-    if (!tenantId) {
-      // Find the first available tenant
-      const firstTenant = await prisma.tenant.findFirst({
-        where: { isActive: true },
-        select: { id: true, name: true, slug: true }
-      });
-
-      if (!firstTenant) {
-        return NextResponse.json(
-          { error: 'No active tenant found. Please contact administrator.' },
-          { status: 404 }
-        );
-      }
-
-      tenantId = firstTenant.id;
+    // Validate API key and get tenant ID
+    const auth = await validateApiKey(request);
+    if (!auth.success) {
+      return NextResponse.json(
+        { error: auth.error },
+        { status: 401 }
+      );
     }
+    const tenantId = auth.tenantId!;
+
+    const { id: productId } = await params;
 
     if (!productId) {
       return NextResponse.json(
@@ -225,27 +214,16 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Get tenant from query parameter or use first available tenant
-    // TODO: Replace with authenticated user's tenant when auth is implemented
-    const { searchParams } = new URL(request.url);
-    let tenantId = searchParams.get('tenantId');
-
-    if (!tenantId) {
-      // Find the first available tenant
-      const firstTenant = await prisma.tenant.findFirst({
-        where: { isActive: true },
-        select: { id: true, name: true, slug: true }
-      });
-
-      if (!firstTenant) {
-        return NextResponse.json(
-          { error: 'No active tenant found. Please contact administrator.' },
-          { status: 404 }
-        );
-      }
-
-      tenantId = firstTenant.id;
+    // Validate API key and get tenant ID
+    const auth = await validateApiKey(request);
+    if (!auth.success) {
+      return NextResponse.json(
+        { error: auth.error },
+        { status: 401 }
+      );
     }
+    const tenantId = auth.tenantId!;
+
     const { id: productId } = await params;
 
     if (!productId) {
@@ -444,27 +422,16 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Get tenant from query parameter or use first available tenant
-    // TODO: Replace with authenticated user's tenant when auth is implemented
-    const { searchParams } = new URL(request.url);
-    let tenantId = searchParams.get('tenantId');
-
-    if (!tenantId) {
-      // Find the first available tenant
-      const firstTenant = await prisma.tenant.findFirst({
-        where: { isActive: true },
-        select: { id: true, name: true, slug: true }
-      });
-
-      if (!firstTenant) {
-        return NextResponse.json(
-          { error: 'No active tenant found. Please contact administrator.' },
-          { status: 404 }
-        );
-      }
-
-      tenantId = firstTenant.id;
+    // Validate API key and get tenant ID
+    const auth = await validateApiKey(request);
+    if (!auth.success) {
+      return NextResponse.json(
+        { error: auth.error },
+        { status: 401 }
+      );
     }
+    const tenantId = auth.tenantId!;
+
     const { id: productId } = await params;
 
     if (!productId) {

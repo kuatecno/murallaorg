@@ -866,6 +866,9 @@ model Tenant {
   payrollRuns  PayrollRun[]
   ptoRequests  PTORequest[]
 
+  // API Keys
+  apiKeys ApiKey[]
+
   @@map("tenants")
 }
 
@@ -1145,4 +1148,27 @@ model PTORequest {
   @@index([tenantId, staffId])
   @@index([status])
   @@map("pto_requests")
+}
+
+// ==========================================
+// API AUTHENTICATION
+// ==========================================
+
+model ApiKey {
+  id          String   @id @default(cuid())
+  name        String   // Friendly name like "Mobile App", "Website", "External Integration"
+  key         String   @unique // The actual API key (hashed)
+  tenantId    String
+  isActive    Boolean  @default(true)
+  expiresAt   DateTime? // Optional expiration
+  lastUsedAt  DateTime?
+  createdById String?  // Staff who created it
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([key, isActive])
+  @@map("api_keys")
 }

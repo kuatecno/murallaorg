@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { validateApiKey } from '@/lib/auth';
 
 /**
  * GET /api/categories
@@ -13,15 +14,17 @@ import prisma from '@/lib/prisma';
  */
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const tenantId = request.headers.get('x-tenant-id') || searchParams.get('tenantId');
-
-    if (!tenantId) {
+    // Validate API key and get tenant ID
+    const auth = await validateApiKey(request);
+    if (!auth.success) {
       return NextResponse.json(
-        { error: 'Tenant ID is required' },
-        { status: 400 }
+        { error: auth.error },
+        { status: 401 }
       );
     }
+    const tenantId = auth.tenantId!;
+
+    const { searchParams } = new URL(request.url);
 
     const search = searchParams.get('search') || undefined;
     const includeInactive = searchParams.get('includeInactive') === 'true';
@@ -92,14 +95,15 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const tenantId = request.headers.get('x-tenant-id');
-
-    if (!tenantId) {
+    // Validate API key and get tenant ID
+    const auth = await validateApiKey(request);
+    if (!auth.success) {
       return NextResponse.json(
-        { error: 'Tenant ID is required' },
-        { status: 400 }
+        { error: auth.error },
+        { status: 401 }
       );
     }
+    const tenantId = auth.tenantId!;
 
     const body = await request.json();
     const { name, description, emoji, color } = body;

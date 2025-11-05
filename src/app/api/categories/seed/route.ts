@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { validateApiKey } from '@/lib/auth';
 
 const PREDEFINED_CATEGORIES = [
   // Barra - Café
@@ -35,14 +36,15 @@ const PREDEFINED_CATEGORIES = [
  */
 export async function POST(request: NextRequest) {
   try {
-    const tenantId = request.headers.get('x-tenant-id');
-
-    if (!tenantId) {
+    // Validate API key and get tenant ID
+    const auth = await validateApiKey(request);
+    if (!auth.success) {
       return NextResponse.json(
-        { error: 'Tenant ID is required' },
-        { status: 400 }
+        { error: auth.error },
+        { status: 401 }
       );
     }
+    const tenantId = auth.tenantId!;
 
     // Check if categories already exist
     const existingCount = await prisma.category.count({

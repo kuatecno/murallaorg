@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { validateApiKey } from '@/lib/auth';
 
 interface RouteParams {
   params: {
@@ -20,15 +21,17 @@ interface RouteParams {
  */
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
-    const { id } = params;
-    const tenantId = request.headers.get('x-tenant-id');
-
-    if (!tenantId) {
+    // Validate API key and get tenant ID
+    const auth = await validateApiKey(request);
+    if (!auth.success) {
       return NextResponse.json(
-        { error: 'Tenant ID is required' },
-        { status: 400 }
+        { error: auth.error },
+        { status: 401 }
       );
     }
+    const tenantId = auth.tenantId!;
+
+    const { id } = params;
 
     const category = await prisma.category.findFirst({
       where: {
@@ -76,15 +79,17 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
  */
 export async function PUT(request: NextRequest, { params }: RouteParams) {
   try {
-    const { id } = params;
-    const tenantId = request.headers.get('x-tenant-id');
-
-    if (!tenantId) {
+    // Validate API key and get tenant ID
+    const auth = await validateApiKey(request);
+    if (!auth.success) {
       return NextResponse.json(
-        { error: 'Tenant ID is required' },
-        { status: 400 }
+        { error: auth.error },
+        { status: 401 }
       );
     }
+    const tenantId = auth.tenantId!;
+
+    const { id } = params;
 
     const body = await request.json();
     const { name, description, emoji, color, isActive } = body;
@@ -177,15 +182,17 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
  */
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
-    const { id } = params;
-    const tenantId = request.headers.get('x-tenant-id');
-
-    if (!tenantId) {
+    // Validate API key and get tenant ID
+    const auth = await validateApiKey(request);
+    if (!auth.success) {
       return NextResponse.json(
-        { error: 'Tenant ID is required' },
-        { status: 400 }
+        { error: auth.error },
+        { status: 401 }
       );
     }
+    const tenantId = auth.tenantId!;
+
+    const { id } = params;
 
     // Find category
     const category = await prisma.category.findFirst({

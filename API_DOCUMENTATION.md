@@ -1,11 +1,12 @@
-# Muralla 5.0 Invoice API Documentation
+# Muralla 5.0 API Documentation
 
 ## Overview
 
-The Muralla 5.0 invoicing system provides a comprehensive API for managing Chilean tax documents including FACTURA, BOLETA, NOTA_CREDITO, NOTA_DEBITO, and GUIA_DESPACHO. The system is designed to comply with Chilean SII (Servicio de Impuestos Internos) requirements.
+The Muralla 5.0 system provides a comprehensive REST API for managing products, inventory, customers, suppliers, invoicing, and point-of-sale operations for Chilean businesses. The system is designed to comply with Chilean SII (Servicio de Impuestos Internos) requirements.
 
-✅ **GitHub Auto-Deployment:** Enabled and configured for `main` branch.
-🔧 **Root Directory:** Fixed to "Muralla 5.0" to match repository structure.
+✅ **GitHub Auto-Deployment:** Enabled and configured for `main` branch
+🔧 **Multi-tenant:** Tenant isolation via API key authentication
+🔐 **Secure:** API key authentication required for all endpoints
 
 ## Base URL
 
@@ -13,7 +14,400 @@ The Muralla 5.0 invoicing system provides a comprehensive API for managing Chile
 
 ## Authentication
 
-*Note: Authentication is not yet implemented. Currently using tenant-based access.*
+**⚠️ All API endpoints require authentication via API key.**
+
+For detailed authentication setup and configuration, see [AUTHENTICATION_SETUP.md](./AUTHENTICATION_SETUP.md).
+
+### Quick Start
+
+Include your API key in the `Authorization` header:
+
+```http
+Authorization: Bearer muralla_live_YOUR_API_KEY_HERE
+```
+
+**API Key Format:**
+- Production: `muralla_live_xxxxx`
+- Test: `muralla_test_xxxxx`
+
+**Getting Started:**
+1. Generate an API key: `npx tsx scripts/generate-api-key.ts`
+2. Configure in your application (localStorage or environment variable)
+3. Include in all API requests
+
+### Authentication Errors
+
+```json
+{
+  "error": "Unauthorized: Invalid or missing API key"
+}
+```
+
+**Status Code:** `401 Unauthorized`
+
+---
+
+## API Overview
+
+### Available Endpoints
+
+| Endpoint | Methods | Description |
+|----------|---------|-------------|
+| `/api/products` | GET, POST | Product management |
+| `/api/products/[id]` | GET, PUT, DELETE | Single product operations |
+| `/api/products/[id]/variants` | GET, POST | Product variants |
+| `/api/products/[id]/modifier-groups` | GET, POST | Modifier groups |
+| `/api/variants/[id]` | PUT, DELETE | Variant operations |
+| `/api/modifier-groups/[id]` | PUT, DELETE | Modifier group operations |
+| `/api/modifier-groups/[id]/modifiers` | POST | Add modifiers to group |
+| `/api/modifiers/[id]` | PUT, DELETE | Modifier operations |
+| `/api/categories` | GET, POST | Category management |
+| `/api/categories/[id]` | PUT, DELETE | Single category operations |
+| `/api/upload` | POST, DELETE | Image upload/delete |
+| `/api/invoices` | GET, POST | Invoice management |
+| `/api/invoices/[id]` | GET, PUT, DELETE | Single invoice operations |
+| `/api/invoices/[id]/approve` | POST | Approve draft invoice |
+| `/api/invoices/[id]/pdf` | GET | Generate invoice PDF |
+
+---
+
+## Products API
+
+Manage products, variants, modifiers, and modifier groups.
+
+### List Products
+
+**GET** `/api/products`
+
+Retrieve all products for the authenticated tenant.
+
+#### Response
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "clxxx...",
+      "sku": "PROD-001",
+      "name": "Lemonade",
+      "description": "Fresh lemonade",
+      "type": "MADE_TO_ORDER",
+      "category": "Beverages",
+      "brand": "House Brand",
+      "unitPrice": 5000,
+      "costPrice": 2000,
+      "cafePrice": 5000,
+      "rappiPrice": 5500,
+      "minStock": 0,
+      "maxStock": null,
+      "unit": "UNIT",
+      "images": ["https://..."],
+      "isActive": true,
+      "variants": [...],
+      "modifierGroups": [...]
+    }
+  ]
+}
+```
+
+### Create Product
+
+**POST** `/api/products`
+
+Create a new product.
+
+#### Request Body
+
+```json
+{
+  "sku": "PROD-001",
+  "name": "Lemonade",
+  "description": "Fresh lemonade",
+  "type": "MADE_TO_ORDER",
+  "category": "Beverages",
+  "brand": "House Brand",
+  "unitPrice": 5000,
+  "costPrice": 2000,
+  "cafePrice": 5000,
+  "rappiPrice": 5500,
+  "pedidosyaPrice": 5500,
+  "uberPrice": 5500,
+  "minStock": 0,
+  "maxStock": 100,
+  "unit": "UNIT",
+  "images": ["https://..."]
+}
+```
+
+**Required Fields:**
+- `sku` (string): Unique product identifier
+- `name` (string): Product name
+- `type` (string): Product type (INPUT, READY_PRODUCT, MANUFACTURED, MADE_TO_ORDER, SERVICE)
+
+### Get Single Product
+
+**GET** `/api/products/[id]`
+
+Get detailed product information including variants and modifier groups.
+
+### Update Product
+
+**PUT** `/api/products/[id]`
+
+Update product information.
+
+### Delete Product
+
+**DELETE** `/api/products/[id]`
+
+Soft delete a product (sets `isActive` to false).
+
+---
+
+## Product Variants API
+
+Manage product variations (sizes, flavors, etc.).
+
+### List Product Variants
+
+**GET** `/api/products/[productId]/variants`
+
+Get all variants for a specific product.
+
+### Create Product Variant
+
+**POST** `/api/products/[productId]/variants`
+
+Create a new variant for a product.
+
+#### Request Body
+
+```json
+{
+  "name": "Small",
+  "displayName": "Small Size",
+  "useCustomName": false,
+  "description": "12oz size",
+  "priceAdjustment": -500,
+  "costPrice": 1500,
+  "cafePrice": 4500,
+  "rappiPrice": 5000,
+  "pedidosyaPrice": 5000,
+  "uberPrice": 5000,
+  "minStock": 10,
+  "maxStock": 100,
+  "images": ["https://..."],
+  "sortOrder": 0,
+  "isDefault": false
+}
+```
+
+**Required Fields:**
+- `name` (string): Variant name (e.g., "Small", "Strawberry")
+
+**Variant Naming:**
+- Default: `{productName} {variantName}` (e.g., "Lemonade Small")
+- Custom: Set `useCustomName: true` and provide `displayName`
+
+### Update Variant
+
+**PUT** `/api/variants/[variantId]`
+
+Update variant details.
+
+### Delete Variant
+
+**DELETE** `/api/variants/[variantId]`
+
+Delete a product variant.
+
+---
+
+## Modifier Groups API
+
+Manage groups of modifiers (e.g., "Milk Options", "Size Options").
+
+### List Modifier Groups
+
+**GET** `/api/products/[productId]/modifier-groups`
+
+Get all modifier groups for a product.
+
+### Create Modifier Group
+
+**POST** `/api/products/[productId]/modifier-groups`
+
+Create a new modifier group.
+
+#### Request Body
+
+```json
+{
+  "name": "Milk Options",
+  "isRequired": false,
+  "allowMultiple": false,
+  "sortOrder": 0
+}
+```
+
+### Update Modifier Group
+
+**PUT** `/api/modifier-groups/[groupId]`
+
+Update modifier group details.
+
+### Delete Modifier Group
+
+**DELETE** `/api/modifier-groups/[groupId]`
+
+Delete a modifier group and all its modifiers.
+
+---
+
+## Modifiers API
+
+Manage individual modifiers within groups.
+
+### Create Modifier
+
+**POST** `/api/modifier-groups/[groupId]/modifiers`
+
+Add a modifier to a group.
+
+#### Request Body
+
+```json
+{
+  "name": "Oat Milk",
+  "type": "ADD",
+  "priceAdjustment": 500,
+  "cafePriceAdjustment": 500,
+  "rappiPriceAdjustment": 600,
+  "pedidosyaPriceAdjustment": 600,
+  "uberPriceAdjustment": 600,
+  "sortOrder": 0
+}
+```
+
+**Modifier Types:**
+- `ADD`: Add-on (e.g., "Extra shot")
+- `REMOVE`: Removal (e.g., "No ice")
+
+**Channel-Specific Pricing:**
+- Base `priceAdjustment` applies to all channels by default
+- Optional channel-specific adjustments override base price for that channel
+
+### Update Modifier
+
+**PUT** `/api/modifiers/[modifierId]`
+
+Update modifier details.
+
+### Delete Modifier
+
+**DELETE** `/api/modifiers/[modifierId]`
+
+Delete a modifier.
+
+---
+
+## Categories API
+
+Manage product categories.
+
+### List Categories
+
+**GET** `/api/categories`
+
+Get all categories for the authenticated tenant.
+
+#### Response
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "clxxx...",
+      "name": "Beverages",
+      "description": "Hot and cold drinks",
+      "emoji": "🥤",
+      "color": "#3B82F6",
+      "sortOrder": 0,
+      "isActive": true,
+      "productCount": 15
+    }
+  ]
+}
+```
+
+### Create Category
+
+**POST** `/api/categories`
+
+Create a new category.
+
+#### Request Body
+
+```json
+{
+  "name": "Beverages",
+  "description": "Hot and cold drinks",
+  "emoji": "🥤",
+  "color": "#3B82F6",
+  "sortOrder": 0
+}
+```
+
+### Update Category
+
+**PUT** `/api/categories/[id]`
+
+Update category details.
+
+### Delete Category
+
+**DELETE** `/api/categories/[id]`
+
+Soft delete a category.
+
+---
+
+## Upload API
+
+Upload images to Cloudinary storage.
+
+### Upload Image
+
+**POST** `/api/upload`
+
+Upload an image file.
+
+#### Request
+
+- **Content-Type:** `multipart/form-data`
+- **Body:** FormData with `file` field
+
+#### Response
+
+```json
+{
+  "success": true,
+  "url": "https://res.cloudinary.com/...",
+  "public_id": "muralla/products/xxx",
+  "width": 1920,
+  "height": 1080
+}
+```
+
+### Delete Image
+
+**DELETE** `/api/upload?publicId={publicId}`
+
+Delete an image from Cloudinary.
+
+---
 
 ## Invoice Endpoints
 
@@ -428,15 +822,24 @@ curl -X POST https://muralla-5-0.vercel.app/api/invoices \
 curl https://muralla-5-0.vercel.app/api/invoices
 ```
 
+## Recent Updates
+
+- ✅ **Authentication Implemented**: API key-based authentication for all endpoints
+- ✅ **Products Management**: Full CRUD with variants, modifiers, and modifier groups
+- ✅ **Categories Management**: Product categorization system
+- ✅ **Image Upload**: Cloudinary integration for product images
+- ✅ **Channel-Specific Pricing**: Support for Café, Rappi, PedidosYa, Uber Eats
+
 ## Future Enhancements
 
-1. **Authentication & Authorization**: JWT-based authentication
-2. **OpenFactura Integration**: Automatic SII submission
-3. **PDF Generation**: Proper PDF library integration
-4. **Email Delivery**: Automated invoice sending
-5. **Payment Integration**: Mercado Pago webhook handling
-6. **Recurring Invoices**: Subscription management
-7. **Advanced Reporting**: Financial analytics
+1. **OpenFactura Integration**: Automatic SII submission for tax documents
+2. **PDF Generation**: Enhanced PDF library for invoices and reports
+3. **Email Delivery**: Automated invoice and report sending
+4. **Payment Integration**: Mercado Pago webhook handling
+5. **Recurring Invoices**: Subscription management
+6. **Advanced Reporting**: Financial analytics and dashboards
+7. **Inventory Tracking**: Stock movements and alerts
+8. **Multi-location Support**: Manage multiple store locations
 
 ## Support
 

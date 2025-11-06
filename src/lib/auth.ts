@@ -1,19 +1,26 @@
 /**
- * Simple API Key Authentication
+ * Unified Authentication System
+ *
+ * Supports two authentication methods:
+ * 1. JWT Cookie (for logged-in web users)
+ * 2. API Key (for external/programmatic access)
  *
  * Usage:
- * - External clients send: Authorization: Bearer YOUR_API_KEY
- * - Server validates key and returns tenantId
+ * - Web users: Automatic via httpOnly cookie after login
+ * - External clients: Authorization: Bearer YOUR_API_KEY
  */
 
 import { NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
 import crypto from 'crypto';
+import { getAuthenticatedUser, type JWTPayload } from './jwt';
 
 export interface AuthResult {
   success: boolean;
   tenantId?: string;
+  userId?: string;
   error?: string;
+  method?: 'jwt' | 'api_key';
 }
 
 /**
@@ -117,4 +124,69 @@ export async function requireApiKey(request: NextRequest): Promise<{ tenantId: s
   }
 
   return { tenantId: auth.tenantId! };
+}
+
+/**
+ * Unified Authentication
+ * Tries JWT cookie first (for web users), falls back to API key (for external clients)
+ */
+export async function authenticate(request: NextRequest): Promise<AuthResult> {
+  // Try JWT authentication first (for logged-in web users)
+  try {
+    const jwtPayload = await getAuthenticatedUser();
+
+    if (jwtPayload) {
+      return {
+        success: true,
+        tenantId: jwtPayload.tenantId,
+        userId: jwtPayload.userId,
+        method: 'jwt',
+      };
+    }
+  } catch (error) {
+    console.error('JWT authentication error:', error);
+    // Fall through to API key check
+  }
+
+  // Try API key authentication (for external clients)
+  const apiKeyResult = await validateApiKey(request);
+
+  if (apiKeyResult.success) {
+    return {
+      ...apiKeyResult,
+      method: 'api_key',
+    };
+  }
+
+  // Both methods failed
+  return {
+    success: false,
+    error: 'Unauthorized: Please log in or provide a valid API key',
+  };
+}
+
+/**
+ * Middleware helper - require authentication via JWT or API key
+ * Returns auth context or error response
+ */
+export async function requireAuth(
+  request: NextRequest
+): Promise<{ tenantId: string; userId?: string; method: 'jwt' | 'api_key' } | Response> {
+  const auth = await authenticate(request);
+
+  if (!auth.success) {
+    return new Response(
+      JSON.stringify({ error: auth.error }),
+      {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' }
+      }
+    );
+  }
+
+  return {
+    tenantId: auth.tenantId!,
+    userId: auth.userId,
+    method: auth.method!,
+  };
 }

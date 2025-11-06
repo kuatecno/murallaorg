@@ -8,7 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { productService } from './product.service';
 import { Prisma } from '@prisma/client';
 import prisma from '@/lib/prisma';
-import { validateApiKey } from '@/lib/auth';
+import { requireAuth } from '@/lib/auth';
 import { getCorsHeaders, corsResponse, corsError } from '@/lib/cors';
 
 interface ProductParams {
@@ -39,14 +39,14 @@ export async function OPTIONS(request: NextRequest) {
  */
 export async function GET(request: NextRequest) {
   const origin = request.headers.get('origin');
-  
+
   try {
-    // Validate API key and get tenant ID
-    const auth = await validateApiKey(request);
-    if (!auth.success) {
-      return corsError(auth.error || 'Unauthorized', 401, origin);
+    // Authenticate user (JWT cookie or API key)
+    const authResult = await requireAuth(request);
+    if (authResult instanceof Response) {
+      return authResult; // Return 401 error
     }
-    const tenantId = auth.tenantId!;
+    const { tenantId } = authResult;
 
     const { searchParams } = new URL(request.url);
 
@@ -224,14 +224,14 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   const origin = request.headers.get('origin');
-  
+
   try {
-    // Validate API key and get tenant ID
-    const auth = await validateApiKey(request);
-    if (!auth.success) {
-      return corsError(auth.error || 'Unauthorized', 401, origin);
+    // Authenticate user (JWT cookie or API key)
+    const authResult = await requireAuth(request);
+    if (authResult instanceof Response) {
+      return authResult; // Return 401 error
     }
-    const tenantId = auth.tenantId!;
+    const { tenantId } = authResult;
 
     const body = await request.json();
 

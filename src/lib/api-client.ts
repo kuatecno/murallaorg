@@ -86,10 +86,11 @@ class ApiClient {
       ...options,
       method: 'GET',
       headers: this.buildHeaders(options.headers),
+      credentials: 'include', // Include cookies for JWT authentication
     });
 
     if (!response.ok && response.status === 401) {
-      console.error('Authentication failed. Please check your API key.');
+      console.error('Authentication failed. Please log in.');
       // Optionally redirect to login or show auth modal
       if (typeof window !== 'undefined') {
         // You can emit a custom event for the app to handle
@@ -109,10 +110,11 @@ class ApiClient {
       method: 'POST',
       headers: this.buildHeaders(options.headers),
       body: data ? JSON.stringify(data) : undefined,
+      credentials: 'include', // Include cookies for JWT authentication
     });
 
     if (!response.ok && response.status === 401) {
-      console.error('Authentication failed. Please check your API key.');
+      console.error('Authentication failed. Please log in.');
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('api-auth-error'));
       }
@@ -130,10 +132,11 @@ class ApiClient {
       method: 'PUT',
       headers: this.buildHeaders(options.headers),
       body: data ? JSON.stringify(data) : undefined,
+      credentials: 'include', // Include cookies for JWT authentication
     });
 
     if (!response.ok && response.status === 401) {
-      console.error('Authentication failed. Please check your API key.');
+      console.error('Authentication failed. Please log in.');
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('api-auth-error'));
       }
@@ -150,10 +153,11 @@ class ApiClient {
       ...options,
       method: 'DELETE',
       headers: this.buildHeaders(options.headers),
+      credentials: 'include', // Include cookies for JWT authentication
     });
 
     if (!response.ok && response.status === 401) {
-      console.error('Authentication failed. Please check your API key.');
+      console.error('Authentication failed. Please log in.');
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('api-auth-error'));
       }

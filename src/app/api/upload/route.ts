@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { v2 as cloudinary } from 'cloudinary';
+import { validateApiKey } from '@/lib/auth';
 
 // Configure Cloudinary
 cloudinary.config({
@@ -19,6 +20,12 @@ cloudinary.config({
  */
 export async function POST(request: NextRequest) {
   try {
+    // Validate API key
+    const auth = await validateApiKey(request);
+    if (!auth.success) {
+      return NextResponse.json({ error: auth.error }, { status: 401 });
+    }
+
     const formData = await request.formData();
     const file = formData.get('file') as File;
 
@@ -63,6 +70,12 @@ export async function POST(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
+    // Validate API key
+    const auth = await validateApiKey(request);
+    if (!auth.success) {
+      return NextResponse.json({ error: auth.error }, { status: 401 });
+    }
+
     const { searchParams } = new URL(request.url);
     const publicId = searchParams.get('publicId');
 

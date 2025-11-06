@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
+import apiClient from '@/lib/api-client';
 
 interface ImageUploaderProps {
   images: string[];
@@ -34,12 +35,23 @@ export default function ImageUploader({
         const formData = new FormData();
         formData.append('file', file);
 
+        // Get API key for authentication
+        const apiKey = apiClient.getApiKey();
+        const headers: HeadersInit = {};
+        if (apiKey) {
+          headers['Authorization'] = `Bearer ${apiKey}`;
+        }
+
         const response = await fetch('/api/upload', {
           method: 'POST',
+          headers,
           body: formData,
         });
 
         if (!response.ok) {
+          if (response.status === 401) {
+            throw new Error('Authentication failed. Please check your API key.');
+          }
           throw new Error('Upload failed');
         }
 
@@ -51,7 +63,7 @@ export default function ImageUploader({
       onImagesChange([...images, ...uploadedUrls]);
     } catch (error) {
       console.error('Upload error:', error);
-      alert('Failed to upload images');
+      alert(error instanceof Error ? error.message : 'Failed to upload images');
     } finally {
       setUploading(false);
     }

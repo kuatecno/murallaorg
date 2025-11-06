@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import ProductEnrichmentModal from './ProductEnrichmentModal';
 import ImageUploader from '../shared/ImageUploader';
 import ChannelPricingModal from '../shared/ChannelPricingModal';
+import apiClient from '@/lib/api-client';
 
 interface CreateProductModalProps {
   isOpen: boolean;
@@ -126,15 +127,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess }: Creat
 
   const fetchCategories = async () => {
     try {
-      const userData = localStorage.getItem('user');
-      if (!userData) return;
-
-      const user = JSON.parse(userData);
-      const response = await fetch('/api/categories', {
-        headers: {
-          'x-tenant-id': user.tenantId,
-        },
-      });
+      const response = await apiClient.get('/api/categories');
 
       if (response.ok) {
         const result = await response.json();
@@ -210,15 +203,6 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess }: Creat
     setError('');
 
     try {
-      const userData = localStorage.getItem('user');
-      if (!userData) {
-        setError('User not authenticated');
-        setLoading(false);
-        return;
-      }
-
-      const user = JSON.parse(userData);
-
       // Prepare data for API
       const productData = {
         sku: formData.sku,
@@ -238,17 +222,9 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess }: Creat
         rappiPrice: formData.rappiPrice ? parseFloat(formData.rappiPrice) : undefined,
         pedidosyaPrice: formData.pedidosyaPrice ? parseFloat(formData.pedidosyaPrice) : undefined,
         uberPrice: formData.uberPrice ? parseFloat(formData.uberPrice) : undefined,
-        tenantId: user.tenantId,
       };
 
-      const response = await fetch('/api/products', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-tenant-id': user.tenantId,
-        },
-        body: JSON.stringify(productData),
-      });
+      const response = await apiClient.post('/api/products', productData);
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -261,28 +237,26 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess }: Creat
       // Create variants if any
       if (variants.length > 0) {
         for (const variant of variants) {
-          await fetch(`/api/products/${productId}/variants`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-tenant-id': user.tenantId,
-            },
-            body: JSON.stringify(variant),
-          });
+          const variantResponse = await apiClient.post(
+            `/api/products/${productId}/variants`,
+            variant
+          );
+          if (!variantResponse.ok) {
+            console.error('Failed to create variant:', variant.name);
+          }
         }
       }
 
       // Create modifier groups and modifiers if any
       if (modifierGroups.length > 0) {
         for (const group of modifierGroups) {
-          await fetch(`/api/products/${productId}/modifier-groups`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-tenant-id': user.tenantId,
-            },
-            body: JSON.stringify(group),
-          });
+          const groupResponse = await apiClient.post(
+            `/api/products/${productId}/modifier-groups`,
+            group
+          );
+          if (!groupResponse.ok) {
+            console.error('Failed to create modifier group:', group.name);
+          }
         }
       }
 

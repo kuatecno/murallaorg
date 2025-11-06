@@ -44,16 +44,25 @@ export async function POST(request: NextRequest) {
       role: user.role,
     });
 
-    // Set httpOnly cookie
-    await setAuthCookie(token);
-
     // Return user without password
     const { password: _, ...userWithoutPassword } = user;
 
-    return NextResponse.json({
+    // Create response with user data
+    const response = NextResponse.json({
       message: 'Login successful',
       user: userWithoutPassword,
     });
+
+    // Set httpOnly cookie on the response
+    response.cookies.set('auth-token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 7, // 7 days
+      path: '/',
+    });
+
+    return response;
 
   } catch (error) {
     console.error('Login error:', error);

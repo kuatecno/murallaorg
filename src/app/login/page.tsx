@@ -4,14 +4,17 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
+import apiClient from '@/lib/api-client';
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('admin@muralla.com');
-  const [password, setPassword] = useState('Muralla2025');
+  const [email, setEmail] = useState('admin@demo.com');
+  const [password, setPassword] = useState('Demo1234');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const [errors, setErrors] = useState<{ email?: string; password?: string; form?: string }>({});
   const router = useRouter();
+  const { login } = useAuth();
 
   const validateForm = () => {
     const newErrors: { email?: string; password?: string } = {};
@@ -39,23 +42,18 @@ export default function LoginPage() {
     setErrors({});
 
     try {
-      // Simple authentication for now
-      if (email === 'admin@muralla.com' && password === 'Muralla2025') {
-        localStorage.setItem('user', JSON.stringify({
-          id: '1',
-          email: email,
-          firstName: 'Admin',
-          lastName: 'User',
-          role: 'ADMIN',
-          tenantId: 'cmh15af4x0000suqejgnkl860' // Muralla Café tenant
-        }));
+      const response = await apiClient.post('/api/auth/login', { email, password });
+
+      if (response.ok) {
+        const data = await response.json();
+        login(data.user);
         router.push('/dashboard');
       } else {
-        throw new Error('Invalid credentials');
+        const errorData = await response.json();
+        setErrors({ form: errorData.error || 'Login failed' });
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Login failed';
-      setErrors({ email: message, password: message });
+      setErrors({ form: 'An unexpected error occurred. Please try again.' });
     } finally {
       setIsLoading(false);
     }
@@ -95,6 +93,9 @@ export default function LoginPage() {
                 />
                 {errors.email && (
                   <p className="mt-1 text-sm text-red-600">{errors.email}</p>
+                )}
+                {errors.form && (
+                  <p className="mt-4 text-sm text-red-600 text-center bg-red-50 p-2 rounded-lg">{errors.form}</p>
                 )}
               </div>
 
@@ -185,8 +186,8 @@ export default function LoginPage() {
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
           <p className="text-sm text-blue-800 text-center">
             <strong>Demo Account:</strong><br />
-            Email: admin@muralla.com<br />
-            Password: Muralla2025
+            Email: admin@demo.com<br />
+            Password: Demo1234
           </p>
         </div>
       </div>

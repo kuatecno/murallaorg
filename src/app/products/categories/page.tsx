@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/context/AuthContext';
 import Link from 'next/link';
 import ProductNavigation from '@/components/products/ProductNavigation';
+import apiClient from '@/lib/api-client';
 
 interface Category {
   id: string;
@@ -32,7 +34,6 @@ const DEFAULT_COLORS = [
 
 export default function CategoriesPage() {
   const [categories, setCategories] = useState<Category[]>([]);
-  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [showActiveOnly, setShowActiveOnly] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -45,42 +46,34 @@ export default function CategoriesPage() {
   });
   const [actionLoading, setActionLoading] = useState(false);
   const router = useRouter();
+  const { user, isLoading: isAuthLoading } = useAuth();
 
   useEffect(() => {
-    const userData = localStorage.getItem('user');
-    if (!userData) {
-      router.push('/login');
-      return;
+    if (!isAuthLoading) {
+      if (!user) {
+        router.push('/login');
+      } else {
+        loadCategories();
+      }
     }
-    loadCategories();
-  }, [router]);
+  }, [user, isAuthLoading, router]);
 
   const loadCategories = async () => {
     try {
-      const userData = localStorage.getItem('user');
-      if (!userData) return;
-
-      const user = JSON.parse(userData);
 
       // Fetch categories from API
-      const response = await fetch('/api/categories', {
-        headers: {
-          'x-tenant-id': user.tenantId,
-        },
-      });
+      const response = await apiClient.get('/api/categories');
 
       if (response.ok) {
         const data = await response.json();
         setCategories(data.data || []);
+      } else if (response.status === 401) {
+        console.error('Authentication failed. Please configure your API key.');
+        router.push('/settings/api-keys');
       } else {
         console.error('Failed to load categories');
         // If no categories exist, seed them
-        const seedResponse = await fetch('/api/categories/seed', {
-          method: 'POST',
-          headers: {
-            'x-tenant-id': user.tenantId,
-          },
-        });
+        const seedResponse = await apiClient.post('/api/categories/seed');
 
         if (seedResponse.ok) {
           // Reload categories after seeding
@@ -89,8 +82,6 @@ export default function CategoriesPage() {
       }
     } catch (error) {
       console.error('Error loading categories:', error);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -134,25 +125,14 @@ export default function CategoriesPage() {
 
     setActionLoading(true);
     try {
-      const userData = localStorage.getItem('user');
-      if (!userData) return;
-
-      const user = JSON.parse(userData);
 
       if (editingCategory) {
         // Update category via API
-        const response = await fetch(`/api/categories/${editingCategory.id}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-tenant-id': user.tenantId,
-          },
-          body: JSON.stringify({
-            name: formData.name,
-            description: formData.description,
-            emoji: formData.emoji,
-            color: formData.color,
-          }),
+        const response = await apiClient.put(`/api/categories/${editingCategory.id}`, {
+          name: formData.name,
+          description: formData.description,
+          emoji: formData.emoji,
+          color: formData.color,
         });
 
         if (!response.ok) {
@@ -161,18 +141,11 @@ export default function CategoriesPage() {
         }
       } else {
         // Create new category via API
-        const response = await fetch('/api/categories', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-tenant-id': user.tenantId,
-          },
-          body: JSON.stringify({
-            name: formData.name,
-            description: formData.description,
-            emoji: formData.emoji,
-            color: formData.color,
-          }),
+        const response = await apiClient.post('/api/categories', {
+          name: formData.name,
+          description: formData.description,
+          emoji: formData.emoji,
+          color: formData.color,
         });
 
         if (!response.ok) {
@@ -197,18 +170,9 @@ export default function CategoriesPage() {
 
     setActionLoading(true);
     try {
-      const userData = localStorage.getItem('user');
-      if (!userData) return;
-
-      const user = JSON.parse(userData);
 
       // Delete category via API (automatically removes from products)
-      const response = await fetch(`/api/categories/${category.id}`, {
-        method: 'DELETE',
-        headers: {
-          'x-tenant-id': user.tenantId,
-        },
-      });
+      const response = await apiClient.delete(`/api/categories/${category.id}`);
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -232,7 +196,7 @@ export default function CategoriesPage() {
     return matchesSearch && matchesActive;
   });
 
-  if (loading) {
+  if (isAuthLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>

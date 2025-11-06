@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/context/AuthContext';
 import Link from 'next/link';
 import CreateProductModal from '@/components/products/CreateProductModal';
 import ProductNavigation from '@/components/products/ProductNavigation';
 import ProductEnrichmentModal from '@/components/products/ProductEnrichmentModal';
+import apiClient from '@/lib/api-client';
 
 interface Product {
   id: string;
@@ -37,7 +39,6 @@ type FilterType = 'ALL' | 'INPUT' | 'READY_PRODUCT' | 'MANUFACTURED' | 'MADE_TO_
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [filterType, setFilterType] = useState<FilterType>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
@@ -45,27 +46,22 @@ export default function ProductsPage() {
   const [isEnrichModalOpen, setIsEnrichModalOpen] = useState(false);
   const [selectedProductForEnrich, setSelectedProductForEnrich] = useState<Product | null>(null);
   const router = useRouter();
+  const { user, isLoading: isAuthLoading } = useAuth();
 
   useEffect(() => {
-    const userData = localStorage.getItem('user');
-    if (!userData) {
-      router.push('/login');
-      return;
+    if (!isAuthLoading) {
+      if (!user) {
+        router.push('/login');
+      } else {
+        loadProducts();
+      }
     }
-    loadProducts();
-  }, [router]);
+  }, [user, isAuthLoading, router]);
 
   const loadProducts = async () => {
     try {
-      const userData = localStorage.getItem('user');
-      if (!userData) return;
 
-      const user = JSON.parse(userData);
-      const response = await fetch('/api/products', {
-        headers: {
-          'x-tenant-id': user.tenantId,
-        },
-      });
+      const response = await apiClient.get('/api/products');
 
       if (response.ok) {
         const data = await response.json();
@@ -77,11 +73,12 @@ export default function ProductsPage() {
           console.error('Invalid products data format:', data);
           setProducts([]);
         }
+      } else if (response.status === 401) {
+        console.error('Authentication failed. Please configure your API key.');
+        // You might want to show a modal or redirect to settings
       }
     } catch (error) {
       console.error('Error loading products:', error);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -125,20 +122,9 @@ export default function ProductsPage() {
     if (!selectedProductForEnrich) return;
 
     try {
-      const userData = localStorage.getItem('user');
-      if (!userData) return;
-
-      const user = JSON.parse(userData);
 
       // Update product with approved data
-      const response = await fetch(`/api/products/${selectedProductForEnrich.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-tenant-id': user.tenantId,
-        },
-        body: JSON.stringify(approvedData),
-      });
+      const response = await apiClient.put(`/api/products/${selectedProductForEnrich.id}`, approvedData);
 
       if (response.ok) {
         // Reload products to show updated data
@@ -154,7 +140,7 @@ export default function ProductsPage() {
     }
   };
 
-  if (loading) {
+  if (isAuthLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>

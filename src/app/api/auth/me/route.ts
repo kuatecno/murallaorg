@@ -4,17 +4,27 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getAuthenticatedUser } from '@/lib/jwt';
+import { verifyToken } from '@/lib/jwt';
 import prisma from '@/lib/prisma';
 
 export async function GET(request: NextRequest) {
   try {
-    // Get authenticated user from JWT cookie
-    const jwtPayload = await getAuthenticatedUser();
+    // Get token from cookie
+    const token = request.cookies.get('auth-token')?.value;
+
+    if (!token) {
+      return NextResponse.json(
+        { error: 'Not authenticated' },
+        { status: 401 }
+      );
+    }
+
+    // Verify and decode token
+    const jwtPayload = verifyToken(token);
 
     if (!jwtPayload) {
       return NextResponse.json(
-        { error: 'Not authenticated' },
+        { error: 'Invalid or expired token' },
         { status: 401 }
       );
     }

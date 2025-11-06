@@ -13,7 +13,7 @@
 import { NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
 import crypto from 'crypto';
-import { getAuthenticatedUser, type JWTPayload } from './jwt';
+import { verifyToken, type JWTPayload } from './jwt';
 
 export interface AuthResult {
   success: boolean;
@@ -133,15 +133,19 @@ export async function requireApiKey(request: NextRequest): Promise<{ tenantId: s
 export async function authenticate(request: NextRequest): Promise<AuthResult> {
   // Try JWT authentication first (for logged-in web users)
   try {
-    const jwtPayload = await getAuthenticatedUser();
-
-    if (jwtPayload) {
-      return {
-        success: true,
-        tenantId: jwtPayload.tenantId,
-        userId: jwtPayload.userId,
-        method: 'jwt',
-      };
+    const token = request.cookies.get('auth-token')?.value;
+    
+    if (token) {
+      const jwtPayload = verifyToken(token);
+      
+      if (jwtPayload) {
+        return {
+          success: true,
+          tenantId: jwtPayload.tenantId,
+          userId: jwtPayload.userId,
+          method: 'jwt',
+        };
+      }
     }
   } catch (error) {
     console.error('JWT authentication error:', error);

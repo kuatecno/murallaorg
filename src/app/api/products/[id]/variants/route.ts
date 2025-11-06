@@ -62,7 +62,24 @@ export async function POST(
     const { id: productId } = await params;
 
     const body = await request.json();
-    const { name, sku, priceAdjustment, sortOrder, isDefault } = body;
+    const {
+      name,
+      displayName,
+      useCustomName,
+      description,
+      sku,
+      priceAdjustment,
+      costPrice,
+      cafePrice,
+      rappiPrice,
+      pedidosyaPrice,
+      uberPrice,
+      minStock,
+      maxStock,
+      images,
+      sortOrder,
+      isDefault,
+    } = body;
 
     if (!name) {
       return NextResponse.json(
@@ -88,8 +105,19 @@ export async function POST(
       data: {
         productId,
         name,
+        displayName,
+        useCustomName: useCustomName || false,
+        description,
         sku,
         priceAdjustment: priceAdjustment || 0,
+        costPrice: costPrice ? parseFloat(costPrice) : undefined,
+        cafePrice: cafePrice ? parseFloat(cafePrice) : undefined,
+        rappiPrice: rappiPrice ? parseFloat(rappiPrice) : undefined,
+        pedidosyaPrice: pedidosyaPrice ? parseFloat(pedidosyaPrice) : undefined,
+        uberPrice: uberPrice ? parseFloat(uberPrice) : undefined,
+        minStock: minStock ? parseInt(minStock) : undefined,
+        maxStock: maxStock ? parseInt(maxStock) : undefined,
+        images: images || [],
         sortOrder: sortOrder || 0,
         isDefault: isDefault || false,
         tenantId,

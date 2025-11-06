@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import ProductEnrichmentModal from './ProductEnrichmentModal';
+import ImageUploader from '../shared/ImageUploader';
+import ChannelPricingModal from '../shared/ChannelPricingModal';
 
 interface CreateProductModalProps {
   isOpen: boolean;
@@ -45,7 +47,18 @@ interface Category {
 interface ProductVariant {
   id?: string;
   name: string;
+  displayName?: string;
+  useCustomName: boolean;
+  description?: string;
   priceAdjustment: number;
+  costPrice?: string;
+  cafePrice?: string;
+  rappiPrice?: string;
+  pedidosyaPrice?: string;
+  uberPrice?: string;
+  minStock?: string;
+  maxStock?: string;
+  images: string[];
   isDefault: boolean;
 }
 
@@ -54,6 +67,10 @@ interface ProductModifier {
   name: string;
   type: 'ADD' | 'REMOVE';
   priceAdjustment: number;
+  cafePriceAdjustment?: string;
+  rappiPriceAdjustment?: string;
+  pedidosyaPriceAdjustment?: string;
+  uberPriceAdjustment?: string;
 }
 
 interface ModifierGroup {
@@ -94,6 +111,11 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess }: Creat
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [isEnrichModalOpen, setIsEnrichModalOpen] = useState(false);
+  const [channelPricingModalOpen, setChannelPricingModalOpen] = useState(false);
+  const [currentVariantIndex, setCurrentVariantIndex] = useState<number | null>(null);
+  const [expandedVariants, setExpandedVariants] = useState<Set<number>>(new Set());
+  const [modifierChannelPricingModalOpen, setModifierChannelPricingModalOpen] = useState(false);
+  const [currentModifierIndices, setCurrentModifierIndices] = useState<{ groupIndex: number; modIndex: number } | null>(null);
 
   // Fetch categories when modal opens
   useEffect(() => {
@@ -304,7 +326,25 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess }: Creat
 
   // Variant management functions
   const addVariant = () => {
-    setVariants([...variants, { name: '', priceAdjustment: 0, isDefault: variants.length === 0 }]);
+    // Smart defaults: pre-populate with product values
+    const newVariant: ProductVariant = {
+      name: '',
+      useCustomName: false,
+      description: '',
+      priceAdjustment: 0,
+      costPrice: formData.costPrice || '',
+      cafePrice: formData.cafePrice || '',
+      rappiPrice: formData.rappiPrice || '',
+      pedidosyaPrice: formData.pedidosyaPrice || '',
+      uberPrice: formData.uberPrice || '',
+      minStock: formData.minStock || '',
+      maxStock: formData.maxStock || '',
+      images: [],
+      isDefault: variants.length === 0,
+    };
+    setVariants([...variants, newVariant]);
+    // Auto-expand the new variant
+    setExpandedVariants(new Set([...expandedVariants, variants.length]));
   };
 
   const updateVariant = (index: number, field: keyof ProductVariant, value: any) => {
@@ -359,6 +399,75 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess }: Creat
     const updated = [...modifierGroups];
     updated[groupIndex].modifiers = updated[groupIndex].modifiers.filter((_, i) => i !== modIndex);
     setModifierGroups(updated);
+  };
+
+  // Helper functions for variants
+  const toggleVariantExpansion = (index: number) => {
+    const newExpanded = new Set(expandedVariants);
+    if (newExpanded.has(index)) {
+      newExpanded.delete(index);
+    } else {
+      newExpanded.add(index);
+    }
+    setExpandedVariants(newExpanded);
+  };
+
+  const openChannelPricingModal = (index: number) => {
+    setCurrentVariantIndex(index);
+    setChannelPricingModalOpen(true);
+  };
+
+  const handleChannelPricingSave = (prices: {
+    cafePrice?: string;
+    rappiPrice?: string;
+    pedidosyaPrice?: string;
+    uberPrice?: string;
+  }) => {
+    if (currentVariantIndex !== null) {
+      const updated = [...variants];
+      updated[currentVariantIndex] = {
+        ...updated[currentVariantIndex],
+        cafePrice: prices.cafePrice,
+        rappiPrice: prices.rappiPrice,
+        pedidosyaPrice: prices.pedidosyaPrice,
+        uberPrice: prices.uberPrice,
+      };
+      setVariants(updated);
+    }
+  };
+
+  // Auto-generate variant display name
+  const getVariantDisplayName = (variant: ProductVariant) => {
+    if (variant.useCustomName && variant.displayName) {
+      return variant.displayName;
+    }
+    return variant.name ? `${formData.name} ${variant.name}` : formData.name;
+  };
+
+  // Modifier channel pricing handlers
+  const openModifierChannelPricingModal = (groupIndex: number, modIndex: number) => {
+    setCurrentModifierIndices({ groupIndex, modIndex });
+    setModifierChannelPricingModalOpen(true);
+  };
+
+  const handleModifierChannelPricingSave = (prices: {
+    cafePrice?: string;
+    rappiPrice?: string;
+    pedidosyaPrice?: string;
+    uberPrice?: string;
+  }) => {
+    if (currentModifierIndices !== null) {
+      const { groupIndex, modIndex } = currentModifierIndices;
+      const updated = [...modifierGroups];
+      updated[groupIndex].modifiers[modIndex] = {
+        ...updated[groupIndex].modifiers[modIndex],
+        cafePriceAdjustment: prices.cafePrice,
+        rappiPriceAdjustment: prices.rappiPrice,
+        pedidosyaPriceAdjustment: prices.pedidosyaPrice,
+        uberPriceAdjustment: prices.uberPrice,
+      };
+      setModifierGroups(updated);
+    }
   };
 
   if (!isOpen) return null;
@@ -717,60 +826,223 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess }: Creat
               </p>
 
               {showVariants && (
-                <div className="mt-4 p-4 bg-gray-50 rounded-lg space-y-3">
-                  {variants.map((variant, index) => (
-                    <div key={index} className="flex gap-3 items-start bg-white p-3 rounded border">
-                      <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-3">
-                        <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">
-                            Variant Name *
-                          </label>
-                          <input
-                            type="text"
-                            value={variant.name}
-                            onChange={(e) => updateVariant(index, 'name', e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                            placeholder="e.g., Medium, Strawberry"
-                          />
+                <div className="mt-4 space-y-3">
+                  {variants.map((variant, index) => {
+                    const isExpanded = expandedVariants.has(index);
+                    const displayName = getVariantDisplayName(variant);
+
+                    return (
+                      <div key={index} className="bg-white border border-gray-300 rounded-lg overflow-hidden">
+                        {/* Variant Header */}
+                        <div className="p-4 bg-gray-50 flex items-center justify-between">
+                          <div className="flex items-center gap-3 flex-1">
+                            <button
+                              type="button"
+                              onClick={() => toggleVariantExpansion(index)}
+                              className="text-gray-600 hover:text-gray-800"
+                            >
+                              {isExpanded ? '▼' : '▶'}
+                            </button>
+                            <div>
+                              <div className="font-medium text-gray-900">
+                                {displayName || 'New Variant'}
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                {variant.isDefault && <span className="text-blue-600 font-medium">DEFAULT • </span>}
+                                {variant.priceAdjustment !== 0 && `Price: ${variant.priceAdjustment >= 0 ? '+' : ''}${variant.priceAdjustment}`}
+                              </div>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removeVariant(index)}
+                            className="text-red-500 hover:text-red-700 p-2"
+                          >
+                            ✕
+                          </button>
                         </div>
-                        <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">
-                            Price Adjustment
-                          </label>
-                          <input
-                            type="number"
-                            value={variant.priceAdjustment}
-                            onChange={(e) => updateVariant(index, 'priceAdjustment', parseFloat(e.target.value))}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                            placeholder="0"
-                            step="0.01"
-                          />
-                        </div>
-                        <div className="flex items-center">
-                          <label className="flex items-center cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={variant.isDefault}
-                              onChange={(e) => updateVariant(index, 'isDefault', e.target.checked)}
-                              className="mr-2"
-                            />
-                            <span className="text-sm">Default</span>
-                          </label>
-                        </div>
+
+                        {/* Variant Details */}
+                        {isExpanded && (
+                          <div className="p-4 space-y-4">
+                            {/* Variant Name */}
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Variant Name <span className="text-red-500">*</span>
+                              </label>
+                              <input
+                                type="text"
+                                value={variant.name}
+                                onChange={(e) => updateVariant(index, 'name', e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                placeholder="e.g., Small, Strawberry"
+                              />
+                              <p className="text-xs text-gray-500 mt-1">
+                                Final name: <span className="font-medium">{displayName}</span>
+                              </p>
+                            </div>
+
+                            {/* Custom Name Override */}
+                            <div className="flex items-start gap-3">
+                              <input
+                                type="checkbox"
+                                id={`custom-name-${index}`}
+                                checked={variant.useCustomName}
+                                onChange={(e) => updateVariant(index, 'useCustomName', e.target.checked)}
+                                className="mt-1"
+                              />
+                              <div className="flex-1">
+                                <label htmlFor={`custom-name-${index}`} className="text-sm font-medium text-gray-700 cursor-pointer">
+                                  Use custom name instead
+                                </label>
+                                {variant.useCustomName && (
+                                  <input
+                                    type="text"
+                                    value={variant.displayName || ''}
+                                    onChange={(e) => updateVariant(index, 'displayName', e.target.value)}
+                                    className="w-full mt-2 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                    placeholder="e.g., Fresa Deluxe"
+                                  />
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Variant Description */}
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Variant Description
+                              </label>
+                              <textarea
+                                value={variant.description || ''}
+                                onChange={(e) => updateVariant(index, 'description', e.target.value)}
+                                rows={2}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                placeholder="Specific details about this variant"
+                              />
+                            </div>
+
+                            {/* Variant Images */}
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Variant Images (Optional)
+                              </label>
+                              <ImageUploader
+                                images={variant.images}
+                                onImagesChange={(images) => updateVariant(index, 'images', images)}
+                                maxImages={4}
+                              />
+                            </div>
+
+                            {/* Pricing Row */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                  Price Adjustment
+                                </label>
+                                <input
+                                  type="number"
+                                  value={variant.priceAdjustment}
+                                  onChange={(e) => updateVariant(index, 'priceAdjustment', parseFloat(e.target.value) || 0)}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                  placeholder="0"
+                                  step="0.01"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                  Cost Price
+                                </label>
+                                <input
+                                  type="number"
+                                  value={variant.costPrice || ''}
+                                  onChange={(e) => updateVariant(index, 'costPrice', e.target.value)}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                  placeholder={formData.costPrice || '0'}
+                                  step="0.01"
+                                />
+                              </div>
+                            </div>
+
+                            {/* Channel Pricing Button */}
+                            <div>
+                              <button
+                                type="button"
+                                onClick={() => openChannelPricingModal(index)}
+                                className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm font-medium"
+                              >
+                                <span className="text-lg">🌐</span>
+                                Channel-Specific Pricing
+                              </button>
+                              {(variant.cafePrice || variant.rappiPrice || variant.pedidosyaPrice || variant.uberPrice) && (
+                                <p className="text-xs text-green-600 mt-1">
+                                  ✓ Custom channel prices configured
+                                </p>
+                              )}
+                            </div>
+
+                            {/* Advanced Inventory Management */}
+                            <details className="border border-gray-300 rounded-lg">
+                              <summary className="px-4 py-2 bg-gray-50 cursor-pointer font-medium text-sm text-gray-700 hover:bg-gray-100">
+                                Advanced Inventory Management
+                              </summary>
+                              <div className="p-4 space-y-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                      Min Stock
+                                    </label>
+                                    <input
+                                      type="number"
+                                      value={variant.minStock || ''}
+                                      onChange={(e) => updateVariant(index, 'minStock', e.target.value)}
+                                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                      placeholder={formData.minStock || '0'}
+                                      min="0"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                      Max Stock
+                                    </label>
+                                    <input
+                                      type="number"
+                                      value={variant.maxStock || ''}
+                                      onChange={(e) => updateVariant(index, 'maxStock', e.target.value)}
+                                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                      placeholder={formData.maxStock || ''}
+                                      min="0"
+                                    />
+                                  </div>
+                                </div>
+                                <p className="text-xs text-gray-500">
+                                  Leave empty to use product-level inventory settings
+                                </p>
+                              </div>
+                            </details>
+
+                            {/* Default Checkbox */}
+                            <div className="flex items-center">
+                              <input
+                                type="checkbox"
+                                id={`default-${index}`}
+                                checked={variant.isDefault}
+                                onChange={(e) => updateVariant(index, 'isDefault', e.target.checked)}
+                                className="mr-2"
+                              />
+                              <label htmlFor={`default-${index}`} className="text-sm font-medium text-gray-700 cursor-pointer">
+                                Set as default variant
+                              </label>
+                            </div>
+                          </div>
+                        )}
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => removeVariant(index)}
-                        className="text-red-500 hover:text-red-700"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  ))}
+                    );
+                  })}
+
                   <button
                     type="button"
                     onClick={addVariant}
-                    className="w-full px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:border-blue-500 hover:text-blue-600 transition-colors"
+                    className="w-full px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:border-blue-500 hover:text-blue-600 transition-colors font-medium"
                   >
                     + Add Variant
                   </button>
@@ -844,39 +1116,57 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess }: Creat
                       <div className="ml-4 space-y-2">
                         <div className="text-sm font-medium text-gray-700">Modifiers:</div>
                         {group.modifiers.map((modifier, modIndex) => (
-                          <div key={modIndex} className="flex gap-3 items-start bg-gray-50 p-2 rounded">
-                            <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-2">
-                              <input
-                                type="text"
-                                value={modifier.name}
-                                onChange={(e) => updateModifier(groupIndex, modIndex, 'name', e.target.value)}
-                                className="px-2 py-1 border border-gray-300 rounded text-sm"
-                                placeholder="Modifier name"
-                              />
-                              <select
-                                value={modifier.type}
-                                onChange={(e) => updateModifier(groupIndex, modIndex, 'type', e.target.value)}
-                                className="px-2 py-1 border border-gray-300 rounded text-sm"
+                          <div key={modIndex} className="bg-gray-50 p-3 rounded border border-gray-200 space-y-2">
+                            <div className="flex gap-2 items-start">
+                              <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-2">
+                                <input
+                                  type="text"
+                                  value={modifier.name}
+                                  onChange={(e) => updateModifier(groupIndex, modIndex, 'name', e.target.value)}
+                                  className="px-2 py-1 border border-gray-300 rounded text-sm"
+                                  placeholder="Modifier name"
+                                />
+                                <select
+                                  value={modifier.type}
+                                  onChange={(e) => updateModifier(groupIndex, modIndex, 'type', e.target.value)}
+                                  className="px-2 py-1 border border-gray-300 rounded text-sm"
+                                >
+                                  <option value="ADD">Add-on (+)</option>
+                                  <option value="REMOVE">Removal (-)</option>
+                                </select>
+                                <input
+                                  type="number"
+                                  value={modifier.priceAdjustment}
+                                  onChange={(e) => updateModifier(groupIndex, modIndex, 'priceAdjustment', parseFloat(e.target.value))}
+                                  className="px-2 py-1 border border-gray-300 rounded text-sm"
+                                  placeholder="Price adjustment"
+                                  step="0.01"
+                                />
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => removeModifier(groupIndex, modIndex)}
+                                className="text-red-500 hover:text-red-700 text-sm mt-1"
                               >
-                                <option value="ADD">Add-on (+)</option>
-                                <option value="REMOVE">Removal (-)</option>
-                              </select>
-                              <input
-                                type="number"
-                                value={modifier.priceAdjustment}
-                                onChange={(e) => updateModifier(groupIndex, modIndex, 'priceAdjustment', parseFloat(e.target.value))}
-                                className="px-2 py-1 border border-gray-300 rounded text-sm"
-                                placeholder="Price"
-                                step="0.01"
-                              />
+                                ✕
+                              </button>
                             </div>
-                            <button
-                              type="button"
-                              onClick={() => removeModifier(groupIndex, modIndex)}
-                              className="text-red-500 hover:text-red-700 text-sm"
-                            >
-                              ✕
-                            </button>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => openModifierChannelPricingModal(groupIndex, modIndex)}
+                                className="flex items-center gap-1 px-2 py-1 border border-gray-300 rounded text-xs hover:bg-gray-100"
+                              >
+                                <span>🌐</span>
+                                Channel Pricing
+                              </button>
+                              {(modifier.cafePriceAdjustment || modifier.rappiPriceAdjustment ||
+                                modifier.pedidosyaPriceAdjustment || modifier.uberPriceAdjustment) && (
+                                <span className="text-xs text-green-600">
+                                  ✓ Custom prices set
+                                </span>
+                              )}
+                            </div>
                           </div>
                         ))}
                         <button
@@ -965,6 +1255,39 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess }: Creat
         productEan={formData.ean}
         onApprove={handleEnrichmentApprove}
       />
+
+      {/* Channel Pricing Modal for Variants */}
+      {currentVariantIndex !== null && (
+        <ChannelPricingModal
+          isOpen={channelPricingModalOpen}
+          onClose={() => setChannelPricingModalOpen(false)}
+          onSave={handleChannelPricingSave}
+          initialPrices={{
+            cafePrice: variants[currentVariantIndex]?.cafePrice,
+            rappiPrice: variants[currentVariantIndex]?.rappiPrice,
+            pedidosyaPrice: variants[currentVariantIndex]?.pedidosyaPrice,
+            uberPrice: variants[currentVariantIndex]?.uberPrice,
+          }}
+          title="Variant Channel Pricing"
+        />
+      )}
+
+      {/* Channel Pricing Modal for Modifiers */}
+      {currentModifierIndices !== null && (
+        <ChannelPricingModal
+          isOpen={modifierChannelPricingModalOpen}
+          onClose={() => setModifierChannelPricingModalOpen(false)}
+          onSave={handleModifierChannelPricingSave}
+          initialPrices={{
+            cafePrice: modifierGroups[currentModifierIndices.groupIndex]?.modifiers[currentModifierIndices.modIndex]?.cafePriceAdjustment,
+            rappiPrice: modifierGroups[currentModifierIndices.groupIndex]?.modifiers[currentModifierIndices.modIndex]?.rappiPriceAdjustment,
+            pedidosyaPrice: modifierGroups[currentModifierIndices.groupIndex]?.modifiers[currentModifierIndices.modIndex]?.pedidosyaPriceAdjustment,
+            uberPrice: modifierGroups[currentModifierIndices.groupIndex]?.modifiers[currentModifierIndices.modIndex]?.uberPriceAdjustment,
+          }}
+          title="Modifier Channel Pricing Adjustments"
+          isPriceAdjustment={true}
+        />
+      )}
     </div>
   );
 }

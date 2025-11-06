@@ -25,7 +25,25 @@ export async function PUT(
     const { variantId } = await params;
 
     const body = await request.json();
-    const { name, sku, priceAdjustment, sortOrder, isDefault, isActive } = body;
+    const {
+      name,
+      displayName,
+      useCustomName,
+      description,
+      sku,
+      priceAdjustment,
+      costPrice,
+      cafePrice,
+      rappiPrice,
+      pedidosyaPrice,
+      uberPrice,
+      minStock,
+      maxStock,
+      images,
+      sortOrder,
+      isDefault,
+      isActive,
+    } = body;
 
     // Check if variant exists and belongs to this tenant
     const existingVariant = await prisma.productVariant.findFirst({
@@ -62,8 +80,19 @@ export async function PUT(
       },
       data: {
         ...(name !== undefined && { name }),
+        ...(displayName !== undefined && { displayName }),
+        ...(useCustomName !== undefined && { useCustomName }),
+        ...(description !== undefined && { description }),
         ...(sku !== undefined && { sku }),
         ...(priceAdjustment !== undefined && { priceAdjustment }),
+        ...(costPrice !== undefined && { costPrice: costPrice ? parseFloat(costPrice) : null }),
+        ...(cafePrice !== undefined && { cafePrice: cafePrice ? parseFloat(cafePrice) : null }),
+        ...(rappiPrice !== undefined && { rappiPrice: rappiPrice ? parseFloat(rappiPrice) : null }),
+        ...(pedidosyaPrice !== undefined && { pedidosyaPrice: pedidosyaPrice ? parseFloat(pedidosyaPrice) : null }),
+        ...(uberPrice !== undefined && { uberPrice: uberPrice ? parseFloat(uberPrice) : null }),
+        ...(minStock !== undefined && { minStock: minStock ? parseInt(minStock) : null }),
+        ...(maxStock !== undefined && { maxStock: maxStock ? parseInt(maxStock) : null }),
+        ...(images !== undefined && { images }),
         ...(sortOrder !== undefined && { sortOrder }),
         ...(isDefault !== undefined && { isDefault }),
         ...(isActive !== undefined && { isActive }),

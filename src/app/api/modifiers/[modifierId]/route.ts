@@ -25,7 +25,17 @@ export async function PUT(
     const { modifierId } = await params;
 
     const body = await request.json();
-    const { name, type, priceAdjustment, sortOrder, isActive } = body;
+    const {
+      name,
+      type,
+      priceAdjustment,
+      cafePriceAdjustment,
+      rappiPriceAdjustment,
+      pedidosyaPriceAdjustment,
+      uberPriceAdjustment,
+      sortOrder,
+      isActive,
+    } = body;
 
     // Check if modifier exists and belongs to this tenant
     const existingModifier = await prisma.productModifier.findFirst({
@@ -50,6 +60,10 @@ export async function PUT(
         ...(name !== undefined && { name }),
         ...(type !== undefined && { type }),
         ...(priceAdjustment !== undefined && { priceAdjustment }),
+        ...(cafePriceAdjustment !== undefined && { cafePriceAdjustment: cafePriceAdjustment ? parseFloat(cafePriceAdjustment) : null }),
+        ...(rappiPriceAdjustment !== undefined && { rappiPriceAdjustment: rappiPriceAdjustment ? parseFloat(rappiPriceAdjustment) : null }),
+        ...(pedidosyaPriceAdjustment !== undefined && { pedidosyaPriceAdjustment: pedidosyaPriceAdjustment ? parseFloat(pedidosyaPriceAdjustment) : null }),
+        ...(uberPriceAdjustment !== undefined && { uberPriceAdjustment: uberPriceAdjustment ? parseFloat(uberPriceAdjustment) : null }),
         ...(sortOrder !== undefined && { sortOrder }),
         ...(isActive !== undefined && { isActive }),
       },

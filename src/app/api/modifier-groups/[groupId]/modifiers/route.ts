@@ -24,7 +24,16 @@ export async function POST(
     const { groupId } = await params;
 
     const body = await request.json();
-    const { name, type, priceAdjustment, sortOrder } = body;
+    const {
+      name,
+      type,
+      priceAdjustment,
+      cafePriceAdjustment,
+      rappiPriceAdjustment,
+      pedidosyaPriceAdjustment,
+      uberPriceAdjustment,
+      sortOrder,
+    } = body;
 
     if (!name) {
       return NextResponse.json(
@@ -54,6 +63,10 @@ export async function POST(
         name,
         type: type || 'ADD',
         priceAdjustment: priceAdjustment || 0,
+        cafePriceAdjustment: cafePriceAdjustment ? parseFloat(cafePriceAdjustment) : undefined,
+        rappiPriceAdjustment: rappiPriceAdjustment ? parseFloat(rappiPriceAdjustment) : undefined,
+        pedidosyaPriceAdjustment: pedidosyaPriceAdjustment ? parseFloat(pedidosyaPriceAdjustment) : undefined,
+        uberPriceAdjustment: uberPriceAdjustment ? parseFloat(uberPriceAdjustment) : undefined,
         sortOrder: sortOrder || 0,
         tenantId,
       },

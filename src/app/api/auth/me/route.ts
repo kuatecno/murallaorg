@@ -13,20 +13,22 @@ export async function GET(request: NextRequest) {
     const token = request.cookies.get('auth-token')?.value;
 
     if (!token) {
-      return NextResponse.json(
-        { error: 'Not authenticated' },
-        { status: 401 }
-      );
+      // Return 200 with authenticated: false to avoid 401 errors in console
+      return NextResponse.json({
+        authenticated: false,
+        user: null,
+      });
     }
 
     // Verify and decode token
     const jwtPayload = verifyToken(token);
 
     if (!jwtPayload) {
-      return NextResponse.json(
-        { error: 'Invalid or expired token' },
-        { status: 401 }
-      );
+      // Return 200 with authenticated: false for invalid/expired tokens
+      return NextResponse.json({
+        authenticated: false,
+        user: null,
+      });
     }
 
     // Fetch full user details from database
@@ -45,13 +47,15 @@ export async function GET(request: NextRequest) {
     });
 
     if (!user || !user.isActive) {
-      return NextResponse.json(
-        { error: 'User not found or inactive' },
-        { status: 401 }
-      );
+      // Return 200 with authenticated: false for inactive users
+      return NextResponse.json({
+        authenticated: false,
+        user: null,
+      });
     }
 
     return NextResponse.json({
+      authenticated: true,
       user,
     });
 

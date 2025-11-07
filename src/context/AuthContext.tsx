@@ -29,11 +29,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const checkUser = async () => {
       try {
         const response = await apiClient.get('/api/auth/me');
+
         if (response.ok) {
           const data = await response.json();
-          setUser(data.user);
-        } else if (response.status === 401) {
-          // Not authenticated - this is fine, just set user to null
+          // Check if authenticated field exists (new format) or user field (legacy)
+          if (data.authenticated === true || (data.user && !data.hasOwnProperty('authenticated'))) {
+            setUser(data.user);
+          } else {
+            setUser(null);
+          }
+        } else {
           setUser(null);
         }
       } catch (error) {

@@ -89,12 +89,15 @@ class ApiClient {
       credentials: 'include', // Include cookies for JWT authentication
     });
 
+    // Handle 401 errors (only log for non-auth endpoints)
     if (!response.ok && response.status === 401) {
-      console.error('Authentication failed. Please log in.');
-      // Optionally redirect to login or show auth modal
-      if (typeof window !== 'undefined') {
-        // You can emit a custom event for the app to handle
-        window.dispatchEvent(new CustomEvent('api-auth-error'));
+      // Don't log errors for /api/auth/me - it's expected when not logged in
+      if (!endpoint.includes('/api/auth/me')) {
+        console.error('Authentication failed. Please log in.');
+        // Emit event for the app to handle
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('api-auth-error'));
+        }
       }
     }
 

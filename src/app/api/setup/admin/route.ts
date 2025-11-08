@@ -46,7 +46,9 @@ export async function POST(request: NextRequest) {
       tenant = await prisma.tenant.create({
         data: {
           name: 'Muralla Cafe',
+          slug: 'muralla-cafe',
           domain: 'murallacafe.cl',
+          email: 'contacto@murallacafe.cl',
           isActive: true,
         }
       });

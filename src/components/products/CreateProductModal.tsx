@@ -51,7 +51,7 @@ interface ProductVariant {
   displayName?: string;
   useCustomName: boolean;
   description?: string;
-  priceAdjustment: number;
+  price?: number;
   costPrice?: string;
   cafePrice?: string;
   rappiPrice?: string;
@@ -305,7 +305,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess }: Creat
       name: '',
       useCustomName: false,
       description: '',
-      priceAdjustment: 0,
+      price: 0,
       costPrice: formData.costPrice || '',
       cafePrice: formData.cafePrice || '',
       rappiPrice: formData.rappiPrice || '',
@@ -823,7 +823,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess }: Creat
                               </div>
                               <div className="text-xs text-gray-500">
                                 {variant.isDefault && <span className="text-blue-600 font-medium">DEFAULT • </span>}
-                                {variant.priceAdjustment !== 0 && `Price: ${variant.priceAdjustment >= 0 ? '+' : ''}${variant.priceAdjustment}`}
+                                {variant.price && variant.price > 0 && `Price: $${variant.price}`}
                               </div>
                             </div>
                           </div>
@@ -915,8 +915,8 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess }: Creat
                                 </label>
                                 <input
                                   type="number"
-                                  value={variant.priceAdjustment}
-                                  onChange={(e) => updateVariant(index, 'priceAdjustment', parseFloat(e.target.value) || 0)}
+                                  value={variant.price || ''}
+                                  onChange={(e) => updateVariant(index, 'price', parseFloat(e.target.value) || 0)}
                                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                                   placeholder="0"
                                   step="0.01"

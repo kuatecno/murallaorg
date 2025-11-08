@@ -28,22 +28,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const checkUser = async () => {
       try {
+        // First check localStorage
+        const storedUser = localStorage.getItem('user');
+        if (storedUser) {
+          try {
+            setUser(JSON.parse(storedUser));
+          } catch (e) {
+            localStorage.removeItem('user');
+          }
+        }
+
+        // Then verify with server
         const response = await apiClient.get('/api/auth/me');
 
         if (response.ok) {
           const data = await response.json();
-          // Check if authenticated field exists (new format) or user field (legacy)
-          if (data.authenticated === true || (data.user && !data.hasOwnProperty('authenticated'))) {
+          if (data.authenticated === true) {
             setUser(data.user);
+            localStorage.setItem('user', JSON.stringify(data.user));
           } else {
             setUser(null);
+            localStorage.removeItem('user');
           }
         } else {
           setUser(null);
+          localStorage.removeItem('user');
         }
       } catch (error) {
         console.error('Failed to fetch user:', error);
-        setUser(null);
+        // Keep localStorage user if server check fails
       } finally {
         setIsLoading(false);
       }

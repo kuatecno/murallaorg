@@ -18,6 +18,7 @@ interface Product {
   ean?: string;
   unitPrice: number;
   costPrice?: number;
+  currentStock: number;
   minStock: number;
   maxStock?: number;
   unit: string;
@@ -47,6 +48,7 @@ interface ProductFormData {
   ean: string;
   unitPrice: string;
   costPrice: string;
+  currentStock: string;
   minStock: string;
   maxStock: string;
   unit: string;
@@ -117,6 +119,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, product
     ean: '',
     unitPrice: '',
     costPrice: '',
+    currentStock: '0',
     minStock: '0',
     maxStock: '',
     unit: 'UNIT',
@@ -162,6 +165,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, product
         ean: product.ean || '',
         unitPrice: product.unitPrice.toString(),
         costPrice: product.costPrice?.toString() || '',
+        currentStock: product.currentStock.toString(),
         minStock: product.minStock.toString(),
         maxStock: product.maxStock?.toString() || '',
         unit: product.unit,
@@ -263,6 +267,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, product
         ean: formData.ean || undefined,
         unitPrice: parseFloat(formData.unitPrice) || 0,
         costPrice: formData.costPrice ? parseFloat(formData.costPrice) : undefined,
+        currentStock: parseInt(formData.currentStock) || 0,
         minStock: parseInt(formData.minStock) || 0,
         maxStock: formData.maxStock ? parseInt(formData.maxStock) : undefined,
         unit: formData.unit || 'UNIT',
@@ -341,6 +346,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, product
       ean: '',
       unitPrice: '',
       costPrice: '',
+      currentStock: '0',
       minStock: '0',
       maxStock: '',
       unit: 'UNIT',
@@ -840,9 +846,22 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, product
 
           {/* Stock Settings (not for MADE_TO_ORDER or SERVICE) */}
           {formData.type !== 'MADE_TO_ORDER' && formData.type !== 'SERVICE' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Min Stock</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t('products.currentStock')}</label>
+                <input
+                  type="number"
+                  name="currentStock"
+                  value={formData.currentStock}
+                  onChange={handleChange}
+                  min="0"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Current inventory"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t('products.minStock')}</label>
                 <input
                   type="number"
                   name="minStock"
@@ -855,7 +874,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, product
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Max Stock</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t('products.maxStock')}</label>
                 <input
                   type="number"
                   name="maxStock"

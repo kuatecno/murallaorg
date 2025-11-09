@@ -148,6 +148,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
   const [modifierGroups, setModifierGroups] = useState<ModifierGroup[]>([]);
   const [showVariants, setShowVariants] = useState(false);
   const [showModifiers, setShowModifiers] = useState(false);
+  const [willHaveVariants, setWillHaveVariants] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [isEnrichModalOpen, setIsEnrichModalOpen] = useState(false);
@@ -674,6 +675,49 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
           </div>
         </div>
 
+          {/* Variant Toggle - Only for sellable products */}
+          {canSell && (
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-medium text-gray-900">Product Structure</h3>
+                  <p className="text-xs text-gray-600 mt-1">
+                    Will this product have variants (sizes, flavors, etc.)?
+                  </p>
+                </div>
+                <div className="flex items-center space-x-4">
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      name="variantChoice"
+                      checked={!willHaveVariants}
+                      onChange={() => {
+                        setWillHaveVariants(false);
+                        setShowVariants(false);
+                        setVariants([]);
+                      }}
+                      className="mr-2"
+                    />
+                    <span className="text-sm">Single Product</span>
+                  </label>
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      name="variantChoice"
+                      checked={willHaveVariants}
+                      onChange={() => {
+                        setWillHaveVariants(true);
+                        setShowVariants(true);
+                      }}
+                      className="mr-2"
+                    />
+                    <span className="text-sm">Has Variants</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* AI Product Enrichment */}
           <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
             <div className="flex items-center justify-between">
@@ -712,8 +756,8 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
               />
             </div>
 
-            {/* SKU - Hidden when variants exist */}
-            {variants.length === 0 && (
+            {/* SKU - Hidden when user chooses to have variants */}
+            {!willHaveVariants && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">{t('products.sku')} <span className="text-red-500">*</span></label>
                 <div className="flex gap-2">
@@ -843,8 +887,8 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
               />
             </div>
 
-            {/* EAN - Hidden when variants exist */}
-            {variants.length === 0 && (
+            {/* EAN - Hidden when user chooses to have variants */}
+            {!willHaveVariants && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">{t('products.ean')}</label>
                 <input
@@ -859,8 +903,8 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
             )}
           </div>
 
-          {/* Info message when variants exist */}
-          {variants.length > 0 && (
+          {/* Info message when user chooses variants */}
+          {willHaveVariants && (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <div className="flex items-start">
                 <div className="flex-shrink-0">
@@ -1067,8 +1111,8 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
           </div>
 
           {/* Stock Settings (not for MADE_TO_ORDER or SERVICE) */}
-          {/* Stock Settings - Hidden when variants exist */}
-          {formData.type !== 'MADE_TO_ORDER' && formData.type !== 'SERVICE' && variants.length === 0 && (
+          {/* Stock Settings - Hidden when user chooses variants */}
+          {formData.type !== 'MADE_TO_ORDER' && formData.type !== 'SERVICE' && !willHaveVariants && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">{t('products.currentStock')}</label>
@@ -1136,21 +1180,33 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
             </div>
           )}
 
-          {/* Product Variants (for sellable products) */}
-          {canSell && (
+          {/* Product Variants (shown when user chooses to have variants) */}
+          {canSell && willHaveVariants && (
             <div>
-              <button
-                type="button"
-                onClick={() => setShowVariants(!showVariants)}
-                className="flex items-center text-blue-600 hover:text-blue-700 font-medium"
-              >
-                {showVariants ? '▼' : '▶'} Product Variants (Optional)
-              </button>
-              <p className="text-xs text-gray-500 mt-1">
-                Add size or flavor variations (e.g., Small/Medium/Large, Strawberry/Mango)
-              </p>
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-lg font-medium text-gray-900">Product Variants</h3>
+                  <p className="text-sm text-gray-600">
+                    Add size or flavor variations (e.g., Small/Medium/Large, Strawberry/Mango)
+                  </p>
+                </div>
+              </div>
 
-              {showVariants && (
+              <div className="space-y-3">
+                {variants.length === 0 && (
+                  <div className="text-center py-8 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+                    <p className="text-gray-500 mb-4">No variants created yet</p>
+                    <button
+                      type="button"
+                      onClick={addVariant}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                    >
+                      Add First Variant
+                    </button>
+                  </div>
+                )}
+
+                {variants.length > 0 && (
                 <div className="mt-4 space-y-3">
                   {variants.map((variant, index) => {
                     const isExpanded = expandedVariants.has(index);
@@ -1398,7 +1454,8 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
                     + Add Variant
                   </button>
                 </div>
-              )}
+                )}
+              </div>
             </div>
           )}
 

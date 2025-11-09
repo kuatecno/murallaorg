@@ -102,6 +102,7 @@ model Product {
   maxStock     Int?
   unit         String      @default("UNIT")
   format       ProductFormat? // Product format: PACKAGED, FROZEN, FRESH
+  tags         String[]    @default([]) // Product tags/features: vegano, sin gluten, etc.
   hasRecipe    Boolean     @default(false)
 
   // Pricing fields (input only wholesalePrice, others are calculated)

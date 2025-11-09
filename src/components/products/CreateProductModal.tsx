@@ -20,6 +20,7 @@ interface Product {
   costPrice?: number;
   currentStock: number;
   format?: string;
+  tags?: string[];
   minStock: number;
   maxStock?: number;
   unit: string;
@@ -59,6 +60,7 @@ interface ProductFormData {
   maxStock: string;
   unit: string;
   format: string;
+  tags: string[];
   images: string[];
   // Platform pricing
   cafePrice: string;
@@ -133,6 +135,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
     maxStock: '',
     unit: 'UNIT',
     format: '',
+    tags: [],
     images: [],
     cafePrice: '',
     rappiPrice: '',
@@ -180,6 +183,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
         maxStock: product.maxStock?.toString() || '',
         unit: product.unit,
         format: product.format || '',
+        tags: product.tags || [],
         images: product.images || [],
         cafePrice: product.cafePrice?.toString() || '',
         rappiPrice: product.rappiPrice?.toString() || '',
@@ -346,6 +350,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
         maxStock: formData.maxStock ? parseInt(formData.maxStock) : undefined,
         unit: formData.unit || 'UNIT',
         format: formData.format || undefined,
+        tags: formData.tags.length > 0 ? formData.tags : [],
         images: formData.images.length > 0 ? formData.images : undefined,
         cafePrice: formData.cafePrice ? parseFloat(formData.cafePrice) : undefined,
         rappiPrice: formData.rappiPrice ? parseFloat(formData.rappiPrice) : undefined,
@@ -426,6 +431,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
       maxStock: '',
       unit: 'UNIT',
       format: '',
+      tags: [],
       images: [],
       cafePrice: '',
       rappiPrice: '',
@@ -877,6 +883,115 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
                 <option value="FROZEN">{t('products.formats.FROZEN')}</option>
                 <option value="FRESH">{t('products.formats.FRESH')}</option>
               </select>
+            </div>
+          </div>
+
+          {/* Tags */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">{t('products.tags')}</label>
+            <div className="space-y-3">
+              {/* Predefined Tags */}
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-2">Common Tags:</label>
+                <div className="flex flex-wrap gap-2">
+                  {Object.entries(t('products.predefinedTags')).map(([key, label]) => {
+                    const isSelected = formData.tags.includes(key);
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => {
+                          if (isSelected) {
+                            setFormData(prev => ({
+                              ...prev,
+                              tags: prev.tags.filter(tag => tag !== key)
+                            }));
+                          } else {
+                            setFormData(prev => ({
+                              ...prev,
+                              tags: [...prev.tags, key]
+                            }));
+                          }
+                        }}
+                        className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
+                          isSelected
+                            ? 'bg-green-100 text-green-800 border border-green-300'
+                            : 'bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200'
+                        }`}
+                      >
+                        {isSelected ? '✓ ' : ''}{label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Custom Tags */}
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-2">Custom Tags:</label>
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {formData.tags
+                    .filter(tag => !Object.keys(t('products.predefinedTags')).includes(tag))
+                    .map((tag, index) => (
+                      <span
+                        key={index}
+                        className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-blue-100 text-blue-800 border border-blue-300"
+                      >
+                        {tag}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFormData(prev => ({
+                              ...prev,
+                              tags: prev.tags.filter(t => t !== tag)
+                            }));
+                          }}
+                          className="ml-2 text-blue-600 hover:text-blue-800"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Add custom tag..."
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        const input = e.target as HTMLInputElement;
+                        const newTag = input.value.trim();
+                        if (newTag && !formData.tags.includes(newTag)) {
+                          setFormData(prev => ({
+                            ...prev,
+                            tags: [...prev.tags, newTag]
+                          }));
+                          input.value = '';
+                        }
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      const input = (e.target as HTMLButtonElement).previousElementSibling as HTMLInputElement;
+                      const newTag = input.value.trim();
+                      if (newTag && !formData.tags.includes(newTag)) {
+                        setFormData(prev => ({
+                          ...prev,
+                          tags: [...prev.tags, newTag]
+                        }));
+                        input.value = '';
+                      }
+                    }}
+                    className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
+                  >
+                    {t('products.addTag')}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
 

@@ -114,6 +114,15 @@
       "FROZEN": "Frozen",
       "FRESH": "Fresh"
     },
+    "tags": "Tags",
+    "addTag": "Add Tag",
+    "removeTag": "Remove Tag",
+    "predefinedTags": {
+      "vegano": "Vegan",
+      "sin azúcar añadido": "No Added Sugar",
+      "sin gluten": "Gluten Free",
+      "sin procesar": "Unprocessed"
+    },
     "searchPlaceholder": "Search by name or SKU...",
     "noProducts": "No products found. Create your first product!",
     "productCreated": "Product created successfully",

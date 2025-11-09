@@ -26,6 +26,7 @@ interface Product {
   currentStock: number;
   minStock: number;
   unit: string;
+  tags?: string[];
   hasRecipe: boolean;
   isActive: boolean;
   menuSection?: string;
@@ -404,7 +405,26 @@ export default function ProductsPage() {
                   </div>
 
                   <h3 className="text-lg font-semibold text-gray-900 mb-1">{product.name}</h3>
-                  <p className="text-sm text-gray-500 mb-4">SKU: {product.sku}</p>
+                  <p className="text-sm text-gray-500 mb-2">SKU: {product.sku}</p>
+                  
+                  {/* Tags */}
+                  {product.tags && product.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mb-2">
+                      {product.tags.slice(0, 3).map((tag, index) => (
+                        <span
+                          key={index}
+                          className="inline-block px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                      {product.tags.length > 3 && (
+                        <span className="inline-block px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded-full">
+                          +{product.tags.length - 3} more
+                        </span>
+                      )}
+                    </div>
+                  )}
 
                   {product.type !== 'INPUT' && product.type !== 'SERVICE' && (
                     <div className="flex items-center justify-between mb-4">

@@ -114,6 +114,15 @@
       "FROZEN": "Congelado",
       "FRESH": "Fresco"
     },
+    "tags": "Etiquetas",
+    "addTag": "Agregar Etiqueta",
+    "removeTag": "Quitar Etiqueta",
+    "predefinedTags": {
+      "vegano": "Vegano",
+      "sin azúcar añadido": "Sin Azúcar Añadido",
+      "sin gluten": "Sin Gluten",
+      "sin procesar": "Sin Procesar"
+    },
     "searchPlaceholder": "Buscar por nombre o SKU...",
     "noProducts": "No se encontraron productos. ¡Crea tu primer producto!",
     "productCreated": "Producto creado exitosamente",

@@ -2,15 +2,17 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useTranslation } from '@/contexts/LanguageContext';
 
 export default function ProductNavigation() {
   const pathname = usePathname();
+  const { t } = useTranslation();
 
   const navItems = [
-    { href: '/products', label: '📦 All Products', match: '/products' },
-    { href: '/products/recipes', label: '📝 Recipes', match: '/products/recipes' },
-    { href: '/products/production', label: '🏭 Production', match: '/products/production' },
-    { href: '/products/categories', label: '🏷️ Categories', match: '/products/categories' },
+    { href: '/products', label: `📦 ${t('navigation.allProducts')}`, match: '/products' },
+    { href: '/products/recipes', label: `📝 ${t('navigation.recipes')}`, match: '/products/recipes' },
+    { href: '/products/production', label: `🏭 ${t('navigation.production')}`, match: '/products/production' },
+    { href: '/products/categories', label: `🏷️ ${t('navigation.categories')}`, match: '/products/categories' },
   ];
 
   const isActive = (itemPath: string) => {

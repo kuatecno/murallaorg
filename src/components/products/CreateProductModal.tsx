@@ -192,32 +192,32 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, product
   const productTypes: { value: ProductType; label: string; description: string; icon: string }[] = [
     {
       value: 'INPUT',
-      label: 'Input / Ingredient',
-      description: 'Raw materials used in recipes (cannot be sold directly)',
+      label: t('products.types.INPUT'),
+      description: t('products.typeDescriptions.INPUT'),
       icon: '🥛',
     },
     {
       value: 'READY_PRODUCT',
-      label: 'Ready Product',
-      description: 'Purchased finished goods ready to sell',
+      label: t('products.types.READY_PRODUCT'),
+      description: t('products.typeDescriptions.READY_PRODUCT'),
       icon: '🥤',
     },
     {
       value: 'MANUFACTURED',
-      label: 'Manufactured',
-      description: 'Products made in batches using recipes',
+      label: t('products.types.MANUFACTURED'),
+      description: t('products.typeDescriptions.MANUFACTURED'),
       icon: '🍞',
     },
     {
       value: 'MADE_TO_ORDER',
-      label: 'Made to Order',
-      description: 'Products made on-the-spot when ordered',
+      label: t('products.types.MADE_TO_ORDER'),
+      description: t('products.typeDescriptions.MADE_TO_ORDER'),
       icon: '☕',
     },
     {
       value: 'SERVICE',
-      label: 'Service',
-      description: 'Non-physical services',
+      label: t('products.types.SERVICE'),
+      description: t('products.typeDescriptions.SERVICE'),
       icon: '🛎️',
     },
   ];
@@ -581,26 +581,52 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, product
             </div>
             {needsRecipe && (
               <p className="mt-2 text-sm text-blue-600">
-                ℹ️ A default recipe will be created automatically. You can add ingredients after creating the product.
+                {t('products.recipeAutoCreate')}
               </p>
             )}
             {formData.type === 'INPUT' && (
               <p className="mt-2 text-sm text-amber-600">
-                ⚠️ INPUT products cannot be sold directly. They are used as ingredients in recipes.
+                {t('products.inputWarning')}
               </p>
             )}
           </div>
 
-          {/* AI Enrichment Button */}
-          <div className="bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg p-4">
+        {/* Product Type Selection */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-3">
+            {t('products.type')} <span className="text-red-500">*</span>
+          </label>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {productTypes.map((type) => (
+              <button
+                key={type.value}
+                type="button"
+                onClick={() => handleTypeChange(type.value)}
+                className={`p-4 border-2 rounded-lg text-left transition-all ${
+                  formData.type === type.value
+                    ? 'border-blue-600 bg-blue-50'
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                <div className="flex items-center mb-2">
+                  <span className="text-2xl mr-2">{type.icon}</span>
+                  <span className="font-medium">{type.label}</span>
+                </div>
+                <p className="text-sm text-gray-600">{type.description}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+
+          {/* AI Product Enrichment */}
+          <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="font-medium text-gray-900 flex items-center">
-                  <span className="text-xl mr-2">✨</span>
-                  AI Product Enrichment
+                <h3 className="text-lg font-semibold text-purple-900 flex items-center">
+                  {t('products.aiEnrichmentTitle')}
                 </h3>
                 <p className="text-sm text-gray-600 mt-1">
-                  Auto-fill product details using AI (name, description, category, images, etc.)
+                  {t('products.aiEnrichmentDesc')}
                 </p>
               </div>
               <button
@@ -608,7 +634,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, product
                 onClick={() => setIsEnrichModalOpen(true)}
                 className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors"
               >
-                ✨ Enrich Product
+                ✨ {t('products.enrichWithAI')}
               </button>
             </div>
           </div>

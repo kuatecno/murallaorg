@@ -27,6 +27,9 @@
   "navigation": {
     "dashboard": "Panel",
     "products": "Productos",
+    "allProducts": "Todos los Productos",
+    "recipes": "Recetas",
+    "production": "Producción",
     "categories": "Categorías",
     "inventory": "Inventario",
     "sales": "Ventas",
@@ -87,6 +90,10 @@
     "recipe": "Receta",
     "hasRecipe": "Tiene Receta",
     "enrichWithAI": "Enriquecer con IA",
+    "aiEnrichmentTitle": "✨Enriquecimiento de Producto con IA",
+    "aiEnrichmentDesc": "Completar automáticamente los detalles del producto usando IA (nombre, descripción, categoría, imágenes, etc.)",
+    "inputWarning": "⚠️ Los productos INSUMO no se pueden vender directamente. Se usan como ingredientes en recetas.",
+    "recipeAutoCreate": "ℹ️ Se creará una receta por defecto automáticamente. Puedes agregar ingredientes después de crear el producto.",
     "searchPlaceholder": "Buscar por nombre o SKU...",
     "noProducts": "No se encontraron productos. ¡Crea tu primer producto!",
     "productCreated": "Producto creado exitosamente",
@@ -104,6 +111,13 @@
       "MANUFACTURED": "Manufacturado",
       "MADE_TO_ORDER": "Hecho por Pedido",
       "SERVICE": "Servicio"
+    },
+    "typeDescriptions": {
+      "INPUT": "Materias primas usadas en recetas (no se pueden vender directamente)",
+      "READY_PRODUCT": "Productos terminados listos para vender",
+      "MANUFACTURED": "Productos hechos en lotes usando recetas",
+      "MADE_TO_ORDER": "Productos hechos al momento cuando se ordenan",
+      "SERVICE": "Servicios no físicos"
     },
     "units": {
       "UNIT": "Unidad",

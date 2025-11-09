@@ -27,6 +27,9 @@
   "navigation": {
     "dashboard": "Dashboard",
     "products": "Products",
+    "allProducts": "All Products",
+    "recipes": "Recipes",
+    "production": "Production",
     "categories": "Categories",
     "inventory": "Inventory",
     "sales": "Sales",
@@ -87,6 +90,10 @@
     "recipe": "Recipe",
     "hasRecipe": "Has Recipe",
     "enrichWithAI": "Enrich with AI",
+    "aiEnrichmentTitle": "✨AI Product Enrichment",
+    "aiEnrichmentDesc": "Auto-fill product details using AI (name, description, category, images, etc.)",
+    "inputWarning": "⚠️ INPUT products cannot be sold directly. They are used as ingredients in recipes.",
+    "recipeAutoCreate": "ℹ️ A default recipe will be created automatically. You can add ingredients after creating the product.",
     "searchPlaceholder": "Search by name or SKU...",
     "noProducts": "No products found. Create your first product!",
     "productCreated": "Product created successfully",
@@ -104,6 +111,13 @@
       "MANUFACTURED": "Manufactured",
       "MADE_TO_ORDER": "Made to Order",
       "SERVICE": "Service"
+    },
+    "typeDescriptions": {
+      "INPUT": "Raw materials used in recipes (cannot be sold directly)",
+      "READY_PRODUCT": "Purchased finished goods ready to sell",
+      "MANUFACTURED": "Products made in batches using recipes",
+      "MADE_TO_ORDER": "Products made on-the-spot when ordered",
+      "SERVICE": "Non-physical services"
     },
     "units": {
       "UNIT": "Unit",

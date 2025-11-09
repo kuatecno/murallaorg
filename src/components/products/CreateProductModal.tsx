@@ -106,7 +106,6 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess }: Creat
   const [categories, setCategories] = useState<Category[]>([]);
   const [variants, setVariants] = useState<ProductVariant[]>([]);
   const [modifierGroups, setModifierGroups] = useState<ModifierGroup[]>([]);
-  const [showPlatformConfig, setShowPlatformConfig] = useState(false);
   const [showVariants, setShowVariants] = useState(false);
   const [showModifiers, setShowModifiers] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -291,7 +290,6 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess }: Creat
     });
     setVariants([]);
     setModifierGroups([]);
-    setShowPlatformConfig(false);
     setShowVariants(false);
     setShowModifiers(false);
     setError('');
@@ -398,6 +396,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess }: Creat
     uberPrice?: string;
   }) => {
     if (currentVariantIndex !== null) {
+      // Update variant pricing
       const updated = [...variants];
       updated[currentVariantIndex] = {
         ...updated[currentVariantIndex],
@@ -407,6 +406,15 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess }: Creat
         uberPrice: prices.uberPrice,
       };
       setVariants(updated);
+    } else {
+      // Update product-level pricing
+      setFormData(prev => ({
+        ...prev,
+        cafePrice: prices.cafePrice || '',
+        rappiPrice: prices.rappiPrice || '',
+        pedidosyaPrice: prices.pedidosyaPrice || '',
+        uberPrice: prices.uberPrice || '',
+      }));
     }
   };
 
@@ -708,80 +716,28 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess }: Creat
             </div>
           )}
 
-          {/* Platform Configuration (for sellable products) */}
+          {/* Channel-Specific Pricing Button (for sellable products) */}
           {canSell && (
-            <div>
+            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+              <div>
+                <h3 className="font-medium text-gray-900">Channel-Specific Pricing</h3>
+                <p className="text-sm text-gray-600">Set different prices for each delivery platform</p>
+                {(formData.cafePrice || formData.rappiPrice || formData.pedidosyaPrice || formData.uberPrice) && (
+                  <p className="text-xs text-green-600 mt-1">
+                    ✓ Custom channel prices configured
+                  </p>
+                )}
+              </div>
               <button
                 type="button"
-                onClick={() => setShowPlatformConfig(!showPlatformConfig)}
-                className="flex items-center text-blue-600 hover:text-blue-700 font-medium"
+                onClick={() => {
+                  setCurrentVariantIndex(null);
+                  setChannelPricingModalOpen(true);
+                }}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
               >
-                {showPlatformConfig ? '▼' : '▶'} Channel-Specific Pricing (Optional)
+                Set Channel Prices
               </button>
-
-              {showPlatformConfig && (
-                <div className="mt-4 p-4 bg-gray-50 rounded-lg grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      ☕ Café Price
-                    </label>
-                    <input
-                      type="number"
-                      name="cafePrice"
-                      value={formData.cafePrice}
-                      onChange={handleChange}
-                      step="0.01"
-                      min="0"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      🛵 Rappi Price
-                    </label>
-                    <input
-                      type="number"
-                      name="rappiPrice"
-                      value={formData.rappiPrice}
-                      onChange={handleChange}
-                      step="0.01"
-                      min="0"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      🍕 PedidosYa Price
-                    </label>
-                    <input
-                      type="number"
-                      name="pedidosyaPrice"
-                      value={formData.pedidosyaPrice}
-                      onChange={handleChange}
-                      step="0.01"
-                      min="0"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      🚗 Uber Eats Price
-                    </label>
-                    <input
-                      type="number"
-                      name="uberPrice"
-                      value={formData.uberPrice}
-                      onChange={handleChange}
-                      step="0.01"
-                      min="0"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                  </div>
-                </div>
-              )}
             </div>
           )}
 
@@ -1230,21 +1186,27 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess }: Creat
         onApprove={handleEnrichmentApprove}
       />
 
-      {/* Channel Pricing Modal for Variants */}
-      {currentVariantIndex !== null && (
-        <ChannelPricingModal
-          isOpen={channelPricingModalOpen}
-          onClose={() => setChannelPricingModalOpen(false)}
-          onSave={handleChannelPricingSave}
-          initialPrices={{
-            cafePrice: variants[currentVariantIndex]?.cafePrice,
-            rappiPrice: variants[currentVariantIndex]?.rappiPrice,
-            pedidosyaPrice: variants[currentVariantIndex]?.pedidosyaPrice,
-            uberPrice: variants[currentVariantIndex]?.uberPrice,
-          }}
-          title="Variant Channel Pricing"
-        />
-      )}
+      {/* Channel Pricing Modal for Products and Variants */}
+      <ChannelPricingModal
+        isOpen={channelPricingModalOpen}
+        onClose={() => setChannelPricingModalOpen(false)}
+        onSave={handleChannelPricingSave}
+        initialPrices={{
+          cafePrice: currentVariantIndex !== null 
+            ? variants[currentVariantIndex]?.cafePrice
+            : formData.cafePrice,
+          rappiPrice: currentVariantIndex !== null 
+            ? variants[currentVariantIndex]?.rappiPrice
+            : formData.rappiPrice,
+          pedidosyaPrice: currentVariantIndex !== null 
+            ? variants[currentVariantIndex]?.pedidosyaPrice
+            : formData.pedidosyaPrice,
+          uberPrice: currentVariantIndex !== null 
+            ? variants[currentVariantIndex]?.uberPrice
+            : formData.uberPrice,
+        }}
+        title={currentVariantIndex !== null ? "Variant Channel Pricing" : "Product Channel Pricing"}
+      />
 
       {/* Channel Pricing Modal for Modifiers */}
       {currentModifierIndices !== null && (

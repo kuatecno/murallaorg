@@ -191,23 +191,15 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
 
   const fetchCategories = async () => {
     try {
-      console.log('Fetching categories...');
       const response = await apiClient.get('/api/categories');
-      console.log('Categories response status:', response.status);
 
       if (response.ok) {
         const result = await response.json();
-        console.log('Categories result:', result);
         if (result.success && result.data) {
-          console.log('Setting categories:', result.data.length, 'categories found');
           setCategories(result.data);
-        } else {
-          console.log('No categories data in result:', result);
         }
       } else {
-        console.log('Categories response not ok:', response.status, response.statusText);
-        const errorText = await response.text();
-        console.log('Error response:', errorText);
+        console.error('Failed to fetch categories:', response.status, response.statusText);
       }
     } catch (error) {
       console.error('Error fetching categories:', error);

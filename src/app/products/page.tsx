@@ -1,12 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import Link from 'next/link';
+import { useTranslation } from '@/contexts/LanguageContext';
 import CreateProductModal from '@/components/products/CreateProductModal';
-import ProductNavigation from '@/components/products/ProductNavigation';
 import ProductEnrichmentModal from '@/components/products/ProductEnrichmentModal';
+import ProductNavigation from '@/components/products/ProductNavigation';
+import LanguageSwitcher from '@/components/shared/LanguageSwitcher';
 import apiClient from '@/lib/api-client';
 
 interface Product {
@@ -49,6 +51,13 @@ export default function ProductsPage() {
   const [selectedProductForEnrich, setSelectedProductForEnrich] = useState<Product | null>(null);
   const router = useRouter();
   const { user, isLoading: isAuthLoading } = useAuth();
+  const { t } = useTranslation();
+
+  // Helper function to get translated product type
+  const getProductTypeLabel = (type: string) => {
+    if (type === 'ALL') return t('filters.all');
+    return t(`products.types.${type}`);
+  };
 
   useEffect(() => {
     if (!isAuthLoading) {
@@ -95,24 +104,26 @@ export default function ProductsPage() {
 
   const getProductTypeBadge = (type: string) => {
     const badges = {
-      INPUT: { label: 'Input', color: 'bg-gray-100 text-gray-800' },
-      READY_PRODUCT: { label: 'Ready Product', color: 'bg-blue-100 text-blue-800' },
-      MANUFACTURED: { label: 'Manufactured', color: 'bg-orange-100 text-orange-800' },
-      MADE_TO_ORDER: { label: 'Made to Order', color: 'bg-green-100 text-green-800' },
-      SERVICE: { label: 'Service', color: 'bg-purple-100 text-purple-800' },
+      INPUT: { color: 'bg-gray-100 text-gray-800' },
+      READY_PRODUCT: { color: 'bg-blue-100 text-blue-800' },
+      MANUFACTURED: { color: 'bg-green-100 text-green-800' },
+      MADE_TO_ORDER: { color: 'bg-yellow-100 text-yellow-800' },
+      SERVICE: { color: 'bg-purple-100 text-purple-800' },
     };
-    const badge = badges[type as keyof typeof badges] || badges.INPUT;
+
+    const badge = badges[type as keyof typeof badges] || { color: 'bg-gray-100 text-gray-800' };
+
     return (
-      <span className={`px-2 py-1 rounded-full text-xs font-medium ${badge.color}`}>
-        {badge.label}
+      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${badge.color}`}>
+        {t(`products.types.${type}`)}
       </span>
     );
   };
 
   const getStockStatus = (currentStock: number, minStock: number) => {
-    if (currentStock === 0) return { label: 'Out of Stock', color: 'text-red-600' };
-    if (currentStock <= minStock) return { label: 'Low Stock', color: 'text-yellow-600' };
-    return { label: 'In Stock', color: 'text-green-600' };
+    if (currentStock === 0) return { label: t('products.stockStatus.outOfStock'), color: 'text-red-600' };
+    if (currentStock <= minStock) return { label: t('products.stockStatus.lowStock'), color: 'text-yellow-600' };
+    return { label: t('products.stockStatus.inStock'), color: 'text-green-600' };
   };
 
   const handleEditProduct = (product: Product) => {
@@ -162,16 +173,19 @@ export default function ProductsPage() {
           <div className="flex justify-between items-center py-6">
             <div className="flex items-center space-x-4">
               <Link href="/dashboard" className="text-gray-600 hover:text-gray-900">
-                ← Back
+                ← {t('common.back')}
               </Link>
-              <h1 className="text-2xl font-bold text-gray-900">Products</h1>
+              <h1 className="text-2xl font-bold text-gray-900">{t('products.title')}</h1>
             </div>
-            <button
-              onClick={() => setIsCreateModalOpen(true)}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-            >
-              + New Product
-            </button>
+            <div className="flex items-center space-x-4">
+              <LanguageSwitcher />
+              <button
+                onClick={() => setIsCreateModalOpen(true)}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+              >
+                + {t('products.newProduct')}
+              </button>
+            </div>
           </div>
 
           {/* Navigation Tabs */}
@@ -187,7 +201,7 @@ export default function ProductsPage() {
             <div className="flex-1 max-w-md">
               <input
                 type="text"
-                placeholder="Search by name or SKU..."
+                placeholder={t('products.searchPlaceholder')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -232,7 +246,7 @@ export default function ProductsPage() {
                       : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                   }`}
                 >
-                  {type === 'ALL' ? 'All' : type.replace(/_/g, ' ')}
+                  {getProductTypeLabel(type)}
                 </button>
               )
             )}
@@ -263,7 +277,7 @@ export default function ProductsPage() {
                   <div className="flex justify-between items-start mb-4">
                     {getProductTypeBadge(product.type)}
                     {product.hasRecipe && (
-                      <span className="text-xs text-gray-500">📝 Has Recipe</span>
+                      <span className="text-xs text-gray-500">📝 {t('products.hasRecipe')}</span>
                     )}
                   </div>
 
@@ -272,7 +286,7 @@ export default function ProductsPage() {
 
                   {product.type !== 'INPUT' && product.type !== 'SERVICE' && (
                     <div className="flex items-center justify-between mb-4">
-                      <span className="text-sm text-gray-600">Stock:</span>
+                      <span className="text-sm text-gray-600">{t('products.stock')}:</span>
                       <span className={`text-sm font-medium ${stockStatus.color}`}>
                         {product.currentStock} {product.unit}
                       </span>
@@ -281,7 +295,7 @@ export default function ProductsPage() {
 
                   <div className="flex items-center justify-between pt-4 border-t border-gray-200">
                     {product.type === 'INPUT' ? (
-                      <span className="text-sm text-gray-500">Cost: ${product.costPrice?.toFixed(0)}</span>
+                      <span className="text-sm text-gray-500">{t('products.costPrice')}: ${product.costPrice?.toFixed(0)}</span>
                     ) : (
                       <span className="text-lg font-bold text-gray-900">${product.unitPrice.toFixed(0)}</span>
                     )}
@@ -289,7 +303,7 @@ export default function ProductsPage() {
                       <button
                         onClick={() => handleEnrichProduct(product)}
                         className="text-purple-600 hover:text-purple-700 text-sm font-medium"
-                        title="Enrich with AI"
+                        title={t('products.enrichWithAI')}
                       >
                         ✨ AI
                       </button>
@@ -297,7 +311,7 @@ export default function ProductsPage() {
                         onClick={() => handleEditProduct(product)}
                         className="text-blue-600 hover:text-blue-700 text-sm font-medium"
                       >
-                        Edit →
+                        {t('common.edit')} →
                       </button>
                     </div>
                   </div>
@@ -311,19 +325,19 @@ export default function ProductsPage() {
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Product
+                    {t('products.name')}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Type
+                    {t('products.type')}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Stock
+                    {t('products.stock')}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Price
+                    {t('products.price')}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
+                    {t('actions')}
                   </th>
                 </tr>
               </thead>
@@ -384,7 +398,7 @@ export default function ProductsPage() {
                           <button
                             onClick={() => handleEnrichProduct(product)}
                             className="text-purple-600 hover:text-purple-700 font-medium"
-                            title="Enrich with AI"
+                            title={t('products.enrichWithAI')}
                           >
                             ✨ AI
                           </button>
@@ -392,7 +406,7 @@ export default function ProductsPage() {
                             onClick={() => handleEditProduct(product)}
                             className="text-blue-600 hover:text-blue-700 font-medium"
                           >
-                            Edit
+                            {t('common.edit')}
                           </button>
                         </div>
                       </td>
@@ -406,7 +420,7 @@ export default function ProductsPage() {
 
         {filteredProducts.length === 0 && (
           <div className="text-center py-12">
-            <p className="text-gray-500">No products found. Create your first product!</p>
+            <p className="text-gray-500">{t('products.noProducts')}</p>
           </div>
         )}
       </main>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useTranslation } from '@/contexts/LanguageContext';
 import ProductEnrichmentModal from './ProductEnrichmentModal';
 import ImageUploader from '../shared/ImageUploader';
 import ChannelPricingModal from '../shared/ChannelPricingModal';
@@ -105,6 +106,7 @@ interface ModifierGroup {
 }
 
 export default function CreateProductModal({ isOpen, onClose, onSuccess, product }: CreateProductModalProps) {
+  const { t } = useTranslation();
   const [formData, setFormData] = useState<ProductFormData>({
     sku: '',
     name: '',
@@ -521,7 +523,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, product
       <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
         <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center">
           <h2 className="text-xl font-bold text-gray-900">
-            {product ? 'Edit Product' : 'Create New Product'}
+            {product ? t('products.editProduct') : t('products.createProduct')}
           </h2>
           <button
             onClick={handleClose}
@@ -600,7 +602,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, product
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Product Name <span className="text-red-500">*</span>
+{t('products.name')} <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
@@ -615,7 +617,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, product
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                SKU <span className="text-red-500">*</span>
+                {t('products.sku')} <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
@@ -630,20 +632,20 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, product
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t('products.description')}</label>
             <textarea
               name="description"
               value={formData.description}
               onChange={handleChange}
               rows={3}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="Optional product description"
+              placeholder={t('products.description')}
             />
           </div>
 
           {/* Product Images */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Product Images</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">{t('products.images')}</label>
             <ImageUploader
               images={formData.images}
               onImagesChange={(images) => setFormData(prev => ({ ...prev, images }))}
@@ -653,14 +655,14 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, product
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('products.category')}</label>
               <select
                 name="category"
                 value={formData.category}
                 onChange={handleChange}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
-                <option value="">Select a category...</option>
+                <option value="">{t('forms.selectOption')}...</option>
                 {categories.map((cat) => (
                   <option key={cat.id} value={cat.name}>
                     {cat.emoji} {cat.name}
@@ -669,13 +671,13 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, product
               </select>
               {categories.length === 0 && (
                 <p className="mt-1 text-xs text-gray-500">
-                  No categories available. Create categories first in Settings.
+                  {t('categories.noCategories')}
                 </p>
               )}
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Brand</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('products.brand')}</label>
               <input
                 type="text"
                 name="brand"

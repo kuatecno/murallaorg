@@ -22,7 +22,8 @@
     "info": "Information",
     "export": "Export",
     "exporting": "Exporting...",
-    "backup": "Backup"
+    "backup": "Backup",
+    "optional": "Optional"
   },
   "navigation": {
     "dashboard": "Dashboard",

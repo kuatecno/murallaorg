@@ -563,41 +563,6 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, product
           )}
 
           {/* Product Type Selection */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-3">
-              Product Type <span className="text-red-500">*</span>
-            </label>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {productTypes.map((type) => (
-                <button
-                  key={type.value}
-                  type="button"
-                  onClick={() => handleTypeChange(type.value)}
-                  className={`p-4 border-2 rounded-lg text-left transition-all ${
-                    formData.type === type.value
-                      ? 'border-blue-600 bg-blue-50'
-                      : 'border-gray-200 hover:border-gray-300'
-                  }`}
-                >
-                  <div className="text-2xl mb-2">{type.icon}</div>
-                  <div className="font-semibold text-gray-900 mb-1">{type.label}</div>
-                  <div className="text-xs text-gray-500">{type.description}</div>
-                </button>
-              ))}
-            </div>
-            {needsRecipe && (
-              <p className="mt-2 text-sm text-blue-600">
-                {t('products.recipeAutoCreate')}
-              </p>
-            )}
-            {formData.type === 'INPUT' && (
-              <p className="mt-2 text-sm text-amber-600">
-                {t('products.inputWarning')}
-              </p>
-            )}
-          </div>
-
-        {/* Product Type Selection */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-3">
             {t('products.type')} <span className="text-red-500">*</span>
@@ -697,6 +662,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, product
               images={formData.images}
               onImagesChange={(images) => setFormData(prev => ({ ...prev, images }))}
               maxImages={5}
+              label={t('products.images')}
             />
           </div>
 
@@ -735,6 +701,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, product
                 images={crossVariantImages}
                 onImagesChange={setCrossVariantImages}
                 maxImages={3}
+                label={t('variants.crossVariantImages')}
               />
             </div>
           )}
@@ -1026,12 +993,13 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, product
                             {/* Variant Images */}
                             <div>
                               <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Variant Images (Optional)
+                                {t('variants.variantImages')} ({t('common.optional')})
                               </label>
                               <ImageUploader
                                 images={variant.images}
                                 onImagesChange={(images) => updateVariant(index, 'images', images)}
                                 maxImages={4}
+                                label={t('variants.variantImages')}
                               />
                             </div>
 
@@ -1296,7 +1264,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, product
           {/* Product Images */}
           {formData.images.length > 0 && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Product Images</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">{t('products.images')}</label>
               <div className="grid grid-cols-4 gap-3">
                 {formData.images.map((imageUrl, index) => (
                   <div key={index} className="relative aspect-square rounded-lg overflow-hidden border-2 border-gray-200">

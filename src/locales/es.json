@@ -22,7 +22,8 @@
     "info": "Información",
     "export": "Exportar",
     "exporting": "Exportando...",
-    "backup": "Respaldo"
+    "backup": "Respaldo",
+    "optional": "Opcional"
   },
   "navigation": {
     "dashboard": "Panel",

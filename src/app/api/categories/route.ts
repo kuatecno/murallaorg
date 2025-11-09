@@ -94,6 +94,14 @@ export async function GET(request: NextRequest) {
 
   } catch (error: any) {
     console.error('Error fetching categories:', error);
+    console.error('Error stack:', error.stack);
+    
+    // If it's a database schema error, provide more specific error info
+    if (error.code === 'P2021' || error.message.includes('does not exist')) {
+      console.error('Database schema error - table or column may not exist');
+      return corsError('Database schema error - please check if migrations have been applied', 500, origin);
+    }
+    
     return corsError('Failed to fetch categories: ' + error.message, 500, origin);
   }
 }

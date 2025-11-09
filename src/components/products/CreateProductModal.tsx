@@ -85,10 +85,11 @@ interface ProductVariant {
   sku?: string;
   name: string;
   displayName?: string;
-  useCustomName: boolean;
+  useCustomName?: boolean;
   description?: string;
-  price?: number;
+  price: number;
   costPrice?: string;
+  currentStock?: number;
   cafePrice?: string;
   rappiPrice?: string;
   pedidosyaPrice?: string;
@@ -460,6 +461,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
       description: '',
       price: 0,
       costPrice: formData.costPrice || '',
+      currentStock: 0,
       cafePrice: formData.cafePrice || '',
       rappiPrice: formData.rappiPrice || '',
       pedidosyaPrice: formData.pedidosyaPrice || '',
@@ -1279,13 +1281,32 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
                               <label className="block text-sm font-medium text-gray-700 mb-2">
                                 Variant SKU
                               </label>
-                              <input
-                                type="text"
-                                value={variant.sku || ''}
-                                onChange={(e) => updateVariant(index, 'sku', e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                                placeholder="e.g., NEST-PKG-MILK-SMAL"
-                              />
+                              <div className="flex gap-2">
+                                <input
+                                  type="text"
+                                  value={variant.sku || ''}
+                                  onChange={(e) => updateVariant(index, 'sku', e.target.value)}
+                                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                  placeholder="e.g., NEST-PKG-MILK-SMAL"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const suggestedSKU = generateSKU(
+                                      formData.brand,
+                                      formData.format,
+                                      formData.name,
+                                      variant.name
+                                    );
+                                    updateVariant(index, 'sku', suggestedSKU);
+                                  }}
+                                  disabled={!formData.name || !variant.name}
+                                  className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-sm whitespace-nowrap"
+                                  title="Suggest SKU for this variant"
+                                >
+                                  🔧 Suggest
+                                </button>
+                              </div>
                             </div>
 
                             {/* Custom Name Override */}
@@ -1315,9 +1336,23 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
 
                             {/* Variant Description */}
                             <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Variant Description
-                              </label>
+                              <div className="flex items-center justify-between mb-1">
+                                <label className="block text-sm font-medium text-gray-700">
+                                  Variant Description
+                                </label>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    // Set the variant name and description for AI enrichment
+                                    setIsEnrichModalOpen(true);
+                                    // You could pass variant-specific data here if needed
+                                  }}
+                                  className="px-2 py-1 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded text-xs font-medium transition-colors"
+                                  title="Use AI to enhance this variant description"
+                                >
+                                  ✨ AI Enhance
+                                </button>
+                              </div>
                               <textarea
                                 value={variant.description || ''}
                                 onChange={(e) => updateVariant(index, 'description', e.target.value)}
@@ -1369,6 +1404,23 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
                                 />
                               </div>
                             </div>
+
+                            {/* Current Stock - Only for products that track inventory */}
+                            {formData.type !== 'MADE_TO_ORDER' && formData.type !== 'SERVICE' && (
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                  {t('products.currentStock')}
+                                </label>
+                                <input
+                                  type="number"
+                                  value={variant.currentStock || ''}
+                                  onChange={(e) => updateVariant(index, 'currentStock', parseInt(e.target.value) || 0)}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                  placeholder="Current inventory for this variant"
+                                  min="0"
+                                />
+                              </div>
+                            )}
 
                             {/* Channel Pricing Button */}
                             <div>

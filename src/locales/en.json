@@ -7,6 +7,8 @@
     "delete": "Delete",
     "create": "Create",
     "update": "Update",
+    "creating": "Creating...",
+    "updating": "Updating...",
     "search": "Search",
     "filter": "Filter",
     "back": "Back",

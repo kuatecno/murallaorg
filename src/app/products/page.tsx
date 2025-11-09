@@ -50,6 +50,10 @@ export default function ProductsPage() {
   const [selectedProductForEdit, setSelectedProductForEdit] = useState<Product | null>(null);
   const [isEnrichModalOpen, setIsEnrichModalOpen] = useState(false);
   const [selectedProductForEnrich, setSelectedProductForEnrich] = useState<Product | null>(null);
+  const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [productToDelete, setProductToDelete] = useState<Product | null>(null);
   const router = useRouter();
   const { user, isLoading: isAuthLoading } = useAuth();
   const { t } = useTranslation();
@@ -92,6 +96,82 @@ export default function ProductsPage() {
     } catch (error) {
       console.error('Error loading products:', error);
     }
+  };
+
+  // Selection functions
+  const toggleProductSelection = (productId: string) => {
+    const newSelection = new Set(selectedProducts);
+    if (newSelection.has(productId)) {
+      newSelection.delete(productId);
+    } else {
+      newSelection.add(productId);
+    }
+    setSelectedProducts(newSelection);
+  };
+
+  const selectAllProducts = () => {
+    const allProductIds = new Set(filteredProducts.map(p => p.id));
+    setSelectedProducts(allProductIds);
+  };
+
+  const clearSelection = () => {
+    setSelectedProducts(new Set());
+  };
+
+  // Delete functions
+  const handleDeleteProduct = (product: Product) => {
+    setProductToDelete(product);
+    setShowDeleteConfirm(true);
+  };
+
+  const handleBulkDelete = () => {
+    if (selectedProducts.size === 0) return;
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDelete = async () => {
+    setIsDeleting(true);
+    try {
+      if (productToDelete) {
+        // Single product delete
+        const response = await apiClient.delete(`/api/products/${productToDelete.id}`);
+        if (response.ok) {
+          setProducts(products.filter(p => p.id !== productToDelete.id));
+          setSelectedProducts(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(productToDelete.id);
+            return newSet;
+          });
+        }
+      } else if (selectedProducts.size > 0) {
+        // Bulk delete
+        const deletePromises = Array.from(selectedProducts).map(productId =>
+          apiClient.delete(`/api/products/${productId}`)
+        );
+        
+        const results = await Promise.allSettled(deletePromises);
+        const successfulDeletes = results
+          .map((result, index) => ({ result, id: Array.from(selectedProducts)[index] }))
+          .filter(({ result }) => result.status === 'fulfilled' && (result.value as Response).ok)
+          .map(({ id }) => id);
+
+        if (successfulDeletes.length > 0) {
+          setProducts(products.filter(p => !successfulDeletes.includes(p.id)));
+          setSelectedProducts(new Set());
+        }
+      }
+    } catch (error) {
+      console.error('Error deleting products:', error);
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteConfirm(false);
+      setProductToDelete(null);
+    }
+  };
+
+  const cancelDelete = () => {
+    setShowDeleteConfirm(false);
+    setProductToDelete(null);
   };
 
   const filteredProducts = products.filter((product) => {
@@ -257,6 +337,32 @@ export default function ProductsPage() {
               )
             )}
           </div>
+
+          {/* Bulk Actions Toolbar */}
+          {selectedProducts.size > 0 && (
+            <div className="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-lg p-3 mt-4">
+              <div className="flex items-center space-x-4">
+                <span className="text-sm font-medium text-blue-900">
+                  {selectedProducts.size} {selectedProducts.size === 1 ? 'product' : 'products'} selected
+                </span>
+                <button
+                  onClick={clearSelection}
+                  className="text-sm text-blue-600 hover:text-blue-800"
+                >
+                  Clear selection
+                </button>
+              </div>
+              <div className="flex items-center space-x-3">
+                <button
+                  onClick={handleBulkDelete}
+                  disabled={isDeleting}
+                  className="bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                >
+                  {isDeleting ? 'Deleting...' : `Delete ${selectedProducts.size}`}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Products Display */}
@@ -265,7 +371,17 @@ export default function ProductsPage() {
             {filteredProducts.map((product) => {
               const stockStatus = getStockStatus(product.currentStock, product.minStock);
               return (
-                <div key={product.id} className="bg-white rounded-lg shadow hover:shadow-lg transition-shadow p-6">
+                <div key={product.id} className="bg-white rounded-lg shadow hover:shadow-lg transition-shadow p-6 relative">
+                  {/* Selection Checkbox */}
+                  <div className="absolute top-3 left-3 z-10">
+                    <input
+                      type="checkbox"
+                      checked={selectedProducts.has(product.id)}
+                      onChange={() => toggleProductSelection(product.id)}
+                      className="w-4 h-4 text-blue-600 bg-white border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
+                    />
+                  </div>
+
                   {/* Product Image */}
                   {product.images && Array.isArray(product.images) && product.images.length > 0 && (
                     <div className="mb-4 rounded-lg overflow-hidden bg-gray-100">
@@ -319,6 +435,13 @@ export default function ProductsPage() {
                       >
                         {t('common.edit')} →
                       </button>
+                      <button
+                        onClick={() => handleDeleteProduct(product)}
+                        className="text-red-600 hover:text-red-700 text-sm font-medium"
+                        title={t('common.delete')}
+                      >
+                        🗑️
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -330,6 +453,20 @@ export default function ProductsPage() {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-12">
+                    <input
+                      type="checkbox"
+                      checked={selectedProducts.size === filteredProducts.length && filteredProducts.length > 0}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          selectAllProducts();
+                        } else {
+                          clearSelection();
+                        }
+                      }}
+                      className="w-4 h-4 text-blue-600 bg-white border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
+                    />
+                  </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     {t('products.name')}
                   </th>
@@ -352,6 +489,14 @@ export default function ProductsPage() {
                   const stockStatus = getStockStatus(product.currentStock, product.minStock);
                   return (
                     <tr key={product.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4">
+                        <input
+                          type="checkbox"
+                          checked={selectedProducts.has(product.id)}
+                          onChange={() => toggleProductSelection(product.id)}
+                          className="w-4 h-4 text-blue-600 bg-white border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
+                        />
+                      </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center space-x-3">
                           {/* Product Image */}
@@ -414,6 +559,13 @@ export default function ProductsPage() {
                           >
                             {t('common.edit')}
                           </button>
+                          <button
+                            onClick={() => handleDeleteProduct(product)}
+                            className="text-red-600 hover:text-red-700 font-medium"
+                            title={t('common.delete')}
+                          >
+                            🗑️
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -453,6 +605,7 @@ export default function ProductsPage() {
           setIsEditModalOpen(false);
           setSelectedProductForEdit(null);
         }}
+        onDelete={handleDeleteProduct}
         product={selectedProductForEdit || undefined}
       />
 
@@ -468,6 +621,39 @@ export default function ProductsPage() {
         productEan={selectedProductForEnrich?.ean}
         onApprove={handleApplyEnrichment}
       />
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              {t('products.deleteConfirm')}
+            </h3>
+            <p className="text-gray-600 mb-6">
+              {productToDelete 
+                ? `Are you sure you want to delete "${productToDelete.name}"? This action cannot be undone.`
+                : `Are you sure you want to delete ${selectedProducts.size} products? This action cannot be undone.`
+              }
+            </p>
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={cancelDelete}
+                disabled={isDeleting}
+                className="px-4 py-2 text-gray-700 bg-gray-200 hover:bg-gray-300 disabled:bg-gray-100 rounded-lg font-medium transition-colors"
+              >
+                {t('common.cancel')}
+              </button>
+              <button
+                onClick={confirmDelete}
+                disabled={isDeleting}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white rounded-lg font-medium transition-colors"
+              >
+                {isDeleting ? 'Deleting...' : t('common.delete')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

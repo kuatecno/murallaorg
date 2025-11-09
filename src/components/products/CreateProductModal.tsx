@@ -23,6 +23,10 @@ interface Product {
   minStock: number;
   maxStock?: number;
   unit: string;
+  hasRecipe: boolean;
+  isActive: boolean;
+  menuSection?: string;
+  hoy?: boolean;
   images?: string[];
   cafePrice?: number;
   rappiPrice?: number;
@@ -34,6 +38,7 @@ interface CreateProductModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  onDelete?: (product: Product) => void; // Optional delete callback for edit mode
   product?: Product; // Optional product for edit mode
 }
 
@@ -111,7 +116,7 @@ interface ModifierGroup {
   modifiers: ProductModifier[];
 }
 
-export default function CreateProductModal({ isOpen, onClose, onSuccess, product }: CreateProductModalProps) {
+export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelete, product }: CreateProductModalProps) {
   const { t } = useTranslation();
   const [formData, setFormData] = useState<ProductFormData>({
     sku: '',
@@ -1423,22 +1428,40 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, product
           )}
 
           {/* Actions */}
-          <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
-            <button
-              type="button"
-              onClick={handleClose}
-              className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
-              disabled={loading}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-blue-300"
-              disabled={loading}
-            >
-              {loading ? 'Creating...' : 'Create Product'}
-            </button>
+          <div className="flex justify-between pt-4 border-t border-gray-200">
+            {/* Delete Button (Edit Mode Only) */}
+            {product && onDelete && (
+              <button
+                type="button"
+                onClick={() => {
+                  onDelete(product);
+                  handleClose();
+                }}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-red-300"
+                disabled={loading}
+              >
+                🗑️ {t('common.delete')}
+              </button>
+            )}
+            
+            {/* Right Side Actions */}
+            <div className="flex space-x-3 ml-auto">
+              <button
+                type="button"
+                onClick={handleClose}
+                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                disabled={loading}
+              >
+                {t('common.cancel')}
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-blue-300"
+                disabled={loading}
+              >
+                {loading ? (product ? t('common.updating') : t('common.creating')) : (product ? t('common.update') : t('common.create'))}
+              </button>
+            </div>
           </div>
         </form>
       </div>

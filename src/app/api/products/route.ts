@@ -289,6 +289,8 @@ export async function POST(request: NextRequest) {
         minStock: body.minStock || 0,
         maxStock: body.maxStock || null,
         unit: body.unit || 'UNIT',
+        // Only include tags if the field exists in the schema
+        ...(body.tags && { tags: body.tags }),
         isActive: body.isActive !== undefined ? body.isActive : true,
         metadata: body.metadata || {},
       },

@@ -56,9 +56,20 @@ export async function GET(request: NextRequest) {
       ];
     }
 
-    // Fetch categories
+    // Fetch categories - select only fields that exist in production
     const categories = await prisma.category.findMany({
       where,
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        emoji: true,
+        color: true,
+        isActive: true,
+        createdAt: true,
+        updatedAt: true,
+        // Don't select format field as it doesn't exist in production yet
+      },
       orderBy: { [sortBy]: sortOrder },
     });
 
@@ -83,8 +94,7 @@ export async function GET(request: NextRequest) {
           productCount,
           createdAt: category.createdAt,
           updatedAt: category.updatedAt,
-          // Only include format if it exists in the schema
-          ...((category as any).format !== undefined && { format: (category as any).format }),
+          // Format field will be added when database is migrated
         };
       })
     );

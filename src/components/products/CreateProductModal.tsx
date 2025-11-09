@@ -75,6 +75,7 @@ interface Category {
 
 interface ProductVariant {
   id?: string;
+  sku?: string;
   name: string;
   displayName?: string;
   useCustomName: boolean;
@@ -250,6 +251,54 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, product
     setError('');
   };
 
+  // SKU Generation Helper
+  const generateSKU = (brand: string, format: string, productName: string, variant?: string) => {
+    const cleanText = (text: string) => {
+      return text
+        .toUpperCase()
+        .replace(/[^A-Z0-9\s]/g, '') // Remove special characters
+        .replace(/\s+/g, '') // Remove spaces
+        .substring(0, 4); // Limit to 4 characters
+    };
+
+    const brandCode = brand ? cleanText(brand) : 'PROD';
+    const formatCode = format ? {
+      'PACKAGED': 'PKG',
+      'FROZEN': 'FRZ', 
+      'FRESH': 'FRS'
+    }[format] || format.substring(0, 3).toUpperCase() : '';
+    
+    const productCode = productName ? cleanText(productName) : '';
+    const variantCode = variant ? cleanText(variant) : '';
+
+    // Build SKU: BRAND-FORMAT-PRODUCT-VARIANT
+    const parts = [brandCode, formatCode, productCode, variantCode].filter(Boolean);
+    return parts.join('-');
+  };
+
+  const suggestSKU = () => {
+    const suggestedSKU = generateSKU(
+      formData.brand,
+      formData.format,
+      formData.name,
+      variants.length > 0 ? variants[0]?.name : undefined
+    );
+    
+    setFormData(prev => ({ ...prev, sku: suggestedSKU }));
+  };
+
+  const suggestVariantSKU = (variantIndex: number) => {
+    const variant = variants[variantIndex];
+    const suggestedSKU = generateSKU(
+      formData.brand,
+      formData.format,
+      formData.name,
+      variant.name
+    );
+    
+    updateVariant(variantIndex, 'sku', suggestedSKU);
+  };
+
   const handleTypeChange = (type: ProductType) => {
     setFormData((prev) => ({ ...prev, type }));
     setError('');
@@ -390,6 +439,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, product
     // Smart defaults: pre-populate with product values
     const newVariant: ProductVariant = {
       name: '',
+      sku: '',
       useCustomName: false,
       description: '',
       price: 0,
@@ -648,18 +698,32 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, product
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                {t('products.sku')} <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                name="sku"
-                value={formData.sku}
-                onChange={handleChange}
-                required
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="e.g., MILK-1L"
-              />
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('products.sku')} <span className="text-red-500">*</span></label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  name="sku"
+                  value={formData.sku}
+                  onChange={handleChange}
+                  required
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="e.g., NEST-PKG-MILK-1L"
+                />
+                <button
+                  type="button"
+                  onClick={suggestSKU}
+                  disabled={!formData.name}
+                  className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-sm whitespace-nowrap"
+                  title={t('products.suggestSKU')}
+                >
+                  🔧 {t('products.suggestSKU')}
+                </button>
+              </div>
+              {!formData.name && (
+                <p className="text-xs text-gray-500 mt-1">
+                  💡 {t('products.name')} is required to generate SKU suggestions
+                </p>
+              )}
             </div>
           </div>
 
@@ -976,16 +1040,41 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, product
                               <label className="block text-sm font-medium text-gray-700 mb-2">
                                 Variant Name <span className="text-red-500">*</span>
                               </label>
+                              <div className="flex gap-2">
+                                <input
+                                  type="text"
+                                  value={variant.name}
+                                  onChange={(e) => updateVariant(index, 'name', e.target.value)}
+                                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                  placeholder="e.g., Small, Strawberry"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => suggestVariantSKU(index)}
+                                  disabled={!formData.name || !variant.name}
+                                  className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-sm whitespace-nowrap"
+                                  title={t('products.suggestSKU')}
+                                >
+                                  🔧
+                                </button>
+                              </div>
+                              <p className="text-xs text-gray-500 mt-1">
+                                This will be used to identify the variant (e.g., size, flavor, color)
+                              </p>
+                            </div>
+
+                            {/* Variant SKU */}
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Variant SKU
+                              </label>
                               <input
                                 type="text"
-                                value={variant.name}
-                                onChange={(e) => updateVariant(index, 'name', e.target.value)}
+                                value={variant.sku || ''}
+                                onChange={(e) => updateVariant(index, 'sku', e.target.value)}
                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                                placeholder="e.g., Small, Strawberry"
+                                placeholder="e.g., NEST-PKG-MILK-SMAL"
                               />
-                              <p className="text-xs text-gray-500 mt-1">
-                                Final name: <span className="font-medium">{displayName}</span>
-                              </p>
                             </div>
 
                             {/* Custom Name Override */}

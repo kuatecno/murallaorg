@@ -93,6 +93,7 @@
     "recipe": "Recipe",
     "hasRecipe": "Has Recipe",
     "enrichWithAI": "Enrich with AI",
+    "suggestSKU": "Suggest SKU",
     "aiEnrichmentTitle": "✨AI Product Enrichment",
     "aiEnrichmentDesc": "Auto-fill product details using AI (name, description, category, images, etc.)",
     "inputWarning": "⚠️ INPUT products cannot be sold directly. They are used as ingredients in recipes.",

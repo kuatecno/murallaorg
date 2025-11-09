@@ -93,6 +93,7 @@
     "recipe": "Receta",
     "hasRecipe": "Tiene Receta",
     "enrichWithAI": "Enriquecer con IA",
+    "suggestSKU": "Sugerir SKU",
     "aiEnrichmentTitle": "✨Enriquecimiento de Producto con IA",
     "aiEnrichmentDesc": "Completar automáticamente los detalles del producto usando IA (nombre, descripción, categoría, imágenes, etc.)",
     "inputWarning": "⚠️ Los productos INSUMO no se pueden vender directamente. Se usan como ingredientes en recetas.",

@@ -43,6 +43,8 @@ export default function ProductsPage() {
   const [filterType, setFilterType] = useState<FilterType>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [selectedProductForEdit, setSelectedProductForEdit] = useState<Product | null>(null);
   const [isEnrichModalOpen, setIsEnrichModalOpen] = useState(false);
   const [selectedProductForEnrich, setSelectedProductForEnrich] = useState<Product | null>(null);
   const router = useRouter();
@@ -111,6 +113,11 @@ export default function ProductsPage() {
     if (currentStock === 0) return { label: 'Out of Stock', color: 'text-red-600' };
     if (currentStock <= minStock) return { label: 'Low Stock', color: 'text-yellow-600' };
     return { label: 'In Stock', color: 'text-green-600' };
+  };
+
+  const handleEditProduct = (product: Product) => {
+    setSelectedProductForEdit(product);
+    setIsEditModalOpen(true);
   };
 
   const handleEnrichProduct = (product: Product) => {
@@ -287,9 +294,7 @@ export default function ProductsPage() {
                         ✨ AI
                       </button>
                       <button
-                        onClick={() => {
-                          alert('Edit functionality coming soon');
-                        }}
+                        onClick={() => handleEditProduct(product)}
                         className="text-blue-600 hover:text-blue-700 text-sm font-medium"
                       >
                         Edit →
@@ -384,9 +389,7 @@ export default function ProductsPage() {
                             ✨ AI
                           </button>
                           <button
-                            onClick={() => {
-                              alert('Edit functionality coming soon');
-                            }}
+                            onClick={() => handleEditProduct(product)}
                             className="text-blue-600 hover:text-blue-700 font-medium"
                           >
                             Edit
@@ -416,6 +419,21 @@ export default function ProductsPage() {
           loadProducts();
           setIsCreateModalOpen(false);
         }}
+      />
+
+      {/* Edit Product Modal */}
+      <CreateProductModal
+        isOpen={isEditModalOpen}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setSelectedProductForEdit(null);
+        }}
+        onSuccess={() => {
+          loadProducts();
+          setIsEditModalOpen(false);
+          setSelectedProductForEdit(null);
+        }}
+        product={selectedProductForEdit || undefined}
       />
 
       {/* Product Enrichment Modal */}

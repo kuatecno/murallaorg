@@ -6,10 +6,32 @@ import ImageUploader from '../shared/ImageUploader';
 import ChannelPricingModal from '../shared/ChannelPricingModal';
 import apiClient from '@/lib/api-client';
 
+interface Product {
+  id: string;
+  sku: string;
+  name: string;
+  description?: string;
+  type: ProductType;
+  category?: string;
+  brand?: string;
+  ean?: string;
+  unitPrice: number;
+  costPrice?: number;
+  minStock: number;
+  maxStock?: number;
+  unit: string;
+  images?: string[];
+  cafePrice?: number;
+  rappiPrice?: number;
+  pedidosyaPrice?: number;
+  uberPrice?: number;
+}
+
 interface CreateProductModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  product?: Product; // Optional product for edit mode
 }
 
 type ProductType = 'INPUT' | 'READY_PRODUCT' | 'MANUFACTURED' | 'MADE_TO_ORDER' | 'SERVICE';
@@ -82,7 +104,7 @@ interface ModifierGroup {
   modifiers: ProductModifier[];
 }
 
-export default function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProductModalProps) {
+export default function CreateProductModal({ isOpen, onClose, onSuccess, product }: CreateProductModalProps) {
   const [formData, setFormData] = useState<ProductFormData>({
     sku: '',
     name: '',
@@ -123,6 +145,31 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess }: Creat
       fetchCategories();
     }
   }, [isOpen]);
+
+  // Populate form data when editing a product
+  useEffect(() => {
+    if (product) {
+      setFormData({
+        sku: product.sku,
+        name: product.name,
+        description: product.description || '',
+        type: product.type,
+        category: product.category || '',
+        brand: product.brand || '',
+        ean: product.ean || '',
+        unitPrice: product.unitPrice.toString(),
+        costPrice: product.costPrice?.toString() || '',
+        minStock: product.minStock.toString(),
+        maxStock: product.maxStock?.toString() || '',
+        unit: product.unit,
+        images: product.images || [],
+        cafePrice: product.cafePrice?.toString() || '',
+        rappiPrice: product.rappiPrice?.toString() || '',
+        pedidosyaPrice: product.pedidosyaPrice?.toString() || '',
+        uberPrice: product.uberPrice?.toString() || '',
+      });
+    }
+  }, [product]);
 
   const fetchCategories = async () => {
     try {
@@ -223,15 +270,27 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess }: Creat
         uberPrice: formData.uberPrice ? parseFloat(formData.uberPrice) : undefined,
       };
 
-      const response = await apiClient.post('/api/products', productData);
+      let response;
+      let productId;
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to create product');
+      if (product) {
+        // Update existing product
+        response = await apiClient.put(`/api/products/${product.id}`, productData);
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to update product');
+        }
+        productId = product.id;
+      } else {
+        // Create new product
+        response = await apiClient.post('/api/products', productData);
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to create product');
+        }
+        const createdProduct = await response.json();
+        productId = createdProduct.id;
       }
-
-      const createdProduct = await response.json();
-      const productId = createdProduct.id;
 
       // Create variants if any
       if (variants.length > 0) {
@@ -262,7 +321,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess }: Creat
       onSuccess();
       handleClose();
     } catch (err: any) {
-      setError(err.message || 'Failed to create product');
+      setError(err.message || `Failed to ${product ? 'update' : 'create'} product`);
     } finally {
       setLoading(false);
     }
@@ -461,7 +520,9 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess }: Creat
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
         <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center">
-          <h2 className="text-xl font-bold text-gray-900">Create New Product</h2>
+          <h2 className="text-xl font-bold text-gray-900">
+            {product ? 'Edit Product' : 'Create New Product'}
+          </h2>
           <button
             onClick={handleClose}
             className="text-gray-400 hover:text-gray-600 text-2xl"

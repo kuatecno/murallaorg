@@ -162,7 +162,11 @@
     "defaultVariant": "Default Variant",
     "variantPrice": "Variant Price",
     "variantImages": "Variant Images",
-    "noVariants": "No variants added yet"
+    "noVariants": "No variants added yet",
+    "crossVariantImages": "Cross-Variant Images",
+    "crossVariantImagesDesc": "Upload images that will be shared across all product variants. These will be added to each variant's individual images.",
+    "applyToAllVariants": "Apply to All Variants",
+    "clear": "Clear"
   },
   "errors": {
     "generic": "Something went wrong. Please try again.",

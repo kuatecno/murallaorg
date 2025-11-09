@@ -162,7 +162,11 @@
     "defaultVariant": "Variante por Defecto",
     "variantPrice": "Precio de la Variante",
     "variantImages": "Imágenes de la Variante",
-    "noVariants": "No se han agregado variantes aún"
+    "noVariants": "No se han agregado variantes aún",
+    "crossVariantImages": "Imágenes Compartidas",
+    "crossVariantImagesDesc": "Sube imágenes que se compartirán entre todas las variantes del producto. Estas se agregarán a las imágenes individuales de cada variante.",
+    "applyToAllVariants": "Aplicar a Todas las Variantes",
+    "clear": "Limpiar"
   },
   "errors": {
     "generic": "Algo salió mal. Por favor intenta de nuevo.",

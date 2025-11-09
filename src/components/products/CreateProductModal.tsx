@@ -140,6 +140,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, product
   const [expandedVariants, setExpandedVariants] = useState<Set<number>>(new Set());
   const [modifierChannelPricingModalOpen, setModifierChannelPricingModalOpen] = useState(false);
   const [currentModifierIndices, setCurrentModifierIndices] = useState<{ groupIndex: number; modIndex: number } | null>(null);
+  const [crossVariantImages, setCrossVariantImages] = useState<string[]>([]);
 
   // Fetch categories when modal opens
   useEffect(() => {
@@ -353,6 +354,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, product
     setModifierGroups([]);
     setShowVariants(false);
     setShowModifiers(false);
+    setCrossVariantImages([]);
     setError('');
     onClose();
   };
@@ -399,6 +401,19 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, product
       updated[0].isDefault = true;
     }
     setVariants(updated);
+  };
+
+  // Cross-variant image functions
+  const applyCrossVariantImages = () => {
+    const updatedVariants = variants.map(variant => ({
+      ...variant,
+      images: [...(variant.images || []), ...crossVariantImages]
+    }));
+    setVariants(updatedVariants);
+  };
+
+  const clearCrossVariantImages = () => {
+    setCrossVariantImages([]);
   };
 
   // Modifier group management functions
@@ -652,6 +667,45 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, product
               maxImages={5}
             />
           </div>
+
+          {/* Cross-Variant Images */}
+          {canSell && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-medium text-blue-900">
+                  📸 {t('variants.crossVariantImages')}
+                </label>
+                <div className="flex space-x-2">
+                  {crossVariantImages.length > 0 && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={applyCrossVariantImages}
+                        className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition-colors"
+                      >
+                        {t('variants.applyToAllVariants')} ({variants.length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={clearCrossVariantImages}
+                        className="px-3 py-1 bg-gray-500 text-white text-xs rounded hover:bg-gray-600 transition-colors"
+                      >
+                        {t('variants.clear')}
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+              <p className="text-xs text-blue-700 mb-3">
+                {t('variants.crossVariantImagesDesc')}
+              </p>
+              <ImageUploader
+                images={crossVariantImages}
+                onImagesChange={setCrossVariantImages}
+                maxImages={3}
+              />
+            </div>
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>

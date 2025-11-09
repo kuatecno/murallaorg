@@ -43,29 +43,52 @@ export async function POST(request: NextRequest) {
     }
     const { tenantId } = authResult;
 
+    const { searchParams } = new URL(request.url);
+    const force = searchParams.get('force') === 'true';
+
     // Check if categories already exist
-    const existingCount = await prisma.category.count({
+    const existingCategories = await prisma.category.findMany({
       where: { tenantId },
+      select: { name: true }
     });
 
-    if (existingCount > 0) {
+    const existingNames = existingCategories.map(cat => cat.name);
+    const missingCategories = PREDEFINED_CATEGORIES.filter(cat => !existingNames.includes(cat.name));
+
+    if (!force && existingCategories.length > 0 && missingCategories.length === 0) {
       return NextResponse.json(
         {
           message: 'Categories already exist for this tenant',
-          existingCount
+          existingCount: existingCategories.length
         },
         { status: 200 }
       );
     }
 
-    // Create all predefined categories
-    const created = await prisma.category.createMany({
-      data: PREDEFINED_CATEGORIES.map(cat => ({
-        ...cat,
-        tenantId,
-      })),
-      skipDuplicates: true,
-    });
+    let created;
+    if (force) {
+      // Delete existing categories and recreate all
+      await prisma.category.deleteMany({
+        where: { tenantId }
+      });
+      
+      created = await prisma.category.createMany({
+        data: PREDEFINED_CATEGORIES.map(cat => ({
+          ...cat,
+          tenantId,
+        })),
+        skipDuplicates: true,
+      });
+    } else {
+      // Create only missing categories
+      created = await prisma.category.createMany({
+        data: missingCategories.map(cat => ({
+          ...cat,
+          tenantId,
+        })),
+        skipDuplicates: true,
+      });
+    }
 
     return NextResponse.json({
       success: true,

@@ -19,7 +19,10 @@
     "success": "Éxito",
     "error": "Error",
     "warning": "Advertencia",
-    "info": "Información"
+    "info": "Información",
+    "export": "Exportar",
+    "exporting": "Exportando...",
+    "backup": "Respaldo"
   },
   "navigation": {
     "dashboard": "Panel",
@@ -174,7 +177,8 @@
     "unauthorized": "No tienes autorización para realizar esta acción.",
     "notFound": "El recurso solicitado no fue encontrado.",
     "validationError": "Por favor revisa el formulario en busca de errores.",
-    "serverError": "Error del servidor. Por favor intenta más tarde."
+    "serverError": "Error del servidor. Por favor intenta más tarde.",
+    "exportFailed": "Error al exportar. Por favor intenta de nuevo."
   },
   "viewModes": {
     "grid": "Vista de Cuadrícula",
@@ -187,5 +191,11 @@
     "brand": "Marca",
     "status": "Estado"
   },
-  "actions": "Acciones"
+  "actions": "Acciones",
+  "export": {
+    "json": "Formato JSON",
+    "jsonDesc": "Datos completos con todos los detalles",
+    "csv": "Formato CSV",
+    "csvDesc": "Formato compatible con hojas de cálculo"
+  }
 }

@@ -9,6 +9,7 @@ import CreateProductModal from '@/components/products/CreateProductModal';
 import ProductEnrichmentModal from '@/components/products/ProductEnrichmentModal';
 import ProductNavigation from '@/components/products/ProductNavigation';
 import LanguageSwitcher from '@/components/shared/LanguageSwitcher';
+import ExportButton from '@/components/shared/ExportButton';
 import apiClient from '@/lib/api-client';
 
 interface Product {
@@ -179,6 +180,11 @@ export default function ProductsPage() {
             </div>
             <div className="flex items-center space-x-4">
               <LanguageSwitcher />
+              <ExportButton 
+                endpoint="/api/products/export"
+                filename="products-backup"
+                variant="secondary"
+              />
               <button
                 onClick={() => setIsCreateModalOpen(true)}
                 className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"

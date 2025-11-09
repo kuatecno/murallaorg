@@ -73,8 +73,8 @@ interface Category {
   id: string;
   name: string;
   description?: string;
-  emoji?: string;
-  color?: string;
+  emoji: string;
+  color: string;
   format?: string;
   isActive: boolean;
   productCount: number;
@@ -250,14 +250,13 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
   };
 
   const handleCategoryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const categoryId = e.target.value;
-    const selectedCategory = categories.find(cat => cat.id === categoryId);
-    
-    setFormData((prev) => ({ 
-      ...prev, 
-      category: categoryId,
-      // Auto-populate format from category if not already set and category has a default format
-      format: prev.format || (selectedCategory?.format || '')
+    const categoryName = e.target.value;
+    const selectedCategory = categories.find(cat => cat.name === categoryName);
+    setFormData(prev => ({
+      ...prev,
+      category: categoryName,
+      // Auto-populate format from category if available
+      format: selectedCategory?.format || prev.format,
     }));
     setError('');
   };
@@ -809,7 +808,18 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
               <select
                 name="category"
                 value={formData.category}
-                onChange={handleCategoryChange}
+                onChange={(e) => {
+                  const selectedCategory = categories.find((cat) => cat.name === e.target.value);
+                  if (selectedCategory) {
+                    setFormData((prev) => ({ 
+                      ...prev, 
+                      category: selectedCategory.name, 
+                      format: selectedCategory.format || prev.format 
+                    }));
+                  } else {
+                    setFormData((prev) => ({ ...prev, category: e.target.value }));
+                  }
+                }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value="">{t('forms.selectOption')}...</option>

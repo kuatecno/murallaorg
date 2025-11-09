@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
         isActive: true,
         createdAt: true,
         updatedAt: true,
-        // Don't select format field as it doesn't exist in production yet
+        // Format field will be included when database is migrated
       },
       orderBy: { [sortBy]: sortOrder },
     });
@@ -94,7 +94,8 @@ export async function GET(request: NextRequest) {
           productCount,
           createdAt: category.createdAt,
           updatedAt: category.updatedAt,
-          // Format field will be added when database is migrated
+          // Include format if it exists in the category
+          ...((category as any).format && { format: (category as any).format }),
         };
       })
     );

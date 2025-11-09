@@ -863,6 +863,7 @@ model ExpenseCategory {
   emoji       String?
   description String?
   color       String  @default("#64748B")
+  format      ProductFormat? // Default format for products in this category
   isActive    Boolean @default(true)
 
   tenantId String

@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { v2 as cloudinary } from 'cloudinary';
-import { validateApiKey } from '@/lib/auth';
+import { requireAuth } from '@/lib/auth';
 
 // Configure Cloudinary
 cloudinary.config({
@@ -20,11 +20,12 @@ cloudinary.config({
  */
 export async function POST(request: NextRequest) {
   try {
-    // Validate API key
-    const auth = await validateApiKey(request);
-    if (!auth.success) {
-      return NextResponse.json({ error: auth.error }, { status: 401 });
+    // Require authentication (JWT or API key)
+    const authResult = await requireAuth(request);
+    if (authResult instanceof Response) {
+      return authResult; // Return 401 error
     }
+    const { tenantId } = authResult;
 
     const formData = await request.formData();
     const file = formData.get('file') as File;
@@ -42,9 +43,9 @@ export async function POST(request: NextRequest) {
     const base64 = buffer.toString('base64');
     const dataURI = `data:${file.type};base64,${base64}`;
 
-    // Upload to Cloudinary
+    // Upload to Cloudinary with tenant-specific folder
     const result = await cloudinary.uploader.upload(dataURI, {
-      folder: 'muralla/products',
+      folder: `muralla/${tenantId}/products`,
       resource_type: 'auto',
     });
 
@@ -70,11 +71,12 @@ export async function POST(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
-    // Validate API key
-    const auth = await validateApiKey(request);
-    if (!auth.success) {
-      return NextResponse.json({ error: auth.error }, { status: 401 });
+    // Require authentication (JWT or API key)
+    const authResult = await requireAuth(request);
+    if (authResult instanceof Response) {
+      return authResult; // Return 401 error
     }
+    const { tenantId } = authResult;
 
     const { searchParams } = new URL(request.url);
     const publicId = searchParams.get('publicId');

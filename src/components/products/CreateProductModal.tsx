@@ -580,6 +580,16 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess }: Creat
             />
           </div>
 
+          {/* Product Images */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Product Images</label>
+            <ImageUploader
+              images={formData.images}
+              onImagesChange={(images) => setFormData(prev => ({ ...prev, images }))}
+              maxImages={5}
+            />
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>

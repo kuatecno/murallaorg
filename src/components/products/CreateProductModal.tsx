@@ -716,7 +716,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess }: Creat
                 onClick={() => setShowPlatformConfig(!showPlatformConfig)}
                 className="flex items-center text-blue-600 hover:text-blue-700 font-medium"
               >
-                {showPlatformConfig ? '▼' : '▶'} Platform Pricing (Optional)
+                {showPlatformConfig ? '▼' : '▶'} Channel-Specific Pricing (Optional)
               </button>
 
               {showPlatformConfig && (

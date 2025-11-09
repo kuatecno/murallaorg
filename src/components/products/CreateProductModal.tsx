@@ -742,7 +742,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, product
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">EAN / Barcode</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('products.ean')}</label>
               <input
                 type="text"
                 name="ean"
@@ -755,20 +755,20 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, product
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Unit</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t('products.unit')}</label>
             <select
               name="unit"
               value={formData.unit}
               onChange={handleChange}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
-              <option value="UNIT">Unit</option>
-              <option value="KG">Kilogram</option>
-              <option value="G">Gram</option>
-              <option value="L">Liter</option>
-              <option value="ML">Milliliter</option>
-              <option value="BOX">Box</option>
-              <option value="PACK">Pack</option>
+              <option value="UNIT">{t('products.units.UNIT')}</option>
+              <option value="KG">{t('products.units.KG')}</option>
+              <option value="G">{t('products.units.G')}</option>
+              <option value="L">{t('products.units.L')}</option>
+              <option value="ML">{t('products.units.ML')}</option>
+              <option value="BOX">{t('products.units.BOX')}</option>
+              <option value="PACK">{t('products.units.PACK')}</option>
             </select>
           </div>
 
@@ -776,7 +776,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, product
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Cost Price {formData.type === 'INPUT' && <span className="text-red-500">*</span>}
+{t('products.costPrice')} {formData.type === 'INPUT' && <span className="text-red-500">*</span>}
               </label>
               <input
                 type="number"
@@ -1020,7 +1020,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, product
                               </div>
                               <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                                  Cost Price
+                                  {t('products.costPrice')}
                                 </label>
                                 <input
                                   type="number"

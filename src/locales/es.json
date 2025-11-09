@@ -79,11 +79,11 @@
     "price": "Precio",
     "costPrice": "Precio de Costo",
     "unitPrice": "Precio Unitario",
-    "stock": "Stock",
+    "ean": "EAN / Código de Barras",
+    "unit": "Unidad",
     "currentStock": "Stock Actual",
     "minStock": "Stock Mínimo",
     "maxStock": "Stock Máximo",
-    "unit": "Unidad",
     "type": "Tipo",
     "images": "Imágenes",
     "variants": "Variantes",
@@ -94,7 +94,16 @@
     "aiEnrichmentTitle": "✨Enriquecimiento de Producto con IA",
     "aiEnrichmentDesc": "Completar automáticamente los detalles del producto usando IA (nombre, descripción, categoría, imágenes, etc.)",
     "inputWarning": "⚠️ Los productos INSUMO no se pueden vender directamente. Se usan como ingredientes en recetas.",
-    "recipeAutoCreate": "ℹ️ Se creará una receta por defecto automáticamente. Puedes agregar ingredientes después de crear el producto.",
+    "recipeAutoCreate": "ℹ️ Se creará automáticamente una receta para este tipo de producto.",
+    "units": {
+      "UNIT": "Unidad",
+      "KG": "Kilogramo",
+      "G": "Gramo", 
+      "L": "Litro",
+      "ML": "Mililitro",
+      "BOX": "Caja",
+      "PACK": "Paquete"
+    },
     "searchPlaceholder": "Buscar por nombre o SKU...",
     "noProducts": "No se encontraron productos. ¡Crea tu primer producto!",
     "productCreated": "Producto creado exitosamente",
@@ -119,13 +128,6 @@
       "MANUFACTURED": "Productos hechos en lotes usando recetas",
       "MADE_TO_ORDER": "Productos hechos al momento cuando se ordenan",
       "SERVICE": "Servicios no físicos"
-    },
-    "units": {
-      "UNIT": "Unidad",
-      "KILOGRAM": "Kilogramo",
-      "GRAM": "Gramo",
-      "LITER": "Litro",
-      "MILLILITER": "Mililitro"
     }
   },
   "categories": {

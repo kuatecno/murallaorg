@@ -79,11 +79,11 @@
     "price": "Price",
     "costPrice": "Cost Price",
     "unitPrice": "Unit Price",
-    "stock": "Stock",
+    "ean": "EAN / Barcode",
+    "unit": "Unit",
     "currentStock": "Current Stock",
     "minStock": "Minimum Stock",
     "maxStock": "Maximum Stock",
-    "unit": "Unit",
     "type": "Type",
     "images": "Images",
     "variants": "Variants",
@@ -94,7 +94,16 @@
     "aiEnrichmentTitle": "✨AI Product Enrichment",
     "aiEnrichmentDesc": "Auto-fill product details using AI (name, description, category, images, etc.)",
     "inputWarning": "⚠️ INPUT products cannot be sold directly. They are used as ingredients in recipes.",
-    "recipeAutoCreate": "ℹ️ A default recipe will be created automatically. You can add ingredients after creating the product.",
+    "recipeAutoCreate": "ℹ️ A recipe will be automatically created for this product type.",
+    "units": {
+      "UNIT": "Unit",
+      "KG": "Kilogram",
+      "G": "Gram",
+      "L": "Liter",
+      "ML": "Milliliter",
+      "BOX": "Box",
+      "PACK": "Pack"
+    },
     "searchPlaceholder": "Search by name or SKU...",
     "noProducts": "No products found. Create your first product!",
     "productCreated": "Product created successfully",
@@ -119,13 +128,6 @@
       "MANUFACTURED": "Products made in batches using recipes",
       "MADE_TO_ORDER": "Products made on-the-spot when ordered",
       "SERVICE": "Non-physical services"
-    },
-    "units": {
-      "UNIT": "Unit",
-      "KILOGRAM": "Kilogram",
-      "GRAM": "Gram",
-      "LITER": "Liter",
-      "MILLILITER": "Milliliter"
     }
   },
   "categories": {

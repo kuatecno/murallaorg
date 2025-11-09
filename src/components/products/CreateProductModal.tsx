@@ -338,9 +338,13 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
     setError('');
 
     try {
+      console.log('Starting product creation/update...');
+      console.log('willHaveVariants:', willHaveVariants);
+      console.log('formData:', formData);
+      
       // Prepare data for API
       const productData = {
-        sku: formData.sku,
+        sku: willHaveVariants ? `${formData.name.replace(/\s+/g, '-').toUpperCase()}-PARENT` : formData.sku,
         name: formData.name,
         description: formData.description || undefined,
         type: formData.type,
@@ -375,13 +379,18 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
         productId = product.id;
       } else {
         // Create new product
+        console.log('Creating new product with data:', productData);
         response = await apiClient.post('/api/products', productData);
+        console.log('Product creation response status:', response.status);
+        
         if (!response.ok) {
           const errorData = await response.json();
+          console.error('Product creation failed:', errorData);
           throw new Error(errorData.error || 'Failed to create product');
         }
         const createdProduct = await response.json();
-        productId = createdProduct.id;
+        console.log('Product created successfully:', createdProduct);
+        productId = createdProduct.data?.id || createdProduct.id;
       }
 
       // Create variants if any
@@ -410,9 +419,11 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
         }
       }
 
+      console.log('Product creation/update completed successfully');
       onSuccess();
       handleClose();
     } catch (err: any) {
+      console.error('Product creation/update error:', err);
       setError(err.message || `Failed to ${product ? 'update' : 'create'} product`);
     } finally {
       setLoading(false);
@@ -768,7 +779,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
                     name="sku"
                     value={formData.sku}
                     onChange={handleChange}
-                    required
+                    required={!willHaveVariants}
                     className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="e.g., NEST-PKG-MILK-1L"
                   />

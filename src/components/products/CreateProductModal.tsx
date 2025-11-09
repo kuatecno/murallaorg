@@ -19,6 +19,7 @@ interface Product {
   unitPrice: number;
   costPrice?: number;
   currentStock: number;
+  format?: string;
   minStock: number;
   maxStock?: number;
   unit: string;
@@ -52,6 +53,7 @@ interface ProductFormData {
   minStock: string;
   maxStock: string;
   unit: string;
+  format: string;
   images: string[];
   // Platform pricing
   cafePrice: string;
@@ -63,9 +65,10 @@ interface ProductFormData {
 interface Category {
   id: string;
   name: string;
-  description: string | null;
-  emoji: string;
-  color: string;
+  description?: string;
+  emoji?: string;
+  color?: string;
+  format?: string;
   isActive: boolean;
   productCount: number;
 }
@@ -123,6 +126,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, product
     minStock: '0',
     maxStock: '',
     unit: 'UNIT',
+    format: '',
     images: [],
     cafePrice: '',
     rappiPrice: '',
@@ -169,6 +173,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, product
         minStock: product.minStock.toString(),
         maxStock: product.maxStock?.toString() || '',
         unit: product.unit,
+        format: product.format || '',
         images: product.images || [],
         cafePrice: product.cafePrice?.toString() || '',
         rappiPrice: product.rappiPrice?.toString() || '',
@@ -232,6 +237,19 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, product
     setError('');
   };
 
+  const handleCategoryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const categoryId = e.target.value;
+    const selectedCategory = categories.find(cat => cat.id === categoryId);
+    
+    setFormData((prev) => ({ 
+      ...prev, 
+      category: categoryId,
+      // Auto-populate format from category if not already set and category has a default format
+      format: prev.format || (selectedCategory?.format || '')
+    }));
+    setError('');
+  };
+
   const handleTypeChange = (type: ProductType) => {
     setFormData((prev) => ({ ...prev, type }));
     setError('');
@@ -271,6 +289,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, product
         minStock: parseInt(formData.minStock) || 0,
         maxStock: formData.maxStock ? parseInt(formData.maxStock) : undefined,
         unit: formData.unit || 'UNIT',
+        format: formData.format || undefined,
         images: formData.images.length > 0 ? formData.images : undefined,
         cafePrice: formData.cafePrice ? parseFloat(formData.cafePrice) : undefined,
         rappiPrice: formData.rappiPrice ? parseFloat(formData.rappiPrice) : undefined,
@@ -350,6 +369,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, product
       minStock: '0',
       maxStock: '',
       unit: 'UNIT',
+      format: '',
       images: [],
       cafePrice: '',
       rappiPrice: '',
@@ -712,7 +732,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, product
               <select
                 name="category"
                 value={formData.category}
-                onChange={handleChange}
+                onChange={handleCategoryChange}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value="">{t('forms.selectOption')}...</option>
@@ -754,22 +774,39 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, product
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">{t('products.unit')}</label>
-            <select
-              name="unit"
-              value={formData.unit}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="UNIT">{t('products.units.UNIT')}</option>
-              <option value="KG">{t('products.units.KG')}</option>
-              <option value="G">{t('products.units.G')}</option>
-              <option value="L">{t('products.units.L')}</option>
-              <option value="ML">{t('products.units.ML')}</option>
-              <option value="BOX">{t('products.units.BOX')}</option>
-              <option value="PACK">{t('products.units.PACK')}</option>
-            </select>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('products.unit')}</label>
+              <select
+                name="unit"
+                value={formData.unit}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="UNIT">{t('products.units.UNIT')}</option>
+                <option value="KG">{t('products.units.KG')}</option>
+                <option value="G">{t('products.units.G')}</option>
+                <option value="L">{t('products.units.L')}</option>
+                <option value="ML">{t('products.units.ML')}</option>
+                <option value="BOX">{t('products.units.BOX')}</option>
+                <option value="PACK">{t('products.units.PACK')}</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('products.format')}</label>
+              <select
+                name="format"
+                value={formData.format}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="">{t('common.select')}</option>
+                <option value="PACKAGED">{t('products.formats.PACKAGED')}</option>
+                <option value="FROZEN">{t('products.formats.FROZEN')}</option>
+                <option value="FRESH">{t('products.formats.FRESH')}</option>
+              </select>
+            </div>
           </div>
 
           {/* Pricing */}

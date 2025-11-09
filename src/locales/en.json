@@ -23,7 +23,8 @@
     "export": "Export",
     "exporting": "Exporting...",
     "backup": "Backup",
-    "optional": "Optional"
+    "optional": "Optional",
+    "select": "Select..."
   },
   "navigation": {
     "dashboard": "Dashboard",
@@ -81,6 +82,7 @@
     "unitPrice": "Unit Price",
     "ean": "EAN / Barcode",
     "unit": "Unit",
+    "format": "Format",
     "currentStock": "Current Stock",
     "minStock": "Minimum Stock",
     "maxStock": "Maximum Stock",
@@ -103,6 +105,11 @@
       "ML": "Milliliter",
       "BOX": "Box",
       "PACK": "Pack"
+    },
+    "formats": {
+      "PACKAGED": "Packaged",
+      "FROZEN": "Frozen",
+      "FRESH": "Fresh"
     },
     "searchPlaceholder": "Search by name or SKU...",
     "noProducts": "No products found. Create your first product!",

@@ -13,6 +13,7 @@ interface Category {
   description?: string;
   emoji?: string;
   color: string;
+  format?: string;
   isActive: boolean;
   productCount?: number;
 }

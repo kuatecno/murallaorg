@@ -23,7 +23,8 @@
     "export": "Exportar",
     "exporting": "Exportando...",
     "backup": "Respaldo",
-    "optional": "Opcional"
+    "optional": "Opcional",
+    "select": "Seleccionar..."
   },
   "navigation": {
     "dashboard": "Panel",
@@ -81,6 +82,7 @@
     "unitPrice": "Precio Unitario",
     "ean": "EAN / Código de Barras",
     "unit": "Unidad",
+    "format": "Formato",
     "currentStock": "Stock Actual",
     "minStock": "Stock Mínimo",
     "maxStock": "Stock Máximo",
@@ -103,6 +105,11 @@
       "ML": "Mililitro",
       "BOX": "Caja",
       "PACK": "Paquete"
+    },
+    "formats": {
+      "PACKAGED": "Envasado",
+      "FROZEN": "Congelado",
+      "FRESH": "Fresco"
     },
     "searchPlaceholder": "Buscar por nombre o SKU...",
     "noProducts": "No se encontraron productos. ¡Crea tu primer producto!",

@@ -72,6 +72,7 @@ model Category {
   description String?
   emoji       String   @default("📦")
   color       String   @default("#3B82F6")
+  format      ProductFormat? // Default format for all products in this category
   isActive    Boolean  @default(true)
   tenantId    String
   createdAt   DateTime @default(now())
@@ -100,6 +101,7 @@ model Product {
   minStock     Int         @default(0)
   maxStock     Int?
   unit         String      @default("UNIT")
+  format       ProductFormat? // Product format: PACKAGED, FROZEN, FRESH
   hasRecipe    Boolean     @default(false)
 
   // Pricing fields (input only wholesalePrice, others are calculated)
@@ -1142,6 +1144,12 @@ enum ProductType {
   MANUFACTURED // Made with recipe, produced in batches
   MADE_TO_ORDER // Made on-the-spot (elaborados al momento)
   SERVICE // Non-physical service
+}
+
+enum ProductFormat {
+  PACKAGED // Envasado - Packaged products
+  FROZEN   // Congelado - Frozen products
+  FRESH    // Fresco - Fresh products
 }
 
 enum ProductionStatus {

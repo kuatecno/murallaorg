@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { validateApiKey } from '@/lib/auth';
+import { requireAuth } from '@/lib/auth';
 
 const PREDEFINED_CATEGORIES = [
   // Barra - Café
@@ -36,15 +36,12 @@ const PREDEFINED_CATEGORIES = [
  */
 export async function POST(request: NextRequest) {
   try {
-    // Validate API key and get tenant ID
-    const auth = await validateApiKey(request);
-    if (!auth.success) {
-      return NextResponse.json(
-        { error: auth.error },
-        { status: 401 }
-      );
+    // Require authentication (JWT or API key)
+    const authResult = await requireAuth(request);
+    if (authResult instanceof Response) {
+      return authResult; // Return 401 error
     }
-    const tenantId = auth.tenantId!;
+    const { tenantId } = authResult;
 
     // Check if categories already exist
     const existingCount = await prisma.category.count({

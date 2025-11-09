@@ -20,9 +20,8 @@ export async function GET(request: NextRequest) {
     // Check if ProductFormat enum exists by trying to query products with format
     let formatSupported = false;
     try {
-      await prisma.product.findFirst({
-        select: { format: true }
-      });
+      // Use raw query to avoid TypeScript issues with potentially missing field
+      await prisma.$queryRaw`SELECT format FROM products LIMIT 1`;
       formatSupported = true;
     } catch (error) {
       console.log('Format field not supported:', error);

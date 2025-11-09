@@ -83,6 +83,8 @@ export async function GET(request: NextRequest) {
           productCount,
           createdAt: category.createdAt,
           updatedAt: category.updatedAt,
+          // Only include format if it exists in the schema
+          ...((category as any).format !== undefined && { format: (category as any).format }),
         };
       })
     );

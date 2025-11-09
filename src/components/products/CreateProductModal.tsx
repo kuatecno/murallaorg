@@ -184,12 +184,15 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
         unit: product.unit,
         format: product.format || '',
         tags: product.tags || [],
-        images: product.images || [],
+        images: [],
         cafePrice: product.cafePrice?.toString() || '',
         rappiPrice: product.rappiPrice?.toString() || '',
         pedidosyaPrice: product.pedidosyaPrice?.toString() || '',
         uberPrice: product.uberPrice?.toString() || '',
       });
+      
+      // Set cross-variant images from product images
+      setCrossVariantImages(product.images || []);
     }
   }, [product]);
 
@@ -350,7 +353,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
         unit: formData.unit || 'UNIT',
         format: formData.format || undefined,
         tags: formData.tags.length > 0 ? formData.tags : [],
-        images: formData.images.length > 0 ? formData.images : undefined,
+        images: crossVariantImages.length > 0 ? crossVariantImages : undefined,
         cafePrice: formData.cafePrice ? parseFloat(formData.cafePrice) : undefined,
         rappiPrice: formData.rappiPrice ? parseFloat(formData.rappiPrice) : undefined,
         pedidosyaPrice: formData.pedidosyaPrice ? parseFloat(formData.pedidosyaPrice) : undefined,
@@ -748,17 +751,6 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
               rows={3}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder={t('products.description')}
-            />
-          </div>
-
-          {/* Product Images */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">{t('products.images')}</label>
-            <ImageUploader
-              images={formData.images}
-              onImagesChange={(images) => setFormData(prev => ({ ...prev, images }))}
-              maxImages={5}
-              label={t('products.images')}
             />
           </div>
 

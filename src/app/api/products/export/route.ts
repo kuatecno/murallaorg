@@ -10,29 +10,20 @@ export async function GET(request: NextRequest) {
       return authResult; // Return 401 error
     }
 
-    const { user } = authResult;
+    const { tenantId } = authResult;
     const { searchParams } = new URL(request.url);
     const format = searchParams.get('format') || 'json'; // json or csv
 
     // Get all products for the user's tenant
     const products = await prisma.product.findMany({
       where: {
-        tenantId: user.tenantId,
+        tenantId: tenantId,
       },
       include: {
         variants: true,
         modifierGroups: {
           include: {
             modifiers: true,
-          },
-        },
-        recipe: {
-          include: {
-            ingredients: {
-              include: {
-                ingredient: true,
-              },
-            },
           },
         },
       },
@@ -66,7 +57,7 @@ export async function GET(request: NextRequest) {
       isActive: product.isActive,
       createdAt: product.createdAt,
       updatedAt: product.updatedAt,
-      variants: product.variants?.map(variant => ({
+      variants: product.variants?.map((variant: any) => ({
         id: variant.id,
         name: variant.name,
         useCustomName: variant.useCustomName,
@@ -78,12 +69,12 @@ export async function GET(request: NextRequest) {
         pedidosyaPrice: variant.pedidosyaPrice,
         uberPrice: variant.uberPrice,
       })) || [],
-      modifierGroups: product.modifierGroups?.map(group => ({
+      modifierGroups: product.modifierGroups?.map((group: any) => ({
         id: group.id,
         name: group.name,
         isRequired: group.isRequired,
         allowMultiple: group.allowMultiple,
-        modifiers: group.modifiers?.map(modifier => ({
+        modifiers: group.modifiers?.map((modifier: any) => ({
           id: modifier.id,
           name: modifier.name,
           price: modifier.price,
@@ -93,18 +84,6 @@ export async function GET(request: NextRequest) {
           uberPrice: modifier.uberPrice,
         })) || [],
       })) || [],
-      recipe: product.recipe ? {
-        id: product.recipe.id,
-        instructions: product.recipe.instructions,
-        preparationTime: product.recipe.preparationTime,
-        servingSize: product.recipe.servingSize,
-        ingredients: product.recipe.ingredients?.map(ing => ({
-          ingredientId: ing.ingredientId,
-          ingredientName: ing.ingredient.name,
-          quantity: ing.quantity,
-          unit: ing.unit,
-        })) || [],
-      } : null,
     }));
 
     if (format === 'csv') {
@@ -158,7 +137,7 @@ export async function GET(request: NextRequest) {
       const jsonData = {
         exportDate: new Date().toISOString(),
         totalProducts: exportData.length,
-        tenantId: user.tenantId,
+        tenantId: tenantId,
         products: exportData,
       };
 

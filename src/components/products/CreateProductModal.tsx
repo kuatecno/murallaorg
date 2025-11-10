@@ -464,26 +464,43 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
 
   // Variant management functions
   const addVariant = () => {
-    // Smart defaults: pre-populate with product values
+    // Smart defaults: if variants exist, use the last variant's values; otherwise use product values
+    const lastVariant = variants.length > 0 ? variants[variants.length - 1] : null;
+
     const newVariant: ProductVariant = {
       name: '',
       sku: '',
       useCustomName: false,
       description: '',
-      price: 0,
-      costPrice: formData.costPrice || '',
-      currentStock: 0,
-      cafePrice: formData.cafePrice || '',
-      rappiPrice: formData.rappiPrice || '',
-      pedidosyaPrice: formData.pedidosyaPrice || '',
-      uberPrice: formData.uberPrice || '',
-      minStock: formData.minStock || '',
-      maxStock: formData.maxStock || '',
+      price: lastVariant?.price || 0,
+      costPrice: lastVariant?.costPrice || formData.costPrice || '',
+      currentStock: lastVariant?.currentStock || 0,
+      cafePrice: lastVariant?.cafePrice || formData.cafePrice || '',
+      rappiPrice: lastVariant?.rappiPrice || formData.rappiPrice || '',
+      pedidosyaPrice: lastVariant?.pedidosyaPrice || formData.pedidosyaPrice || '',
+      uberPrice: lastVariant?.uberPrice || formData.uberPrice || '',
+      minStock: lastVariant?.minStock || formData.minStock || '',
+      maxStock: lastVariant?.maxStock || formData.maxStock || '',
       images: [],
-      isDefault: variants.length === 0,
+      isDefault: false, // No auto-default - all variants are equal
     };
     setVariants([...variants, newVariant]);
     // Auto-expand the new variant
+    setExpandedVariants(new Set([...expandedVariants, variants.length]));
+  };
+
+  const duplicateVariant = (index: number) => {
+    const sourceVariant = variants[index];
+    const newVariant: ProductVariant = {
+      ...sourceVariant,
+      id: undefined, // Clear ID for new variant
+      name: `${sourceVariant.name} - Copy`,
+      sku: '', // Clear SKU, user will need to set a unique one
+      isDefault: false, // Copy is never default
+      images: [...(sourceVariant.images || [])], // Copy array
+    };
+    setVariants([...variants, newVariant]);
+    // Auto-expand the duplicated variant
     setExpandedVariants(new Set([...expandedVariants, variants.length]));
   };
 
@@ -501,10 +518,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
 
   const removeVariant = (index: number) => {
     const updated = variants.filter((_, i) => i !== index);
-    // If removing the default, set first as default
-    if (variants[index].isDefault && updated.length > 0) {
-      updated[0].isDefault = true;
-    }
+    // No auto-default logic - all variants are equal
     setVariants(updated);
   };
 
@@ -931,7 +945,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
                   </h3>
                   <div className="mt-2 text-sm text-blue-700">
                     <p>
-                      SKU, EAN/Barcode, and Stock fields are now managed individually for each variant. 
+                      SKU, EAN/Barcode, Pricing, and Stock fields are now managed individually for each variant.
                       Configure these settings in the variant sections below.
                     </p>
                   </div>
@@ -1084,44 +1098,46 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
             </div>
           </div>
 
-          {/* Pricing */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-{t('products.costPrice')} {formData.type === 'INPUT' && <span className="text-red-500">*</span>}
-              </label>
-              <input
-                type="number"
-                name="costPrice"
-                value={formData.costPrice}
-                onChange={handleChange}
-                required={formData.type === 'INPUT'}
-                step="0.01"
-                min="0"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Cost per unit"
-              />
-            </div>
-
-            {canSell && (
+          {/* Pricing - Hidden when user chooses variants */}
+          {!willHaveVariants && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Selling Price <span className="text-red-500">*</span>
+{t('products.costPrice')} {formData.type === 'INPUT' && <span className="text-red-500">*</span>}
                 </label>
                 <input
                   type="number"
-                  name="unitPrice"
-                  value={formData.unitPrice}
+                  name="costPrice"
+                  value={formData.costPrice}
                   onChange={handleChange}
-                  required={canSell}
+                  required={formData.type === 'INPUT'}
                   step="0.01"
                   min="0"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Selling price"
+                  placeholder="Cost per unit"
                 />
               </div>
-            )}
-          </div>
+
+              {canSell && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Selling Price <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    name="unitPrice"
+                    value={formData.unitPrice}
+                    onChange={handleChange}
+                    required={canSell}
+                    step="0.01"
+                    min="0"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Selling price"
+                  />
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Stock Settings (not for MADE_TO_ORDER or SERVICE) */}
           {/* Stock Settings - Hidden when user chooses variants */}
@@ -1247,13 +1263,26 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
                               </div>
                             </div>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => removeVariant(index)}
-                            className="text-red-500 hover:text-red-700 p-2"
-                          >
-                            ✕
-                          </button>
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => duplicateVariant(index)}
+                              className="text-blue-500 hover:text-blue-700 p-2 hover:bg-blue-50 rounded transition-colors"
+                              title="Duplicate variant"
+                            >
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                              </svg>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => removeVariant(index)}
+                              className="text-red-500 hover:text-red-700 p-2 hover:bg-red-50 rounded transition-colors"
+                              title="Remove variant"
+                            >
+                              ✕
+                            </button>
+                          </div>
                         </div>
 
                         {/* Variant Details */}
@@ -1499,8 +1528,8 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
                                 onChange={(e) => updateVariant(index, 'isDefault', e.target.checked)}
                                 className="mr-2"
                               />
-                              <label htmlFor={`default-${index}`} className="text-sm font-medium text-gray-700 cursor-pointer">
-                                Set as default variant
+                              <label htmlFor={`default-${index}`} className="text-sm text-gray-600 cursor-pointer">
+                                Mark as default variant <span className="text-gray-400">(optional)</span>
                               </label>
                             </div>
                           </div>

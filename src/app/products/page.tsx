@@ -36,6 +36,14 @@ interface Product {
   pedidosyaPrice?: number;
   uberPrice?: number;
   images?: string[];
+  variants?: {
+    id: string;
+    name: string;
+    displayName?: string;
+    sku?: string | null;
+    price?: number | null;
+    isDefault: boolean;
+  }[];
 }
 
 type ViewMode = 'grid' | 'table';
@@ -406,6 +414,32 @@ export default function ProductsPage() {
 
                   <h3 className="text-lg font-semibold text-gray-900 mb-1">{product.name}</h3>
                   <p className="text-sm text-gray-500 mb-2">SKU: {product.sku}</p>
+
+                  {/* Variants */}
+                  {product.variants && product.variants.length > 0 && (
+                    <div className="space-y-1 mb-3">
+                      <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Variants</p>
+                      <ul className="space-y-1">
+                        {product.variants.map((variant) => (
+                          <li
+                            key={variant.id}
+                            className="text-xs text-gray-600 flex items-center justify-between bg-gray-50 border border-gray-200 rounded px-2 py-1"
+                          >
+                            <span>
+                              {variant.isDefault && <span className="text-blue-600 mr-1">★</span>}
+                              {variant.displayName || variant.name}
+                              {variant.sku && <span className="text-gray-400 ml-2">({variant.sku})</span>}
+                            </span>
+                            {variant.price !== null && variant.price !== undefined && (
+                              <span className="text-gray-800 font-medium">
+                                ${variant.price.toFixed(0)}
+                              </span>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                   
                   {/* Tags */}
                   {product.tags && product.tags.length > 0 && (
@@ -562,6 +596,23 @@ export default function ProductsPage() {
                           <span className="text-sm text-gray-600">Cost: ${product.costPrice?.toFixed(0)}</span>
                         ) : (
                           <span className="text-sm font-medium text-gray-900">${product.unitPrice.toFixed(0)}</span>
+                        )}
+                        {product.variants && product.variants.length > 0 && (
+                          <div className="mt-2 space-y-1">
+                            {product.variants.map((variant) => (
+                              <div key={variant.id} className="text-xs text-gray-600 flex items-center justify-between">
+                                <span>
+                                  {variant.isDefault && <span className="text-blue-600 mr-1">★</span>}
+                                  {variant.displayName || variant.name}
+                                </span>
+                                {variant.price !== null && variant.price !== undefined && (
+                                  <span className="text-gray-800 font-medium">
+                                    ${variant.price.toFixed(0)}
+                                  </span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
                         )}
                       </td>
                       <td className="px-6 py-4 text-sm">

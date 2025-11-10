@@ -135,6 +135,17 @@ export async function GET(request: NextRequest) {
               },
             },
           },
+          variants: {
+            orderBy: { sortOrder: 'asc' },
+            select: {
+              id: true,
+              name: true,
+              displayName: true,
+              sku: true,
+              price: true,
+              isDefault: true,
+            },
+          },
         },
       }),
       prisma.product.count({ where }),
@@ -183,6 +194,14 @@ export async function GET(request: NextRequest) {
         email: so.staff.email,
         relationship: so.relationship,
       })),
+      variants: product.variants?.map(variant => ({
+        id: variant.id,
+        name: variant.name,
+        displayName: variant.displayName,
+        sku: variant.sku,
+        price: variant.price ? Number(variant.price) : null,
+        isDefault: variant.isDefault,
+      })) || [],
     }));
 
     const totalPages = Math.ceil(totalCount / params.limit!);

@@ -154,7 +154,6 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
   const [error, setError] = useState('');
   const [isEnrichModalOpen, setIsEnrichModalOpen] = useState(false);
   const [channelPricingModalOpen, setChannelPricingModalOpen] = useState(false);
-  const [currentVariantIndex, setCurrentVariantIndex] = useState<number | null>(null);
   const [expandedVariants, setExpandedVariants] = useState<Set<number>>(new Set());
   const [modifierChannelPricingModalOpen, setModifierChannelPricingModalOpen] = useState(false);
   const [currentModifierIndices, setCurrentModifierIndices] = useState<{ groupIndex: number; modIndex: number } | null>(null);
@@ -606,38 +605,19 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
     setExpandedVariants(newExpanded);
   };
 
-  const openChannelPricingModal = (index: number) => {
-    setCurrentVariantIndex(index);
-    setChannelPricingModalOpen(true);
-  };
-
   const handleChannelPricingSave = (prices: {
     cafePrice?: string;
     rappiPrice?: string;
     pedidosyaPrice?: string;
     uberPrice?: string;
   }) => {
-    if (currentVariantIndex !== null) {
-      // Update variant pricing
-      const updated = [...variants];
-      updated[currentVariantIndex] = {
-        ...updated[currentVariantIndex],
-        cafePrice: prices.cafePrice,
-        rappiPrice: prices.rappiPrice,
-        pedidosyaPrice: prices.pedidosyaPrice,
-        uberPrice: prices.uberPrice,
-      };
-      setVariants(updated);
-    } else {
-      // Update product-level pricing
-      setFormData(prev => ({
-        ...prev,
-        cafePrice: prices.cafePrice || '',
-        rappiPrice: prices.rappiPrice || '',
-        pedidosyaPrice: prices.pedidosyaPrice || '',
-        uberPrice: prices.uberPrice || '',
-      }));
-    }
+    setFormData(prev => ({
+      ...prev,
+      cafePrice: prices.cafePrice || '',
+      rappiPrice: prices.rappiPrice || '',
+      pedidosyaPrice: prices.pedidosyaPrice || '',
+      uberPrice: prices.uberPrice || '',
+    }));
   };
 
   // Auto-generate variant display name
@@ -1215,7 +1195,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
           {canSell && (
             <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
               <div>
-                <h3 className="font-medium text-gray-900">Channel-Specific Pricing</h3>
+                <h3 className="font-medium text-gray-900">{t('variants.channelPricing')}</h3>
                 <p className="text-sm text-gray-600">Set different prices for each delivery platform</p>
                 {(formData.cafePrice || formData.rappiPrice || formData.pedidosyaPrice || formData.uberPrice) && (
                   <p className="text-xs text-green-600 mt-1">
@@ -1225,10 +1205,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
               </div>
               <button
                 type="button"
-                onClick={() => {
-                  setCurrentVariantIndex(null);
-                  setChannelPricingModalOpen(true);
-                }}
+                onClick={() => setChannelPricingModalOpen(true)}
                 className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
               >
                 Set Channel Prices
@@ -1318,7 +1295,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
                             {/* Variant Name */}
                             <div>
                               <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Variant Name <span className="text-red-500">*</span>
+                                {t('variants.variantName')} <span className="text-red-500">*</span>
                               </label>
                               <div className="flex gap-2">
                                 <input
@@ -1346,7 +1323,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
                             {/* Variant SKU */}
                             <div>
                               <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Variant SKU
+                                {t('variants.variantSKU')}
                               </label>
                               <div className="flex gap-2">
                                 <input
@@ -1387,7 +1364,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
                               />
                               <div className="flex-1">
                                 <label htmlFor={`custom-name-${index}`} className="text-sm font-medium text-gray-700 cursor-pointer">
-                                  Use custom name instead
+                                  {t('variants.useCustomName')}
                                 </label>
                                 {variant.useCustomName && (
                                   <input
@@ -1405,7 +1382,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
                             <div>
                               <div className="flex items-center justify-between mb-1">
                                 <label className="block text-sm font-medium text-gray-700">
-                                  Variant Description
+                                  {t('variants.variantDescription')}
                                 </label>
                                 <button
                                   type="button"
@@ -1446,7 +1423,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                               <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                                  Price
+                                  {t('products.price')}
                                 </label>
                                 <input
                                   type="number"
@@ -1489,27 +1466,10 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
                               </div>
                             )}
 
-                            {/* Channel Pricing Button */}
-                            <div>
-                              <button
-                                type="button"
-                                onClick={() => openChannelPricingModal(index)}
-                                className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm font-medium"
-                              >
-                                <span className="text-lg">🌐</span>
-                                Channel-Specific Pricing
-                              </button>
-                              {(variant.cafePrice || variant.rappiPrice || variant.pedidosyaPrice || variant.uberPrice) && (
-                                <p className="text-xs text-green-600 mt-1">
-                                  ✓ Custom channel prices configured
-                                </p>
-                              )}
-                            </div>
-
                             {/* Advanced Inventory Management */}
                             <details className="border border-gray-300 rounded-lg">
                               <summary className="px-4 py-2 bg-gray-50 cursor-pointer font-medium text-sm text-gray-700 hover:bg-gray-100">
-                                Advanced Inventory Management
+                                {t('variants.advancedInventory')}
                               </summary>
                               <div className="p-4 space-y-4">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1556,7 +1516,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
                                 className="mr-2"
                               />
                               <label htmlFor={`default-${index}`} className="text-sm text-gray-600 cursor-pointer">
-                                Mark as default variant <span className="text-gray-400">(optional)</span>
+                                {t('variants.markAsDefault')} <span className="text-gray-400">({t('common.optional')})</span>
                               </label>
                             </div>
                           </div>
@@ -1570,7 +1530,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
                     onClick={addVariant}
                     className="w-full px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:border-blue-500 hover:text-blue-600 transition-colors font-medium"
                   >
-                    + Add Variant
+                    + {t('variants.addVariant')}
                   </button>
                 </div>
                 )}
@@ -1586,10 +1546,10 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
                 onClick={() => setShowModifiers(!showModifiers)}
                 className="flex items-center text-blue-600 hover:text-blue-700 font-medium"
               >
-                {showModifiers ? '▼' : '▶'} Add-ons & Removals (Optional)
+                {showModifiers ? '▼' : '▶'} {t('modifierGroups.titleOptional')}
               </button>
               <p className="text-xs text-gray-500 mt-1">
-                Configure add-ons (e.g., Extra shot, Coconut milk) and removals (e.g., No ice, No sugar)
+                {t('modifierGroups.description')}
               </p>
 
               {showModifiers && (
@@ -1599,7 +1559,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
                       <div className="flex items-start gap-3">
                         <div className="flex-1">
                           <label className="block text-xs font-medium text-gray-700 mb-1">
-                            Group Name *
+                            {t('modifierGroups.groupName')} *
                           </label>
                           <input
                             type="text"
@@ -1626,7 +1586,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
                             onChange={(e) => updateModifierGroup(groupIndex, 'isRequired', e.target.checked)}
                             className="mr-2"
                           />
-                          <span className="text-sm">Required</span>
+                          <span className="text-sm">{t('modifierGroups.required')}</span>
                         </label>
                         <label className="flex items-center cursor-pointer">
                           <input
@@ -1635,13 +1595,13 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
                             onChange={(e) => updateModifierGroup(groupIndex, 'allowMultiple', e.target.checked)}
                             className="mr-2"
                           />
-                          <span className="text-sm">Allow Multiple</span>
+                          <span className="text-sm">{t('modifierGroups.allowMultiple')}</span>
                         </label>
                       </div>
 
                       {/* Modifiers in this group */}
                       <div className="ml-4 space-y-2">
-                        <div className="text-sm font-medium text-gray-700">Modifiers:</div>
+                        <div className="text-sm font-medium text-gray-700">{t('modifierGroups.modifiers')}</div>
                         {group.modifiers.map((modifier, modIndex) => (
                           <div key={modIndex} className="bg-gray-50 p-3 rounded border border-gray-200 space-y-2">
                             <div className="flex gap-2 items-start">
@@ -1701,7 +1661,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
                           onClick={() => addModifier(groupIndex)}
                           className="w-full px-3 py-1 border border-dashed border-gray-300 rounded text-sm text-gray-600 hover:border-blue-500 hover:text-blue-600"
                         >
-                          + Add Modifier
+                          + {t('modifierGroups.addModifier')}
                         </button>
                       </div>
                     </div>
@@ -1711,7 +1671,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
                     onClick={addModifierGroup}
                     className="w-full px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:border-blue-500 hover:text-blue-600 transition-colors"
                   >
-                    + Add Modifier Group
+                    + {t('modifierGroups.addModifierGroup')}
                   </button>
                 </div>
               )}
@@ -1807,20 +1767,12 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
         onClose={() => setChannelPricingModalOpen(false)}
         onSave={handleChannelPricingSave}
         initialPrices={{
-          cafePrice: currentVariantIndex !== null 
-            ? variants[currentVariantIndex]?.cafePrice
-            : formData.cafePrice,
-          rappiPrice: currentVariantIndex !== null 
-            ? variants[currentVariantIndex]?.rappiPrice
-            : formData.rappiPrice,
-          pedidosyaPrice: currentVariantIndex !== null 
-            ? variants[currentVariantIndex]?.pedidosyaPrice
-            : formData.pedidosyaPrice,
-          uberPrice: currentVariantIndex !== null 
-            ? variants[currentVariantIndex]?.uberPrice
-            : formData.uberPrice,
+          cafePrice: formData.cafePrice,
+          rappiPrice: formData.rappiPrice,
+          pedidosyaPrice: formData.pedidosyaPrice,
+          uberPrice: formData.uberPrice,
         }}
-        title={currentVariantIndex !== null ? "Variant Channel Pricing" : "Product Channel Pricing"}
+        title="Product Channel Pricing"
       />
 
       {/* Channel Pricing Modal for Modifiers */}

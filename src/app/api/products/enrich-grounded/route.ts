@@ -7,6 +7,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
+if (!process.env.GEMINI_API_KEY) {
+  console.warn('⚠️ GEMINI_API_KEY is not set. Grounded enrichment will return 500 errors.');
+}
+
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
 // Flattened category list for AI prompt
@@ -66,6 +70,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Product name is required' },
         { status: 400 }
+      );
+    }
+
+    if (!process.env.GEMINI_API_KEY) {
+      return NextResponse.json(
+        {
+          error: 'Grounded enrichment is not configured',
+          details: 'Missing GEMINI_API_KEY environment variable on the server.',
+        },
+        { status: 500 }
       );
     }
 

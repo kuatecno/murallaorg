@@ -3,6 +3,9 @@
 import React, { useState } from 'react';
 import { X, Check, Loader2, Sparkles, AlertCircle } from 'lucide-react';
 
+const FALLBACK_IMAGE =
+  'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="300" height="200" viewBox="0 0 300 200"><rect width="300" height="200" fill="%23f3f4f6"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="Arial" font-size="16" fill="%236b7280">Imagen no disponible</text></svg>';
+
 interface EnrichmentSuggestion {
   name?: string;
   description?: string;
@@ -882,7 +885,10 @@ function ImageCard({ imageUrl, index, isSelected, isUploading, onToggle }: Image
             setDimensions({ width: img.naturalWidth, height: img.naturalHeight });
           }}
           onError={(e) => {
-            (e.target as HTMLImageElement).src = 'https://via.placeholder.com/300x200?text=Image+Not+Available';
+            const img = e.target as HTMLImageElement;
+            if (img.src !== FALLBACK_IMAGE) {
+              img.src = FALLBACK_IMAGE;
+            }
           }}
         />
       </div>

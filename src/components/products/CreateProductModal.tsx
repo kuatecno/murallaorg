@@ -1192,7 +1192,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
           )}
 
           {/* Channel-Specific Pricing Button (for sellable products) */}
-          {canSell && (
+          {canSell && !willHaveVariants && (
             <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
               <div>
                 <h3 className="font-medium text-gray-900">{t('variants.channelPricing')}</h3>
@@ -1690,7 +1690,12 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
                       alt={`Product ${index + 1}`}
                       className="w-full h-full object-cover"
                       onError={(e) => {
-                        (e.target as HTMLImageElement).src = 'https://via.placeholder.com/200?text=Error';
+                        const fallback =
+                          'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><rect width="200" height="200" fill="%23f3f4f6"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="Arial" font-size="14" fill="%236b7280">Sin imagen</text></svg>';
+                        const img = e.target as HTMLImageElement;
+                        if (img.src !== fallback) {
+                          img.src = fallback;
+                        }
                       }}
                     />
                     <button

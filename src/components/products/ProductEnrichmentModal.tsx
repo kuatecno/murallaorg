@@ -6,6 +6,29 @@ import { X, Check, Loader2, Sparkles, AlertCircle } from 'lucide-react';
 const FALLBACK_IMAGE =
   'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="300" height="200" viewBox="0 0 300 200"><rect width="300" height="200" fill="%23f3f4f6"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="Arial" font-size="16" fill="%236b7280">Imagen no disponible</text></svg>';
 
+const sanitizeImageUrls = (urls?: string[]): string[] => {
+  if (!urls) return [];
+
+  const seen = new Set<string>();
+
+  return urls.reduce<string[]>((acc, url) => {
+    if (!url) return acc;
+    const trimmedUrl = url.trim();
+
+    if (!trimmedUrl.startsWith('https://')) {
+      return acc;
+    }
+
+    if (seen.has(trimmedUrl)) {
+      return acc;
+    }
+
+    seen.add(trimmedUrl);
+    acc.push(trimmedUrl);
+    return acc;
+  }, []);
+};
+
 interface EnrichmentSuggestion {
   name?: string;
   description?: string;
@@ -51,6 +74,7 @@ interface ProductEnrichmentModalProps {
   productId?: string;
   productName?: string;
   productEan?: string;
+  variantNames?: string[];
   onApprove: (approvedData: Partial<EnrichmentSuggestion>) => void;
 }
 
@@ -64,6 +88,7 @@ export default function ProductEnrichmentModal({
   productId,
   productName,
   productEan,
+  variantNames,
   onApprove,
 }: ProductEnrichmentModalProps) {
   const [loading, setLoading] = useState(false);
@@ -101,6 +126,7 @@ export default function ProductEnrichmentModal({
           name: productName,
           ean: productEan,
           tenantId: user.tenantId,
+          variantNames,
         }),
       });
 
@@ -110,7 +136,12 @@ export default function ProductEnrichmentModal({
       }
 
       const data = await response.json();
-      setSuggestions(data.suggestions);
+      const sanitizedSuggestions: EnrichmentSuggestion = {
+        ...data.suggestions,
+        images: sanitizeImageUrls(data.suggestions.images),
+      };
+
+      setSuggestions(sanitizedSuggestions);
       setCurrentData(data.currentData);
       setImageSources(data.sources);
       setMetadata(data.metadata);
@@ -127,8 +158,8 @@ export default function ProductEnrichmentModal({
       setApprovals(initialApprovals);
 
       // Auto-select first image if available
-      if (data.suggestions.images && data.suggestions.images.length > 0) {
-        setSelectedImages([data.suggestions.images[0]]);
+      if (sanitizedSuggestions.images && sanitizedSuggestions.images.length > 0) {
+        setSelectedImages([sanitizedSuggestions.images[0]]);
       }
 
     } catch (err: any) {
@@ -251,7 +282,19 @@ export default function ProductEnrichmentModal({
       }
 
       const data = await response.json();
-      setSuggestions(prev => ({ ...prev, ...data.suggestions }));
+      const sanitizedImages = sanitizeImageUrls(data.suggestions.images);
+
+      setSuggestions(prev => {
+        const nextSuggestions = { ...prev, ...data.suggestions } as EnrichmentSuggestion;
+
+        if (data.suggestions.images) {
+          nextSuggestions.images = sanitizedImages;
+        } else if (prev?.images) {
+          nextSuggestions.images = prev.images;
+        }
+
+        return nextSuggestions;
+      });
       setMetadata(data.metadata);
       setEnrichmentMethod('web_extraction');
 
@@ -302,7 +345,19 @@ export default function ProductEnrichmentModal({
       }
 
       const data = await response.json();
-      setSuggestions(prev => ({ ...prev, ...data.suggestions }));
+      const sanitizedImages = sanitizeImageUrls(data.suggestions.images);
+
+      setSuggestions(prev => {
+        const nextSuggestions = { ...prev, ...data.suggestions } as EnrichmentSuggestion;
+
+        if (data.suggestions.images) {
+          nextSuggestions.images = sanitizedImages;
+        } else if (prev?.images) {
+          nextSuggestions.images = prev.images;
+        }
+
+        return nextSuggestions;
+      });
       setMetadata(data.metadata);
       setEnrichmentMethod('grounded');
       setGroundingInfo(data.grounding);
@@ -343,18 +398,21 @@ export default function ProductEnrichmentModal({
           name: productName,
           ean: productEan,
           tenantId: user.tenantId,
+          variantNames,
         }),
       });
 
       if (response.ok) {
         const data = await response.json();
         if (data.suggestions.images) {
+          const sanitizedImages = sanitizeImageUrls(data.suggestions.images);
+
           // Merge new images with existing ones (avoiding duplicates)
           setSuggestions(prev => ({
             ...prev!,
             images: [
               ...(prev?.images || []),
-              ...data.suggestions.images.filter((img: string) => !prev?.images?.includes(img))
+              ...sanitizedImages.filter((img: string) => !prev?.images?.includes(img))
             ],
           }));
 

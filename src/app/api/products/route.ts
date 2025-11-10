@@ -161,6 +161,8 @@ export async function GET(request: NextRequest) {
       minStock: product.minStock,
       maxStock: product.maxStock,
       unit: product.unit,
+      format: product.format,
+      tags: product.tags,
       hasRecipe: product.hasRecipe,
       isActive: product.isActive,
       cafePrice: product.cafePrice ? Number(product.cafePrice) : null,
@@ -289,6 +291,7 @@ export async function POST(request: NextRequest) {
         minStock: body.minStock || 0,
         maxStock: body.maxStock || null,
         unit: body.unit || 'UNIT',
+        format: body.format || null,
         // Only include tags if the field exists in the schema
         ...(body.tags && { tags: body.tags }),
         isActive: body.isActive !== undefined ? body.isActive : true,

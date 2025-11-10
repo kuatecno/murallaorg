@@ -124,6 +124,8 @@ export async function GET(
       minStock: product.minStock,
       maxStock: product.maxStock,
       unit: product.unit,
+      format: product.format,
+      tags: product.tags,
       isActive: product.isActive,
       metadata: product.metadata,
       createdAt: product.createdAt,
@@ -310,6 +312,8 @@ export async function PUT(
     if (body.minStock !== undefined) updateData.minStock = body.minStock;
     if (body.maxStock !== undefined) updateData.maxStock = body.maxStock;
     if (body.unit !== undefined) updateData.unit = body.unit;
+    if (body.format !== undefined) updateData.format = body.format;
+    if (body.tags !== undefined) updateData.tags = body.tags;
     if (body.images !== undefined) updateData.images = body.images;
     if (body.isActive !== undefined) updateData.isActive = body.isActive;
     if (body.metadata !== undefined) updateData.metadata = body.metadata;
@@ -359,6 +363,8 @@ export async function PUT(
       minStock: updatedProduct.minStock,
       maxStock: updatedProduct.maxStock,
       unit: updatedProduct.unit,
+      format: updatedProduct.format,
+      tags: updatedProduct.tags,
       isActive: updatedProduct.isActive,
       metadata: updatedProduct.metadata,
       createdAt: updatedProduct.createdAt,

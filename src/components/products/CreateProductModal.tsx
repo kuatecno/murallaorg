@@ -341,7 +341,34 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
       console.log('Starting product creation/update...');
       console.log('willHaveVariants:', willHaveVariants);
       console.log('formData:', formData);
-      
+
+      // Derive pricing based on product structure
+      const parsedUnitPrice = parseFloat(formData.unitPrice);
+      const parsedCostPrice = formData.costPrice ? parseFloat(formData.costPrice) : undefined;
+      let derivedUnitPrice = Number.isFinite(parsedUnitPrice) ? parsedUnitPrice : 0;
+      let derivedCostPrice = Number.isFinite(parsedCostPrice) ? parsedCostPrice : undefined;
+
+      if (willHaveVariants) {
+        if (variants.length === 0) {
+          setError('Please add at least one variant before creating the product.');
+          setLoading(false);
+          return;
+        }
+
+        const defaultVariant = variants.find(variant => variant.isDefault) || variants[0];
+        const variantPrice = Number(defaultVariant?.price);
+        derivedUnitPrice = Number.isFinite(variantPrice) ? variantPrice : 0;
+
+        if (defaultVariant?.costPrice !== undefined) {
+          const variantCost = parseFloat(defaultVariant.costPrice);
+          if (Number.isFinite(variantCost)) {
+            derivedCostPrice = variantCost;
+          }
+        }
+
+        console.log('Derived unit price from variants:', derivedUnitPrice);
+      }
+
       // Prepare data for API
       const productData = {
         sku: willHaveVariants ? `${formData.name.replace(/\s+/g, '-').toUpperCase()}-PARENT` : formData.sku,
@@ -351,8 +378,8 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
         category: formData.category || undefined,
         brand: formData.brand || undefined,
         ean: formData.ean || undefined,
-        unitPrice: parseFloat(formData.unitPrice) || 0,
-        costPrice: formData.costPrice ? parseFloat(formData.costPrice) : undefined,
+        unitPrice: derivedUnitPrice,
+        costPrice: derivedCostPrice,
         currentStock: parseInt(formData.currentStock) || 0,
         minStock: parseInt(formData.minStock) || 0,
         maxStock: formData.maxStock ? parseInt(formData.maxStock) : undefined,

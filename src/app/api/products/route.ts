@@ -5,7 +5,6 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { productService } from './product.service';
 import { Prisma } from '@prisma/client';
 import prisma from '@/lib/prisma';
 import { requireAuth } from '@/lib/auth';
@@ -238,8 +237,8 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
 
     // Validate required fields
-    const requiredFields = ['sku', 'name', 'unitPrice'];
-    const missingFields = requiredFields.filter(field => !body[field]);
+    const requiredFields = ['sku', 'name'];
+    const missingFields = requiredFields.filter(field => body[field] === undefined || body[field] === null || (typeof body[field] === 'string' && body[field].trim() === ''));
 
     if (missingFields.length > 0) {
       return corsError(
@@ -249,18 +248,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate data types
-    if (typeof body.unitPrice !== 'number' || body.unitPrice <= 0) {
-      return corsError('Unit price must be a positive number', 400, origin);
-    }
+    const unitPriceValue = typeof body.unitPrice === 'number' && !Number.isNaN(body.unitPrice)
+      ? body.unitPrice
+      : (typeof body.unitPrice === 'string' && body.unitPrice.trim() !== '' && !Number.isNaN(Number(body.unitPrice)))
+        ? Number(body.unitPrice)
+        : 0;
 
-    if (body.costPrice && (typeof body.costPrice !== 'number' || body.costPrice < 0)) {
-      return corsError('Cost price must be a non-negative number', 400, origin);
-    }
+    const costPriceValue = body.costPrice !== undefined && body.costPrice !== null && body.costPrice !== ''
+      ? Number(body.costPrice)
+      : undefined;
 
-    if (body.currentStock && (typeof body.currentStock !== 'number' || body.currentStock < 0)) {
-      return corsError('Current stock must be a non-negative number', 400, origin);
-    }
+    const currentStockValue = body.currentStock !== undefined && body.currentStock !== null && body.currentStock !== ''
+      ? Number(body.currentStock)
+      : undefined;
+
+    const minStockValue = body.minStock !== undefined && body.minStock !== null && body.minStock !== ''
+      ? Number(body.minStock)
+      : undefined;
+
+    const maxStockValue = body.maxStock !== undefined && body.maxStock !== null && body.maxStock !== ''
+      ? Number(body.maxStock)
+      : undefined;
 
     // Check if SKU already exists for this tenant
     const existingProduct = await prisma.product.findUnique({
@@ -285,11 +293,11 @@ export async function POST(request: NextRequest) {
         description: body.description || null,
         category: body.category || null,
         brand: body.brand || null,
-        unitPrice: new Prisma.Decimal(body.unitPrice),
-        costPrice: body.costPrice ? new Prisma.Decimal(body.costPrice) : null,
-        currentStock: body.currentStock || 0,
-        minStock: body.minStock || 0,
-        maxStock: body.maxStock || null,
+        unitPrice: new Prisma.Decimal(unitPriceValue || 0),
+        costPrice: costPriceValue !== undefined && !Number.isNaN(costPriceValue) ? new Prisma.Decimal(costPriceValue) : null,
+        currentStock: currentStockValue !== undefined && !Number.isNaN(currentStockValue) ? currentStockValue : 0,
+        minStock: minStockValue !== undefined && !Number.isNaN(minStockValue) ? minStockValue : 0,
+        maxStock: maxStockValue !== undefined && !Number.isNaN(maxStockValue) ? maxStockValue : null,
         unit: body.unit || 'UNIT',
         format: body.format || null,
         // Only include tags if the field exists in the schema

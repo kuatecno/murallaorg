@@ -1,5 +1,5 @@
 /**
- * Script to add missing 'format' column to products table
+ * Script to add missing columns to products table
  * Run this with: npx tsx scripts/add-format-column.ts
  */
 
@@ -7,9 +7,9 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-async function addFormatColumn() {
+async function addMissingColumns() {
   try {
-    console.log('Adding format column to products table...');
+    console.log('Adding missing columns to products table...');
 
     // Create ProductFormat enum if it doesn't exist
     await prisma.$executeRawUnsafe(`
@@ -29,6 +29,14 @@ async function addFormatColumn() {
     `);
 
     console.log('✓ format column added to products table');
+
+    // Add tags column to products table if it doesn't exist
+    await prisma.$executeRawUnsafe(`
+      ALTER TABLE products
+      ADD COLUMN IF NOT EXISTS tags TEXT[] DEFAULT '{}';
+    `);
+
+    console.log('✓ tags column added to products table');
 
     // Also add format column to categories table if it doesn't exist
     await prisma.$executeRawUnsafe(`
@@ -55,4 +63,4 @@ async function addFormatColumn() {
   }
 }
 
-addFormatColumn();
+addMissingColumns();

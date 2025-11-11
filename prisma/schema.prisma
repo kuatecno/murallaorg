@@ -182,6 +182,7 @@ model ProductVariant {
   // Images and source
   images      Json     @default("[]") // Variant-specific images
   sourceUrl   String?  // Original variant URL (for AI enrichment and reference)
+  tags        String[] @default([]) // Variant-specific tags: vegano, sin gluten, etc.
 
   sortOrder   Int      @default(0)
   isDefault   Boolean  @default(false) // Mark one variant as default

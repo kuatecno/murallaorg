@@ -303,6 +303,7 @@ export async function PUT(
     if (body.description !== undefined) updateData.description = body.description;
     if (body.category !== undefined) updateData.category = body.category;
     if (body.brand !== undefined) updateData.brand = body.brand;
+    if (body.sourceUrl !== undefined) updateData.sourceUrl = body.sourceUrl;
     if (body.type !== undefined) updateData.type = body.type;
     if (body.menuSection !== undefined) updateData.menuSection = body.menuSection;
     if (body.unitPrice !== undefined) updateData.unitPrice = new Prisma.Decimal(body.unitPrice);

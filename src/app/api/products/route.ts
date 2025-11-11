@@ -323,6 +323,7 @@ export async function POST(request: NextRequest) {
         description: body.description || null,
         category: body.category || null,
         brand: body.brand || null,
+        sourceUrl: body.sourceUrl || null,
         unitPrice: new Prisma.Decimal(unitPriceValue || 0),
         costPrice: costPriceValue !== undefined && !Number.isNaN(costPriceValue) ? new Prisma.Decimal(costPriceValue) : null,
         currentStock: currentStockValue !== undefined && !Number.isNaN(currentStockValue) ? currentStockValue : 0,

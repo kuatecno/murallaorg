@@ -119,8 +119,9 @@ model Product {
   pedidosyaPrice Decimal? @db.Decimal(12, 2)
   uberPrice      Decimal? @db.Decimal(12, 2)
 
-  // Product images
+  // Product images and source
   images    Json     @default("[]") // Array of image URLs
+  sourceUrl String?  // Original product URL (for AI enrichment and reference)
 
   isActive  Boolean  @default(true)
   metadata  Json     @default("{}")
@@ -178,8 +179,9 @@ model ProductVariant {
   minStock    Int?
   maxStock    Int?
 
-  // Images
+  // Images and source
   images      Json     @default("[]") // Variant-specific images
+  sourceUrl   String?  // Original variant URL (for AI enrichment and reference)
 
   sortOrder   Int      @default(0)
   isDefault   Boolean  @default(false) // Mark one variant as default

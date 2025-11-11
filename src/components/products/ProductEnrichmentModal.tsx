@@ -74,6 +74,7 @@ interface ProductEnrichmentModalProps {
   productId?: string;
   productName?: string;
   productEan?: string;
+  productSourceUrl?: string; // Product source URL from database
   variantNames?: string[];
   onApprove: (approvedData: Partial<EnrichmentSuggestion>) => void;
 }
@@ -88,6 +89,7 @@ export default function ProductEnrichmentModal({
   productId,
   productName,
   productEan,
+  productSourceUrl,
   variantNames,
   onApprove,
 }: ProductEnrichmentModalProps) {
@@ -104,7 +106,7 @@ export default function ProductEnrichmentModal({
   const [approvals, setApprovals] = useState<FieldApproval>({});
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
   const [cloudinaryUrls, setCloudinaryUrls] = useState<Map<string, string>>(new Map());
-  const [sourceUrl, setSourceUrl] = useState<string>(''); // Manual URL input
+  const [sourceUrl, setSourceUrl] = useState<string>(productSourceUrl || ''); // Manual URL input, pre-filled from product
 
   const fetchEnrichment = async () => {
     setLoading(true);

@@ -16,6 +16,7 @@ interface Product {
   category?: string;
   brand?: string;
   ean?: string;
+  sourceUrl?: string; // Product source URL
   unitPrice: number;
   costPrice?: number;
   currentStock: number;
@@ -54,6 +55,7 @@ interface ProductFormData {
   category: string;
   brand: string;
   ean: string;
+  sourceUrl: string; // Product source URL for AI enrichment
   unitPrice: string;
   costPrice: string;
   currentStock: string;
@@ -88,6 +90,7 @@ interface ProductVariant {
   displayName?: string;
   useCustomName?: boolean;
   description?: string;
+  sourceUrl?: string; // Variant source URL
   price: number;
   costPrice?: string;
   currentStock?: number;
@@ -130,6 +133,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
     category: '',
     brand: '',
     ean: '',
+    sourceUrl: '',
     unitPrice: '',
     costPrice: '',
     currentStock: '0',
@@ -178,6 +182,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
         category: product.category || '',
         brand: product.brand || '',
         ean: product.ean || '',
+        sourceUrl: product.sourceUrl || '',
         unitPrice: product.unitPrice.toString(),
         costPrice: product.costPrice?.toString() || '',
         currentStock: product.currentStock.toString(),
@@ -209,6 +214,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
           displayName: v.displayName || '',
           useCustomName: !!v.displayName,
           description: v.description || '',
+          sourceUrl: v.sourceUrl || '',
           price: v.price || 0,
           costPrice: v.costPrice?.toString() || '',
           cafePrice: v.cafePrice?.toString() || '',
@@ -414,6 +420,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
         category: formData.category || undefined,
         brand: formData.brand || undefined,
         ean: formData.ean || undefined,
+        sourceUrl: formData.sourceUrl || undefined,
         unitPrice: derivedUnitPrice,
         costPrice: derivedCostPrice,
         currentStock: parseInt(formData.currentStock) || 0,
@@ -956,6 +963,23 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder={t('products.brandPlaceholder')}
               />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Product URL <span className="text-gray-500 text-xs">(Optional, for AI enrichment)</span>
+              </label>
+              <input
+                type="url"
+                name="sourceUrl"
+                value={formData.sourceUrl}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                placeholder="https://example.com/product/lasana-vegetariana"
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                💡 Link to producer's website or social media post for better AI enrichment
+              </p>
             </div>
 
             {/* EAN - Hidden when user chooses to have variants */}
@@ -1797,6 +1821,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
         onClose={() => setIsEnrichModalOpen(false)}
         productName={formData.name}
         productEan={formData.ean}
+        productSourceUrl={formData.sourceUrl}
         variantNames={variants.map(variant => variant.name).filter(Boolean)}
         onApprove={handleEnrichmentApprove}
       />

@@ -463,15 +463,29 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
         productId = createdProduct.data?.id || createdProduct.id;
       }
 
-      // Create variants if any
+      // Create or update variants
       if (variants.length > 0) {
         for (const variant of variants) {
-          const variantResponse = await apiClient.post(
-            `/api/products/${productId}/variants`,
-            variant
-          );
+          let variantResponse;
+          
+          if (variant.id) {
+            // Update existing variant
+            console.log('Updating existing variant:', variant.id, variant.name);
+            variantResponse = await apiClient.put(
+              `/api/variants/${variant.id}`,
+              variant
+            );
+          } else {
+            // Create new variant
+            console.log('Creating new variant:', variant.name);
+            variantResponse = await apiClient.post(
+              `/api/products/${productId}/variants`,
+              variant
+            );
+          }
+          
           if (!variantResponse.ok) {
-            console.error('Failed to create variant:', variant.name);
+            console.error(`Failed to ${variant.id ? 'update' : 'create'} variant:`, variant.name);
           }
         }
       }
@@ -509,6 +523,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
       category: '',
       brand: '',
       ean: '',
+      sourceUrl: '',
       unitPrice: '',
       costPrice: '',
       currentStock: '0',

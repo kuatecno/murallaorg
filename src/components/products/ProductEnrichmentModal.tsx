@@ -6,16 +6,34 @@ import { X, Check, Loader2, Sparkles, AlertCircle } from 'lucide-react';
 const FALLBACK_IMAGE =
   'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="300" height="200" viewBox="0 0 300 200"><rect width="300" height="200" fill="%23f3f4f6"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="Arial" font-size="16" fill="%236b7280">Imagen no disponible</text></svg>';
 
+const DISALLOWED_IMAGE_HOSTS = new Set([
+  'opengraph.githubassets.com',
+  'avatars.githubusercontent.com',
+]);
+
 const sanitizeImageUrls = (urls?: string[]): string[] => {
   if (!urls) return [];
 
   const seen = new Set<string>();
 
   return urls.reduce<string[]>((acc, url) => {
+    if (acc.length >= 20) {
+      return acc;
+    }
+
     if (!url) return acc;
     const trimmedUrl = url.trim();
 
     if (!trimmedUrl.startsWith('https://')) {
+      return acc;
+    }
+
+    try {
+      const { hostname } = new URL(trimmedUrl);
+      if (DISALLOWED_IMAGE_HOSTS.has(hostname.toLowerCase())) {
+        return acc;
+      }
+    } catch (error) {
       return acc;
     }
 

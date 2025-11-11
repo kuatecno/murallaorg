@@ -628,8 +628,8 @@ export default function ProductsPage() {
                     <p className="text-sm text-gray-500 mb-2">SKU: {getDisplaySKU(product)}</p>
                   )}
 
-                  {/* Variants */}
-                  {product.variants && product.variants.length > 0 && (
+                  {/* Variants - Only show when not in expanded view */}
+                  {!showVariantsExpanded && product.variants && product.variants.length > 0 && (
                     <div className="space-y-1 mb-3">
                       <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Variants</p>
                       <ul className="space-y-1">

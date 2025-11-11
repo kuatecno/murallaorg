@@ -151,18 +151,19 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [variants, setVariants] = useState<ProductVariant[]>([]);
+  const [originalVariants, setOriginalVariants] = useState<ProductVariant[]>([]); // Track original variants for deletion
   const [modifierGroups, setModifierGroups] = useState<ModifierGroup[]>([]);
   const [showVariants, setShowVariants] = useState(false);
   const [showModifiers, setShowModifiers] = useState(false);
   const [willHaveVariants, setWillHaveVariants] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [expandedVariants, setExpandedVariants] = useState<Set<number>>(new Set());
+  const [crossVariantImages, setCrossVariantImages] = useState<string[]>([]);
   const [isEnrichModalOpen, setIsEnrichModalOpen] = useState(false);
   const [channelPricingModalOpen, setChannelPricingModalOpen] = useState(false);
-  const [expandedVariants, setExpandedVariants] = useState<Set<number>>(new Set());
   const [modifierChannelPricingModalOpen, setModifierChannelPricingModalOpen] = useState(false);
   const [currentModifierIndices, setCurrentModifierIndices] = useState<{ groupIndex: number; modIndex: number } | null>(null);
-  const [crossVariantImages, setCrossVariantImages] = useState<string[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   // Fetch categories when modal opens
   useEffect(() => {
@@ -228,6 +229,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
         }));
 
         setVariants(formVariants);
+        setOriginalVariants(formVariants); // Store original variants for comparison
 
         // Expand all variants by default when editing
         const allIndices = new Set(formVariants.map((_, index) => index));
@@ -463,7 +465,23 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
         productId = createdProduct.data?.id || createdProduct.id;
       }
 
-      // Create or update variants
+      // Handle variants: create, update, and delete
+      if (product && originalVariants.length > 0) {
+        // When editing, find variants to delete (present in original but not in current)
+        const currentVariantIds = new Set(variants.filter(v => v.id).map(v => v.id));
+        const variantsToDelete = originalVariants.filter(v => v.id && !currentVariantIds.has(v.id));
+        
+        // Delete removed variants
+        for (const variantToDelete of variantsToDelete) {
+          console.log('Deleting removed variant:', variantToDelete.id, variantToDelete.name);
+          const deleteResponse = await apiClient.delete(`/api/variants/${variantToDelete.id}`);
+          if (!deleteResponse.ok) {
+            console.error('Failed to delete variant:', variantToDelete.name);
+          }
+        }
+      }
+
+      // Create or update current variants
       if (variants.length > 0) {
         for (const variant of variants) {
           let variantResponse;
@@ -539,6 +557,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
       uberPrice: '',
     });
     setVariants([]);
+    setOriginalVariants([]);
     setModifierGroups([]);
     setShowVariants(false);
     setShowModifiers(false);

@@ -200,6 +200,26 @@ export default function ProductsPage() {
   };
 
   // Expand products with variants into individual variant items
+  // Helper function to get the appropriate SKU to display
+  const getDisplaySKU = (product: any): string | null => {
+    // If showing variants expanded, the product is actually a variant
+    if (showVariantsExpanded && product._isVariant) {
+      return product.sku; // This is already the variant SKU
+    }
+    
+    // If showing parent products only
+    if (!showVariantsExpanded) {
+      // If product has variants, don't show parent SKU
+      if (product.variants && product.variants.length > 0) {
+        return null;
+      }
+      // If it's a simple product (no variants), show the SKU
+      return product.sku;
+    }
+    
+    return product.sku;
+  };
+
   const expandedProducts = showVariantsExpanded
     ? products.flatMap((product) => {
         if (product.variants && product.variants.length > 0) {
@@ -604,7 +624,9 @@ export default function ProductsPage() {
                   </div>
 
                   <h3 className="text-lg font-semibold text-gray-900 mb-1">{product.name}</h3>
-                  <p className="text-sm text-gray-500 mb-2">SKU: {product.sku}</p>
+                  {getDisplaySKU(product) && (
+                    <p className="text-sm text-gray-500 mb-2">SKU: {getDisplaySKU(product)}</p>
+                  )}
 
                   {/* Variants */}
                   {product.variants && product.variants.length > 0 && (
@@ -770,7 +792,9 @@ export default function ProductsPage() {
                           )}
                           <div>
                             <div className="text-sm font-medium text-gray-900">{product.name}</div>
-                            <div className="text-sm text-gray-500">{product.sku}</div>
+                            {getDisplaySKU(product) && (
+                              <div className="text-sm text-gray-500">{getDisplaySKU(product)}</div>
+                            )}
                           </div>
                         </div>
                       </td>

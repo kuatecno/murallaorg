@@ -63,12 +63,13 @@ interface GroundedRequest {
   productEan?: string;
   productBrand?: string;
   tenantId: string;
+  sourceUrl?: string; // Optional URL to product page
 }
 
 export async function POST(request: NextRequest) {
   try {
     const body: GroundedRequest = await request.json();
-    const { productName, productEan, productBrand, tenantId } = body;
+    const { productName, productEan, productBrand, tenantId, sourceUrl } = body;
 
     const finalTenantId = request.headers.get('x-tenant-id') || tenantId;
 
@@ -105,9 +106,10 @@ PRODUCTO A INVESTIGAR:
 - Nombre: ${productName}
 ${productBrand ? `- Marca: ${productBrand}` : ''}
 ${productEan ? `- Código EAN/Barcode: ${productEan}` : ''}
+${sourceUrl ? `- URL del producto: ${sourceUrl}` : ''}
 
 INSTRUCCIONES IMPORTANTES:
-1. USA GOOGLE SEARCH para encontrar información REAL del producto
+${sourceUrl ? `1. 🎯 PRIORIDAD MÁXIMA: Visita y usa la información de esta URL específica: ${sourceUrl}` : '1. USA GOOGLE SEARCH para encontrar información REAL del producto'}
 2. Busca en:
    - Sitio web oficial de la marca
    - E-commerce chileno (Jumbo, Lider, Santa Isabel, Unimarc)

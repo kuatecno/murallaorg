@@ -90,6 +90,7 @@ interface EnrichmentRequest {
   ean?: string;
   tenantId: string;
   variantNames?: string[];
+  sourceUrl?: string; // Optional URL to product page
 }
 
 interface EnrichmentSuggestion {
@@ -122,7 +123,7 @@ interface EnrichmentWithMetadata {
 export async function POST(request: NextRequest) {
   try {
     const body: EnrichmentRequest = await request.json();
-    const { productId, name, ean, tenantId, variantNames } = body;
+    const { productId, name, ean, tenantId, variantNames, sourceUrl } = body;
 
     // Get tenant from header or body
     const finalTenantId = request.headers.get('x-tenant-id') || tenantId;
@@ -178,9 +179,10 @@ PRODUCTO A INVESTIGAR:
 ${productData.name ? `- Nombre: ${productData.name}` : ''}
 ${productData.ean ? `- Código EAN: ${productData.ean}` : ''}
 ${productData.brand ? `- Marca: ${productData.brand}` : ''}
+${sourceUrl ? `- URL del producto: ${sourceUrl}` : ''}
 
 INSTRUCCIONES IMPORTANTES:
-1. USA GOOGLE SEARCH para encontrar información REAL y VERIFICABLE de la marca oficial
+${sourceUrl ? `1. 🎯 PRIORIDAD MÁXIMA: Usa la información de esta URL específica: ${sourceUrl}` : '1. USA GOOGLE SEARCH para encontrar información REAL y VERIFICABLE de la marca oficial'}
 2. Busca el sitio web oficial, Instagram, Facebook, o e-commerce chileno del producto
 3. Prioriza información de fuentes chilenas conocidas
 4. Para las imágenes, busca URLs REALES de:

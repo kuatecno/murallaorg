@@ -104,6 +104,7 @@ export default function ProductEnrichmentModal({
   const [approvals, setApprovals] = useState<FieldApproval>({});
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
   const [cloudinaryUrls, setCloudinaryUrls] = useState<Map<string, string>>(new Map());
+  const [sourceUrl, setSourceUrl] = useState<string>(''); // Manual URL input
 
   const fetchEnrichment = async () => {
     setLoading(true);
@@ -127,6 +128,7 @@ export default function ProductEnrichmentModal({
           ean: productEan,
           tenantId: user.tenantId,
           variantNames,
+          sourceUrl: sourceUrl || undefined, // Include optional source URL
         }),
       });
 
@@ -336,6 +338,7 @@ export default function ProductEnrichmentModal({
           productEan: productEan || suggestions?.ean,
           productBrand: suggestions?.brand,
           tenantId: user.tenantId,
+          sourceUrl: sourceUrl || undefined, // Include optional source URL
         }),
       });
 
@@ -457,18 +460,38 @@ export default function ProductEnrichmentModal({
         {/* Content */}
         <div className="p-6 overflow-y-auto max-h-[calc(90vh-180px)]">
           {!suggestions && !loading && (
-            <div className="text-center py-12">
+            <div className="py-8">
               <Sparkles className="w-16 h-16 mx-auto text-blue-500 mb-4" />
-              <p className="text-gray-600 mb-6">
+              <p className="text-gray-600 mb-6 text-center">
                 Click the button below to generate AI-powered suggestions for this product
               </p>
-              <button
-                onClick={fetchEnrichment}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors inline-flex items-center space-x-2"
-              >
-                <Sparkles className="w-5 h-5" />
-                <span>Generate Suggestions</span>
-              </button>
+
+              {/* Optional Source URL Input */}
+              <div className="max-w-2xl mx-auto mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Product URL (Optional)
+                </label>
+                <input
+                  type="url"
+                  value={sourceUrl}
+                  onChange={(e) => setSourceUrl(e.target.value)}
+                  placeholder="https://example.com/product/lasana-vegetariana"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  💡 Provide a link to the official product page for more accurate results
+                </p>
+              </div>
+
+              <div className="text-center">
+                <button
+                  onClick={fetchEnrichment}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors inline-flex items-center space-x-2"
+                >
+                  <Sparkles className="w-5 h-5" />
+                  <span>Generate Suggestions</span>
+                </button>
+              </div>
             </div>
           )}
 

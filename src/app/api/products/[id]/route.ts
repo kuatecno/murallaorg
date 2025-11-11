@@ -247,10 +247,11 @@ export async function PUT(
     }
 
     // Validate data types if provided
-    if (body.unitPrice !== undefined) {
-      if (typeof body.unitPrice !== 'number' || body.unitPrice <= 0) {
+    // Note: unitPrice can be 0 for products with variants (each variant has its own price)
+    if (body.unitPrice !== undefined && body.unitPrice !== null) {
+      if (typeof body.unitPrice !== 'number' || body.unitPrice < 0) {
         return NextResponse.json(
-          { error: 'Unit price must be a positive number' },
+          { error: 'Unit price must be a non-negative number' },
           { status: 400 }
         );
       }

@@ -33,6 +33,7 @@ interface Product {
   rappiPrice?: number;
   pedidosyaPrice?: number;
   uberPrice?: number;
+  variants?: any[]; // Variants data from API
 }
 
 interface CreateProductModalProps {
@@ -191,9 +192,46 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
         pedidosyaPrice: product.pedidosyaPrice?.toString() || '',
         uberPrice: product.uberPrice?.toString() || '',
       });
-      
+
       // Set cross-variant images from product images
       setCrossVariantImages(product.images || []);
+
+      // Load variants if product has them
+      if (product.variants && product.variants.length > 0) {
+        setWillHaveVariants(true);
+        setShowVariants(true);
+
+        // Transform API variants to form variants
+        const formVariants: ProductVariant[] = product.variants.map(v => ({
+          id: v.id,
+          sku: v.sku || '',
+          name: v.name,
+          displayName: v.displayName || '',
+          useCustomName: !!v.displayName,
+          description: v.description || '',
+          price: v.price || 0,
+          costPrice: v.costPrice?.toString() || '',
+          currentStock: v.currentStock || 0,
+          cafePrice: v.cafePrice?.toString() || '',
+          rappiPrice: v.rappiPrice?.toString() || '',
+          pedidosyaPrice: v.pedidosyaPrice?.toString() || '',
+          uberPrice: v.uberPrice?.toString() || '',
+          minStock: v.minStock?.toString() || '',
+          maxStock: v.maxStock?.toString() || '',
+          images: v.images || [],
+          isDefault: v.isDefault || false,
+        }));
+
+        setVariants(formVariants);
+
+        // Expand all variants by default when editing
+        const allIndices = new Set(formVariants.map((_, index) => index));
+        setExpandedVariants(allIndices);
+      } else {
+        setWillHaveVariants(false);
+        setShowVariants(false);
+        setVariants([]);
+      }
     }
   }, [product]);
 

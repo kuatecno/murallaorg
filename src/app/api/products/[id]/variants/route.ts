@@ -77,6 +77,7 @@ export async function POST(
       minStock,
       maxStock,
       images,
+      tags,
       sortOrder,
       isDefault,
     } = body;
@@ -118,6 +119,7 @@ export async function POST(
         minStock: minStock ? parseInt(minStock) : undefined,
         maxStock: maxStock ? parseInt(maxStock) : undefined,
         images: images || [],
+        tags: tags || [],
         sortOrder: sortOrder || 0,
         isDefault: isDefault || false,
         tenantId,

@@ -7,7 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { validateApiKey } from '@/lib/auth';
+import { requireAuth } from '@/lib/auth';
 
 /**
  * GET /api/categories/[id]
@@ -18,15 +18,12 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Validate API key and get tenant ID
-    const auth = await validateApiKey(request);
-    if (!auth.success) {
-      return NextResponse.json(
-        { error: auth.error },
-        { status: 401 }
-      );
+    // Require authentication (JWT or API key)
+    const authResult = await requireAuth(request);
+    if (authResult instanceof Response) {
+      return authResult; // Return 401 error
     }
-    const tenantId = auth.tenantId!;
+    const { tenantId } = authResult;
 
     const { id } = await params;
 
@@ -79,15 +76,12 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Validate API key and get tenant ID
-    const auth = await validateApiKey(request);
-    if (!auth.success) {
-      return NextResponse.json(
-        { error: auth.error },
-        { status: 401 }
-      );
+    // Require authentication (JWT or API key)
+    const authResult = await requireAuth(request);
+    if (authResult instanceof Response) {
+      return authResult; // Return 401 error
     }
-    const tenantId = auth.tenantId!;
+    const { tenantId } = authResult;
 
     const { id } = await params;
 
@@ -185,15 +179,12 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Validate API key and get tenant ID
-    const auth = await validateApiKey(request);
-    if (!auth.success) {
-      return NextResponse.json(
-        { error: auth.error },
-        { status: 401 }
-      );
+    // Require authentication (JWT or API key)
+    const authResult = await requireAuth(request);
+    if (authResult instanceof Response) {
+      return authResult; // Return 401 error
     }
-    const tenantId = auth.tenantId!;
+    const { tenantId } = authResult;
 
     const { id } = await params;
 

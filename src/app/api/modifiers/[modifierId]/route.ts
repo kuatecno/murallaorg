@@ -6,7 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { validateApiKey } from '@/lib/auth';
+import { requireAuth } from '@/lib/auth';
 
 /**
  * PUT /api/modifiers/[modifierId]
@@ -17,11 +17,11 @@ export async function PUT(
   { params }: { params: Promise<{ modifierId: string }> }
 ) {
   try {
-    const auth = await validateApiKey(request);
-    if (!auth.success) {
-      return NextResponse.json({ error: auth.error }, { status: 401 });
+    const authResult = await requireAuth(request);
+    if (authResult instanceof Response) {
+      return authResult; // Return 401 error
     }
-    const tenantId = auth.tenantId!;
+    const { tenantId } = authResult;
     const { modifierId } = await params;
 
     const body = await request.json();
@@ -91,11 +91,11 @@ export async function DELETE(
   { params }: { params: Promise<{ modifierId: string }> }
 ) {
   try {
-    const auth = await validateApiKey(request);
-    if (!auth.success) {
-      return NextResponse.json({ error: auth.error }, { status: 401 });
+    const authResult = await requireAuth(request);
+    if (authResult instanceof Response) {
+      return authResult; // Return 401 error
     }
-    const tenantId = auth.tenantId!;
+    const { tenantId } = authResult;
     const { modifierId } = await params;
 
     // Check if modifier exists and belongs to this tenant

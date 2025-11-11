@@ -45,6 +45,7 @@ export async function POST(request: NextRequest) {
     }
 
     // First, call the enrichment API to get product data from the URL
+    // We provide a placeholder name since the API requires name or EAN, but the real data will be extracted from the URL
     const enrichmentResponse = await fetch(`${request.nextUrl.origin}/api/products/enrich`, {
       method: 'POST',
       headers: {
@@ -53,6 +54,7 @@ export async function POST(request: NextRequest) {
         'Cookie': request.headers.get('Cookie') || '',
       },
       body: JSON.stringify({
+        name: 'Product from URL', // Placeholder name, will be replaced by enrichment
         sourceUrl: url,
         tenantId,
       }),
@@ -73,6 +75,19 @@ export async function POST(request: NextRequest) {
 
     // Generate a unique SKU based on the product name
     const generateSKU = (name: string): string => {
+      if (!name || name === 'Product from URL') {
+        // If no name was extracted, use domain from URL
+        try {
+          const urlObj = new URL(url);
+          const domain = urlObj.hostname.replace('www.', '').split('.')[0];
+          const timestamp = Date.now().toString().slice(-6);
+          return `${domain.toUpperCase()}-${timestamp}`;
+        } catch {
+          const timestamp = Date.now().toString().slice(-6);
+          return `IMPORTED-${timestamp}`;
+        }
+      }
+      
       const cleanName = name
         .replace(/[^a-zA-Z0-9\s]/g, '') // Remove special characters
         .replace(/\s+/g, '-') // Replace spaces with hyphens
@@ -83,10 +98,15 @@ export async function POST(request: NextRequest) {
       return `${cleanName}-${timestamp}`;
     };
 
+    // Use enriched data or fallback to extracted info from URL
+    const productName = enrichedProduct.name && enrichedProduct.name !== 'Product from URL' 
+      ? enrichedProduct.name 
+      : `Product from ${new URL(url).hostname}`;
+
     // Prepare product data for creation
     const productData = {
-      sku: generateSKU(enrichedProduct.name || 'PRODUCT'),
-      name: enrichedProduct.name || 'Imported Product',
+      sku: generateSKU(productName),
+      name: productName,
       description: enrichedProduct.description || '',
       type,
       category: enrichedProduct.category || '',

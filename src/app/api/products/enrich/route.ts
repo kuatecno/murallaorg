@@ -76,6 +76,7 @@ interface EnrichmentRequest {
   name?: string;
   ean?: string;
   tenantId: string;
+  variantNames?: string[];
 }
 
 interface EnrichmentSuggestion {
@@ -108,7 +109,7 @@ interface EnrichmentWithMetadata {
 export async function POST(request: NextRequest) {
   try {
     const body: EnrichmentRequest = await request.json();
-    const { productId, name, ean, tenantId } = body;
+    const { productId, name, ean, tenantId, variantNames } = body;
 
     // Get tenant from header or body
     const finalTenantId = request.headers.get('x-tenant-id') || tenantId;

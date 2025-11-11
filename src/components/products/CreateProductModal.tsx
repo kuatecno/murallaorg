@@ -714,9 +714,9 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
             <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-sm font-medium text-gray-900">Product Structure</h3>
+                  <h3 className="text-sm font-medium text-gray-900">{t('products.structure.title')}</h3>
                   <p className="text-xs text-gray-600 mt-1">
-                    Will this product have variants (sizes, flavors, etc.)?
+                    {t('products.structure.description')}
                   </p>
                 </div>
                 <div className="flex items-center space-x-4">
@@ -732,7 +732,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
                       }}
                       className="mr-2"
                     />
-                    <span className="text-sm">Single Product</span>
+                    <span className="text-sm">{t('products.structure.single')}</span>
                   </label>
                   <label className="flex items-center">
                     <input
@@ -745,7 +745,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
                       }}
                       className="mr-2"
                     />
-                    <span className="text-sm">Has Variants</span>
+                    <span className="text-sm">{t('products.structure.variants')}</span>
                   </label>
                 </div>
               </div>
@@ -786,7 +786,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
                 onChange={handleChange}
                 required
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="e.g., Whole Milk 1L"
+                placeholder={t('products.namePlaceholder')}
               />
             </div>
 
@@ -802,7 +802,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
                     onChange={handleChange}
                     required={!willHaveVariants}
                     className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="e.g., NEST-PKG-MILK-1L"
+                    placeholder={t('products.skuPlaceholder')}
                   />
                   <button
                     type="button"
@@ -816,7 +816,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
                 </div>
                 {!formData.name && (
                   <p className="text-xs text-gray-500 mt-1">
-                    💡 {t('products.name')} is required to generate SKU suggestions
+                    💡 {t('products.skuSuggestionHint', { field: t('products.name') })}
                   </p>
                 )}
               </div>
@@ -917,7 +917,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
                 value={formData.brand}
                 onChange={handleChange}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="e.g., Nestlé"
+                placeholder={t('products.brandPlaceholder')}
               />
             </div>
 
@@ -931,7 +931,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
                   value={formData.ean}
                   onChange={handleChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="e.g., 7791234567890"
+                  placeholder={t('products.eanPlaceholder')}
                 />
               </div>
             )}
@@ -948,13 +948,10 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
                 </div>
                 <div className="ml-3">
                   <h3 className="text-sm font-medium text-blue-800">
-                    Variant-Specific Fields
+                    {t('products.variantNotice.title')}
                   </h3>
                   <div className="mt-2 text-sm text-blue-700">
-                    <p>
-                      SKU, EAN/Barcode, Pricing, and Stock fields are now managed individually for each variant.
-                      Configure these settings in the variant sections below.
-                    </p>
+                    <p>{t('products.variantNotice.description')}</p>
                   </div>
                 </div>
               </div>
@@ -1066,7 +1063,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
                 <div className="flex gap-2">
                   <input
                     type="text"
-                    placeholder="Add custom tag..."
+                    placeholder={t('products.addTagPlaceholder')}
                     className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                     onKeyPress={(e) => {
                       if (e.key === 'Enter') {
@@ -1121,14 +1118,14 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
                   step="0.01"
                   min="0"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Cost per unit"
+                  placeholder={t('products.costPricePlaceholder')}
                 />
               </div>
 
               {canSell && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Selling Price <span className="text-red-500">*</span>
+                    {t('products.unitPrice')} <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="number"
@@ -1139,7 +1136,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
                     step="0.01"
                     min="0"
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Selling price"
+                    placeholder={t('products.unitPricePlaceholder')}
                   />
                 </div>
               )}
@@ -1159,7 +1156,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
                   onChange={handleChange}
                   min="0"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Current inventory"
+                  placeholder={t('products.currentStockPlaceholder')}
                 />
               </div>
 
@@ -1172,7 +1169,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
                   onChange={handleChange}
                   min="0"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Minimum stock level"
+                  placeholder={t('products.minStockPlaceholder')}
                 />
               </div>
 
@@ -1185,7 +1182,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
                   onChange={handleChange}
                   min="0"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Maximum stock level"
+                  placeholder={t('products.maxStockPlaceholder')}
                 />
               </div>
             </div>
@@ -1196,10 +1193,10 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
             <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
               <div>
                 <h3 className="font-medium text-gray-900">{t('variants.channelPricing')}</h3>
-                <p className="text-sm text-gray-600">Set different prices for each delivery platform</p>
+                <p className="text-sm text-gray-600">{t('products.channelPricingDescription')}</p>
                 {(formData.cafePrice || formData.rappiPrice || formData.pedidosyaPrice || formData.uberPrice) && (
                   <p className="text-xs text-green-600 mt-1">
-                    ✓ Custom channel prices configured
+                    ✓ {t('modals.customChannelPrices')}
                   </p>
                 )}
               </div>
@@ -1208,7 +1205,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
                 onClick={() => setChannelPricingModalOpen(true)}
                 className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
               >
-                Set Channel Prices
+                {t('modals.setChannelPrices')}
               </button>
             </div>
           )}
@@ -1218,9 +1215,9 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
             <div>
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h3 className="text-lg font-medium text-gray-900">Product Variants</h3>
+                  <h3 className="text-lg font-medium text-gray-900">{t('variants.title')}</h3>
                   <p className="text-sm text-gray-600">
-                    Add size or flavor variations (e.g., Small/Medium/Large, Strawberry/Mango)
+                    {t('variants.description')}
                   </p>
                 </div>
               </div>
@@ -1228,13 +1225,13 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
               <div className="space-y-3">
                 {variants.length === 0 && (
                   <div className="text-center py-8 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
-                    <p className="text-gray-500 mb-4">No variants created yet</p>
+                    <p className="text-gray-500 mb-4">{t('variants.noVariants')}</p>
                     <button
                       type="button"
                       onClick={addVariant}
                       className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                     >
-                      Add First Variant
+                      {t('variants.addFirstVariant')}
                     </button>
                   </div>
                 )}
@@ -1259,11 +1256,11 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
                             </button>
                             <div>
                               <div className="font-medium text-gray-900">
-                                {displayName || 'New Variant'}
+                                {displayName || t('variants.newVariant')}
                               </div>
                               <div className="text-xs text-gray-500">
-                                {variant.isDefault && <span className="text-blue-600 font-medium">DEFAULT • </span>}
-                                {variant.price && variant.price > 0 && `Price: $${variant.price}`}
+                                {variant.isDefault && <span className="text-blue-600 font-medium">{t('variants.defaultIndicator')} • </span>}
+                                {variant.price && variant.price > 0 && t('variants.priceSummary', { price: variant.price })}
                               </div>
                             </div>
                           </div>
@@ -1272,7 +1269,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
                               type="button"
                               onClick={() => duplicateVariant(index)}
                               className="text-blue-500 hover:text-blue-700 p-2 hover:bg-blue-50 rounded transition-colors"
-                              title="Duplicate variant"
+                              title={t('variants.duplicateTooltip')}
                             >
                               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
@@ -1282,7 +1279,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
                               type="button"
                               onClick={() => removeVariant(index)}
                               className="text-red-500 hover:text-red-700 p-2 hover:bg-red-50 rounded transition-colors"
-                              title="Remove variant"
+                              title={t('variants.removeTooltip')}
                             >
                               ✕
                             </button>
@@ -1303,20 +1300,20 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
                                   value={variant.name}
                                   onChange={(e) => updateVariant(index, 'name', e.target.value)}
                                   className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                                  placeholder="e.g., Small, Strawberry"
+                                  placeholder={t('variants.namePlaceholder')}
                                 />
                                 <button
                                   type="button"
                                   onClick={() => suggestVariantSKU(index)}
                                   disabled={!formData.name || !variant.name}
                                   className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-sm whitespace-nowrap"
-                                  title={t('products.suggestSKU')}
+                                  title={t('variants.suggestSkuTooltip')}
                                 >
-                                  🔧
+                                  🔧 {t('variants.suggestButton')}
                                 </button>
                               </div>
                               <p className="text-xs text-gray-500 mt-1">
-                                This will be used to identify the variant (e.g., size, flavor, color)
+                                {t('variants.nameHelper')}
                               </p>
                             </div>
 
@@ -1331,7 +1328,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
                                   value={variant.sku || ''}
                                   onChange={(e) => updateVariant(index, 'sku', e.target.value)}
                                   className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                                  placeholder="e.g., NEST-PKG-MILK-SMAL"
+                                  placeholder={t('variants.skuPlaceholder')}
                                 />
                                 <button
                                   type="button"
@@ -1346,9 +1343,9 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
                                   }}
                                   disabled={!formData.name || !variant.name}
                                   className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-sm whitespace-nowrap"
-                                  title="Suggest SKU for this variant"
+                                  title={t('variants.suggestSkuTooltip')}
                                 >
-                                  🔧 Suggest
+                                  🔧 {t('variants.suggestButton')}
                                 </button>
                               </div>
                             </div>
@@ -1372,7 +1369,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
                                     value={variant.displayName || ''}
                                     onChange={(e) => updateVariant(index, 'displayName', e.target.value)}
                                     className="w-full mt-2 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                                    placeholder="e.g., Fresa Deluxe"
+                                    placeholder={t('variants.customNamePlaceholder')}
                                   />
                                 )}
                               </div>
@@ -1392,9 +1389,9 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
                                     // You could pass variant-specific data here if needed
                                   }}
                                   className="px-2 py-1 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded text-xs font-medium transition-colors"
-                                  title="Use AI to enhance this variant description"
+                                  title={t('variants.aiEnhanceTooltip')}
                                 >
-                                  ✨ AI Enhance
+                                  {t('variants.aiEnhanceButton')}
                                 </button>
                               </div>
                               <textarea
@@ -1402,7 +1399,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
                                 onChange={(e) => updateVariant(index, 'description', e.target.value)}
                                 rows={2}
                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                                placeholder="Specific details about this variant"
+                                placeholder={t('variants.descriptionPlaceholder')}
                               />
                             </div>
 
@@ -1421,22 +1418,6 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
 
                             {/* Pricing Row */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                  {t('products.price')}
-                                </label>
-                                <input
-                                  type="number"
-                                  value={variant.price || ''}
-                                  onChange={(e) => updateVariant(index, 'price', parseFloat(e.target.value) || 0)}
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                                  placeholder="0"
-                                  step="0.01"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                  {t('products.costPrice')}
                                 </label>
                                 <input
                                   type="number"
@@ -1460,7 +1441,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
                                   value={variant.currentStock || ''}
                                   onChange={(e) => updateVariant(index, 'currentStock', parseInt(e.target.value) || 0)}
                                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                                  placeholder="Current inventory for this variant"
+                                  placeholder={t('variants.currentStockPlaceholder')}
                                   min="0"
                                 />
                               </div>
@@ -1475,7 +1456,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                   <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                                      Min Stock
+                                      {t('products.minStock')}
                                     </label>
                                     <input
                                       type="number"
@@ -1488,7 +1469,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
                                   </div>
                                   <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                                      Max Stock
+                                      {t('products.maxStock')}
                                     </label>
                                     <input
                                       type="number"
@@ -1501,7 +1482,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
                                   </div>
                                 </div>
                                 <p className="text-xs text-gray-500">
-                                  Leave empty to use product-level inventory settings
+                                  {t('variants.leaveEmptyHint')}
                                 </p>
                               </div>
                             </details>
@@ -1566,7 +1547,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
                             value={group.name}
                             onChange={(e) => updateModifierGroup(groupIndex, 'name', e.target.value)}
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                            placeholder="e.g., Milk Options, Ice Options"
+                            placeholder={t('modifierGroups.groupPlaceholder')}
                           />
                         </div>
                         <button
@@ -1611,22 +1592,22 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
                                   value={modifier.name}
                                   onChange={(e) => updateModifier(groupIndex, modIndex, 'name', e.target.value)}
                                   className="px-2 py-1 border border-gray-300 rounded text-sm"
-                                  placeholder="Modifier name"
+                                  placeholder={t('modifierGroups.modifierNamePlaceholder')}
                                 />
                                 <select
                                   value={modifier.type}
                                   onChange={(e) => updateModifier(groupIndex, modIndex, 'type', e.target.value)}
                                   className="px-2 py-1 border border-gray-300 rounded text-sm"
                                 >
-                                  <option value="ADD">Add-on (+)</option>
-                                  <option value="REMOVE">Removal (-)</option>
+                                  <option value="ADD">{t('modifierGroups.addOption')}</option>
+                                  <option value="REMOVE">{t('modifierGroups.removeOption')}</option>
                                 </select>
                                 <input
                                   type="number"
                                   value={modifier.priceAdjustment}
                                   onChange={(e) => updateModifier(groupIndex, modIndex, 'priceAdjustment', parseFloat(e.target.value))}
                                   className="px-2 py-1 border border-gray-300 rounded text-sm"
-                                  placeholder="Price adjustment"
+                                  placeholder={t('modifierGroups.priceAdjustmentPlaceholder')}
                                   step="0.01"
                                 />
                               </div>
@@ -1645,12 +1626,12 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
                                 className="flex items-center gap-1 px-2 py-1 border border-gray-300 rounded text-xs hover:bg-gray-100"
                               >
                                 <span>🌐</span>
-                                Channel Pricing
+                                {t('modals.channelPricing')}
                               </button>
                               {(modifier.cafePriceAdjustment || modifier.rappiPriceAdjustment ||
                                 modifier.pedidosyaPriceAdjustment || modifier.uberPriceAdjustment) && (
                                 <span className="text-xs text-green-600">
-                                  ✓ Custom prices set
+                                  ✓ {t('modals.customChannelPrices')}
                                 </span>
                               )}
                             </div>
@@ -1763,6 +1744,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
         onClose={() => setIsEnrichModalOpen(false)}
         productName={formData.name}
         productEan={formData.ean}
+        variantNames={variants.map(variant => variant.name).filter(Boolean)}
         onApprove={handleEnrichmentApprove}
       />
 
@@ -1777,7 +1759,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
           pedidosyaPrice: formData.pedidosyaPrice,
           uberPrice: formData.uberPrice,
         }}
-        title="Product Channel Pricing"
+        title={t('modals.productChannelPricing')}
       />
 
       {/* Channel Pricing Modal for Modifiers */}
@@ -1792,7 +1774,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
             pedidosyaPrice: modifierGroups[currentModifierIndices.groupIndex]?.modifiers[currentModifierIndices.modIndex]?.pedidosyaPriceAdjustment,
             uberPrice: modifierGroups[currentModifierIndices.groupIndex]?.modifiers[currentModifierIndices.modIndex]?.uberPriceAdjustment,
           }}
-          title="Modifier Channel Pricing Adjustments"
+          title={t('modals.modifierChannelPricing')}
           isPriceAdjustment={true}
         />
       )}

@@ -233,9 +233,8 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
         setVariants(formVariants);
         setOriginalVariants(formVariants); // Store original variants for comparison
 
-        // Expand all variants by default when editing
-        const allIndices = new Set(formVariants.map((_, index) => index));
-        setExpandedVariants(allIndices);
+        // Keep variants collapsed by default when editing for easier recognition
+        setExpandedVariants(new Set());
       } else {
         setWillHaveVariants(false);
         setShowVariants(false);

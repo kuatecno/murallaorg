@@ -17,9 +17,7 @@ async function migrateTags() {
     const productsWithTags = await prisma.product.findMany({
       where: {
         tags: {
-          not: {
-            equals: []
-          }
+          isEmpty: false
         }
       },
       include: {

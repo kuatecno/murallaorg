@@ -304,6 +304,71 @@ export default function ProductsPage() {
     }
   };
 
+  // Duplicate functions
+  const handleDuplicateProduct = async (product: Product) => {
+    const newName = prompt(`Enter name for duplicated product:`, `Copy of ${product.name}`);
+    if (!newName) return;
+
+    const newSku = prompt(`Enter SKU for duplicated product:`, `${product.sku}-COPY`);
+    if (!newSku) return;
+
+    try {
+      const response = await apiClient.post(`/api/products/${product.id}/duplicate`, {
+        newName,
+        newSku,
+        duplicateVariants: true,
+        duplicateModifiers: true,
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        alert(`Product duplicated successfully! New product: ${result.data.name}`);
+        loadProducts();
+      } else {
+        const error = await response.json();
+        alert(`Failed to duplicate product: ${error.error}`);
+      }
+    } catch (error) {
+      console.error('Error duplicating product:', error);
+      alert('Failed to duplicate product');
+    }
+  };
+
+  const handleBulkDuplicate = async () => {
+    if (selectedProducts.size === 0) return;
+
+    const namePrefix = prompt('Enter prefix for duplicated products:', 'Copy of') || 'Copy of';
+    
+    if (!confirm(`Duplicate ${selectedProducts.size} selected products with prefix "${namePrefix}"?`)) {
+      return;
+    }
+
+    try {
+      const response = await apiClient.post('/api/products/bulk-duplicate', {
+        productIds: Array.from(selectedProducts),
+        namePrefix,
+        duplicateVariants: true,
+        duplicateModifiers: true,
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        alert(`Successfully duplicated ${result.data.totalSuccessful} of ${result.data.totalRequested} products`);
+        if (result.data.errors.length > 0) {
+          console.error('Duplication errors:', result.data.errors);
+        }
+        loadProducts();
+        clearSelection();
+      } else {
+        const error = await response.json();
+        alert(`Failed to duplicate products: ${error.error}`);
+      }
+    } catch (error) {
+      console.error('Error duplicating products:', error);
+      alert('Failed to duplicate products');
+    }
+  };
+
   if (isAuthLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -451,6 +516,12 @@ export default function ProductsPage() {
               </div>
               <div className="flex items-center space-x-3">
                 <button
+                  onClick={handleBulkDuplicate}
+                  className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                >
+                  📋 Duplicate {selectedProducts.size}
+                </button>
+                <button
                   onClick={handleBulkDelete}
                   disabled={isDeleting}
                   className="bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
@@ -570,6 +641,13 @@ export default function ProductsPage() {
                         title={t('products.enrichWithAI')}
                       >
                         ✨ AI
+                      </button>
+                      <button
+                        onClick={() => handleDuplicateProduct(product)}
+                        className="text-green-600 hover:text-green-700 text-sm font-medium"
+                        title="Duplicate product"
+                      >
+                        📋
                       </button>
                       <button
                         onClick={() => handleEditProduct(product)}
@@ -711,6 +789,13 @@ export default function ProductsPage() {
                             title={t('products.enrichWithAI')}
                           >
                             ✨ AI
+                          </button>
+                          <button
+                            onClick={() => handleDuplicateProduct(product)}
+                            className="text-green-600 hover:text-green-700 font-medium"
+                            title="Duplicate product"
+                          >
+                            📋
                           </button>
                           <button
                             onClick={() => handleEditProduct(product)}

@@ -369,6 +369,31 @@ export default function ProductsPage() {
     }
   };
 
+  // Create product from link function
+  const handleCreateFromLink = async () => {
+    const url = prompt('Enter the product URL to import:');
+    if (!url) return;
+
+    try {
+      const response = await apiClient.post('/api/products/create-from-link', {
+        url,
+        type: 'READY_PRODUCT',
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        alert(`Product created successfully from URL! Product: ${result.data.product.name}`);
+        loadProducts();
+      } else {
+        const error = await response.json();
+        alert(`Failed to create product from URL: ${error.error}`);
+      }
+    } catch (error) {
+      console.error('Error creating product from link:', error);
+      alert('Failed to create product from URL');
+    }
+  };
+
   if (isAuthLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -395,6 +420,13 @@ export default function ProductsPage() {
                 filename="products-backup"
                 variant="secondary"
               />
+              <button
+                onClick={handleCreateFromLink}
+                className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                title="Create product from URL"
+              >
+                🔗 From Link
+              </button>
               <button
                 onClick={() => setIsCreateModalOpen(true)}
                 className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"

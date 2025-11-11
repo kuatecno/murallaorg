@@ -70,6 +70,8 @@
   "products": {
     "title": "Products",
     "newProduct": "New Product",
+    "createFromLink": "Create from Link",
+    "createFromLinkDescription": "Create a purchased product directly from a URL",
     "editProduct": "Edit Product",
     "createProduct": "Create New Product",
     "productList": "Product List",
@@ -201,7 +203,7 @@
     },
     "types": {
       "INPUT": "Input",
-      "READY_PRODUCT": "Ready Product",
+      "READY_PRODUCT": "Purchased Product",
       "MANUFACTURED": "Manufactured",
       "MADE_TO_ORDER": "Made to Order",
       "SERVICE": "Service"

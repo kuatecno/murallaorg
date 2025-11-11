@@ -70,6 +70,8 @@
   "products": {
     "title": "Productos",
     "newProduct": "Nuevo Producto",
+    "createFromLink": "Crear desde Enlace",
+    "createFromLinkDescription": "Crear un producto comprado directamente desde una URL",
     "editProduct": "Editar Producto",
     "createProduct": "Crear Nuevo Producto",
     "productList": "Lista de Productos",
@@ -149,14 +151,14 @@
     },
     "types": {
       "INPUT": "Insumo",
-      "READY_PRODUCT": "Producto Listo",
+      "READY_PRODUCT": "Producto comprado",
       "MANUFACTURED": "Manufacturado",
       "MADE_TO_ORDER": "Hecho por Pedido",
       "SERVICE": "Servicio"
     },
     "typeDescriptions": {
       "INPUT": "Materias primas usadas en recetas (no se pueden vender directamente)",
-      "READY_PRODUCT": "Productos terminados listos para vender",
+      "READY_PRODUCT": "Productos comprados terminados listos para vender",
       "MANUFACTURED": "Productos hechos en lotes usando recetas",
       "MADE_TO_ORDER": "Productos hechos al momento cuando se ordenan",
       "SERVICE": "Servicios no físicos"

@@ -152,6 +152,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
   const [categories, setCategories] = useState<Category[]>([]);
   const [variants, setVariants] = useState<ProductVariant[]>([]);
   const [originalVariants, setOriginalVariants] = useState<ProductVariant[]>([]); // Track original variants for deletion
+  const [variantsToDelete, setVariantsToDelete] = useState<string[]>([]); // Track variant IDs to delete
   const [modifierGroups, setModifierGroups] = useState<ModifierGroup[]>([]);
   const [showVariants, setShowVariants] = useState(false);
   const [showModifiers, setShowModifiers] = useState(false);
@@ -465,18 +466,15 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
         productId = createdProduct.data?.id || createdProduct.id;
       }
 
-      // Handle variants: create, update, and delete
-      if (product && originalVariants.length > 0) {
-        // When editing, find variants to delete (present in original but not in current)
-        const currentVariantIds = new Set(variants.filter(v => v.id).map(v => v.id));
-        const variantsToDelete = originalVariants.filter(v => v.id && !currentVariantIds.has(v.id));
-        
-        // Delete removed variants
-        for (const variantToDelete of variantsToDelete) {
-          console.log('Deleting removed variant:', variantToDelete.id, variantToDelete.name);
-          const deleteResponse = await apiClient.delete(`/api/variants/${variantToDelete.id}`);
+      // Handle variants: delete marked variants first
+      if (variantsToDelete.length > 0) {
+        console.log('Deleting marked variants:', variantsToDelete);
+        for (const variantId of variantsToDelete) {
+          const deleteResponse = await apiClient.delete(`/api/variants/${variantId}`);
           if (!deleteResponse.ok) {
-            console.error('Failed to delete variant:', variantToDelete.name);
+            console.error('Failed to delete variant:', variantId);
+          } else {
+            console.log('Successfully deleted variant:', variantId);
           }
         }
       }
@@ -558,6 +556,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
     });
     setVariants([]);
     setOriginalVariants([]);
+    setVariantsToDelete([]);
     setModifierGroups([]);
     setShowVariants(false);
     setShowModifiers(false);
@@ -621,8 +620,15 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
   };
 
   const removeVariant = (index: number) => {
+    const variantToRemove = variants[index];
+    
+    // If the variant has an ID, mark it for deletion
+    if (variantToRemove.id) {
+      setVariantsToDelete(prev => [...prev, variantToRemove.id!]);
+      console.log('Marking variant for deletion:', variantToRemove.id, variantToRemove.name);
+    }
+    
     const updated = variants.filter((_, i) => i !== index);
-    // No auto-default logic - all variants are equal
     setVariants(updated);
   };
 

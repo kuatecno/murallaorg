@@ -13,6 +13,19 @@ if (!process.env.GEMINI_API_KEY) {
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
+/**
+ * Clean JSON response from LLM - removes markdown code fences and extra whitespace
+ */
+function cleanJsonResponse(text: string): string {
+  // Remove markdown code fences (```json ... ``` or ``` ... ```)
+  let cleaned = text.replace(/^```(?:json)?\s*\n?/i, '').replace(/\n?```\s*$/i, '');
+
+  // Trim whitespace
+  cleaned = cleaned.trim();
+
+  return cleaned;
+}
+
 // Flattened category list for AI prompt
 const CATEGORY_LIST = [
   // Barra - Café
@@ -141,7 +154,14 @@ BUSCA EN GOOGLE AHORA y devuelve el JSON con la información más precisa que en
 
     const response = result.response;
     const responseText = response.text();
-    const groundedData = JSON.parse(responseText);
+
+    // Clean the response before parsing (removes markdown code fences)
+    const cleanedText = cleanJsonResponse(responseText);
+
+    console.log('📝 Raw response:', responseText.substring(0, 200));
+    console.log('🧹 Cleaned response:', cleanedText.substring(0, 200));
+
+    const groundedData = JSON.parse(cleanedText);
 
     console.log('✅ Grounded enrichment completed');
     console.log('📊 Grounded data:', groundedData);

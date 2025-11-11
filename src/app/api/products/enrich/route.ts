@@ -11,6 +11,19 @@ import prisma from '@/lib/prisma';
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
+/**
+ * Clean JSON response from LLM - removes markdown code fences and extra whitespace
+ */
+function cleanJsonResponse(text: string): string {
+  // Remove markdown code fences (```json ... ``` or ``` ... ```)
+  let cleaned = text.replace(/^```(?:json)?\s*\n?/i, '').replace(/\n?```\s*$/i, '');
+
+  // Trim whitespace
+  cleaned = cleaned.trim();
+
+  return cleaned;
+}
+
 // Available categories with hierarchical structure
 const CATEGORIES = {
   'Barra': {
@@ -222,8 +235,9 @@ BUSCA EN GOOGLE AHORA y devuelve SOLO el objeto JSON con información real encon
           });
           const result = await model.generateContent(prompt);
           const responseText = result.response.text();
+          const cleanedText = cleanJsonResponse(responseText);
           console.log('✅ Gemini response received');
-          return JSON.parse(responseText);
+          return JSON.parse(cleanedText);
         } catch (error) {
           console.error('❌ Gemini error:', error);
           return null;
@@ -250,7 +264,9 @@ BUSCA EN GOOGLE AHORA y devuelve SOLO el objeto JSON con información real encon
           });
           const responseContent = completion.choices[0]?.message?.content;
           console.log('✅ OpenAI response received');
-          return responseContent ? JSON.parse(responseContent) : null;
+          if (!responseContent) return null;
+          const cleanedText = cleanJsonResponse(responseContent);
+          return JSON.parse(cleanedText);
         } catch (error) {
           console.error('❌ OpenAI error:', error);
           return null;

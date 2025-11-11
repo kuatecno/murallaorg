@@ -133,6 +133,11 @@
       "title": "Variant-Specific Fields",
       "description": "SKU, EAN/Barcode, pricing, and stock fields are now managed individually for each variant. Configure these settings in the variant sections below."
     },
+    "display": "Display",
+    "parents": "Parents Only",
+    "allVariants": "All Variants",
+    "showParentsOnly": "Show parent products only",
+    "showAllVariants": "Show all variants as individual items",
     "aiEnrichmentTitle": "✨AI Product Enrichment",
     "aiEnrichmentDesc": "Auto-fill product details using AI (name, description, category, images, etc.)",
     "inputWarning": "⚠️ INPUT products cannot be sold directly. They are used as ingredients in recipes.",

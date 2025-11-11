@@ -44,6 +44,12 @@ interface Product {
     price?: number | null;
     isDefault: boolean;
   }[];
+  // Fields added when variants are expanded
+  _isVariant?: boolean;
+  _parentId?: string;
+  _variantId?: string;
+  _variantName?: string;
+  _isDefault?: boolean;
 }
 
 type ViewMode = 'grid' | 'table';
@@ -54,6 +60,7 @@ export default function ProductsPage() {
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [filterType, setFilterType] = useState<FilterType>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
+  const [showVariantsExpanded, setShowVariantsExpanded] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedProductForEdit, setSelectedProductForEdit] = useState<Product | null>(null);
@@ -129,6 +136,15 @@ export default function ProductsPage() {
 
   // Delete functions
   const handleDeleteProduct = (product: Product) => {
+    // If deleting an expanded variant, delete the parent product instead
+    if (product._isVariant && product._parentId) {
+      const parentProduct = products.find(p => p.id === product._parentId);
+      if (parentProduct) {
+        setProductToDelete(parentProduct);
+        setShowDeleteConfirm(true);
+        return;
+      }
+    }
     setProductToDelete(product);
     setShowDeleteConfirm(true);
   };
@@ -183,7 +199,29 @@ export default function ProductsPage() {
     setProductToDelete(null);
   };
 
-  const filteredProducts = products.filter((product) => {
+  // Expand products with variants into individual variant items
+  const expandedProducts = showVariantsExpanded
+    ? products.flatMap((product) => {
+        if (product.variants && product.variants.length > 0) {
+          // Create a product entry for each variant
+          return product.variants.map((variant) => ({
+            ...product,
+            id: `${product.id}-variant-${variant.id}`,
+            _parentId: product.id,
+            _variantId: variant.id,
+            name: `${product.name} - ${variant.displayName || variant.name}`,
+            sku: variant.sku || product.sku,
+            unitPrice: variant.price ?? product.unitPrice,
+            _isVariant: true,
+            _variantName: variant.displayName || variant.name,
+            _isDefault: variant.isDefault,
+          }));
+        }
+        return [product];
+      })
+    : products;
+
+  const filteredProducts = expandedProducts.filter((product) => {
     const matchesType = filterType === 'ALL' || product.type === filterType;
     const matchesSearch =
       searchQuery === '' ||
@@ -217,11 +255,29 @@ export default function ProductsPage() {
   };
 
   const handleEditProduct = (product: Product) => {
+    // If editing an expanded variant, find and edit the parent product instead
+    if (product._isVariant && product._parentId) {
+      const parentProduct = products.find(p => p.id === product._parentId);
+      if (parentProduct) {
+        setSelectedProductForEdit(parentProduct);
+        setIsEditModalOpen(true);
+        return;
+      }
+    }
     setSelectedProductForEdit(product);
     setIsEditModalOpen(true);
   };
 
   const handleEnrichProduct = (product: Product) => {
+    // If enriching an expanded variant, enrich the parent product instead
+    if (product._isVariant && product._parentId) {
+      const parentProduct = products.find(p => p.id === product._parentId);
+      if (parentProduct) {
+        setSelectedProductForEnrich(parentProduct);
+        setIsEnrichModalOpen(true);
+        return;
+      }
+    }
     setSelectedProductForEnrich(product);
     setIsEnrichModalOpen(true);
   };
@@ -303,28 +359,60 @@ export default function ProductsPage() {
               />
             </div>
 
-            {/* View Toggle */}
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={() => setViewMode('grid')}
-                className={`p-2 rounded ${
-                  viewMode === 'grid' ? 'bg-blue-100 text-blue-600' : 'text-gray-600 hover:bg-gray-100'
-                }`}
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-                </svg>
-              </button>
-              <button
-                onClick={() => setViewMode('table')}
-                className={`p-2 rounded ${
-                  viewMode === 'table' ? 'bg-blue-100 text-blue-600' : 'text-gray-600 hover:bg-gray-100'
-                }`}
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                </svg>
-              </button>
+            {/* View Toggle and Variant Display Toggle */}
+            <div className="flex items-center space-x-4">
+              {/* Variant Display Toggle */}
+              <div className="flex items-center space-x-2 border-r pr-4">
+                <span className="text-sm text-gray-600">{t('products.display')}:</span>
+                <button
+                  onClick={() => setShowVariantsExpanded(false)}
+                  className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
+                    !showVariantsExpanded
+                      ? 'bg-blue-100 text-blue-600'
+                      : 'text-gray-600 hover:bg-gray-100'
+                  }`}
+                  title={t('products.showParentsOnly')}
+                >
+                  {t('products.parents')}
+                </button>
+                <button
+                  onClick={() => setShowVariantsExpanded(true)}
+                  className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
+                    showVariantsExpanded
+                      ? 'bg-blue-100 text-blue-600'
+                      : 'text-gray-600 hover:bg-gray-100'
+                  }`}
+                  title={t('products.showAllVariants')}
+                >
+                  {t('products.allVariants')}
+                </button>
+              </div>
+
+              {/* View Mode Toggle */}
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => setViewMode('grid')}
+                  className={`p-2 rounded ${
+                    viewMode === 'grid' ? 'bg-blue-100 text-blue-600' : 'text-gray-600 hover:bg-gray-100'
+                  }`}
+                  title={t('viewModes.grid')}
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                  </svg>
+                </button>
+                <button
+                  onClick={() => setViewMode('table')}
+                  className={`p-2 rounded ${
+                    viewMode === 'table' ? 'bg-blue-100 text-blue-600' : 'text-gray-600 hover:bg-gray-100'
+                  }`}
+                  title={t('viewModes.table')}
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
 

@@ -170,7 +170,12 @@
     "variantNotice": {
       "title": "Campos Específicos de Variantes",
       "description": "Los campos SKU, EAN/Código de Barras, Precios y Stock ahora se gestionan individualmente para cada variante. Configure estos ajustes en las secciones de variantes a continuación."
-    }
+    },
+    "display": "Mostrar",
+    "parents": "Solo Padres",
+    "allVariants": "Todas las Variantes",
+    "showParentsOnly": "Mostrar solo productos padre",
+    "showAllVariants": "Mostrar todas las variantes como elementos individuales"
   },
   "categories": {
     "title": "Categorías",

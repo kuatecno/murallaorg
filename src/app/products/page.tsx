@@ -209,7 +209,7 @@ export default function ProductsPage() {
             id: `${product.id}-variant-${variant.id}`,
             _parentId: product.id,
             _variantId: variant.id,
-            name: `${product.name} - ${variant.displayName || variant.name}`,
+            name: `${product.name} ${variant.displayName || variant.name}`,
             sku: variant.sku || product.sku,
             unitPrice: variant.price ?? product.unitPrice,
             _isVariant: true,

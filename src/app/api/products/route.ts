@@ -146,7 +146,6 @@ export async function GET(request: NextRequest) {
               sku: true,
               price: true,
               costPrice: true,
-              currentStock: true,
               cafePrice: true,
               rappiPrice: true,
               pedidosyaPrice: true,

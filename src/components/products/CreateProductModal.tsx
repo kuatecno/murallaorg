@@ -211,7 +211,6 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
           description: v.description || '',
           price: v.price || 0,
           costPrice: v.costPrice?.toString() || '',
-          currentStock: v.currentStock || 0,
           cafePrice: v.cafePrice?.toString() || '',
           rappiPrice: v.rappiPrice?.toString() || '',
           pedidosyaPrice: v.pedidosyaPrice?.toString() || '',

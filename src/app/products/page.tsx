@@ -230,7 +230,7 @@ export default function ProductsPage() {
             _parentId: product.id,
             _variantId: variant.id,
             name: `${product.name} ${variant.displayName || variant.name}`,
-            sku: variant.sku, // Only show variant SKU, don't fall back to parent
+            sku: variant.sku ?? '', // Use empty string if no variant SKU
             unitPrice: variant.price ?? product.unitPrice,
             _isVariant: true,
             _variantName: variant.displayName || variant.name,

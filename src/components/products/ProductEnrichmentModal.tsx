@@ -144,8 +144,8 @@ export default function ProductEnrichmentModal({
         },
         body: JSON.stringify({
           productId,
-          name: productName,
-          ean: productEan,
+          name: productName || undefined,
+          ean: productEan || undefined,
           tenantId: user.tenantId,
           variantNames,
           sourceUrl: sourceUrl || undefined, // Include optional source URL
@@ -154,7 +154,14 @@ export default function ProductEnrichmentModal({
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to enrich product');
+        const errorMessage = errorData.error || 'Failed to enrich product';
+
+        // Add helpful context for URL-only enrichment failures
+        if (!productName && !productEan && sourceUrl) {
+          throw new Error(`${errorMessage}\n\nTip: Make sure the URL is publicly accessible. The AI will extract product name, description, and other data from the webpage.`);
+        }
+
+        throw new Error(errorMessage);
       }
 
       const data = await response.json();
@@ -483,13 +490,15 @@ export default function ProductEnrichmentModal({
             <div className="py-8">
               <Sparkles className="w-16 h-16 mx-auto text-blue-500 mb-4" />
               <p className="text-gray-600 mb-6 text-center">
-                Click the button below to generate AI-powered suggestions for this product
+                {productName || productEan
+                  ? 'Click the button below to generate AI-powered suggestions for this product'
+                  : 'Enter a product URL to extract and enrich product data with AI'}
               </p>
 
-              {/* Optional Source URL Input */}
+              {/* Source URL Input - Required when no product name/EAN */}
               <div className="max-w-2xl mx-auto mb-6">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Product URL (Optional)
+                  Product URL {!productName && !productEan && <span className="text-red-500">*</span>}
                 </label>
                 <input
                   type="url"
@@ -497,19 +506,23 @@ export default function ProductEnrichmentModal({
                   onChange={(e) => setSourceUrl(e.target.value)}
                   placeholder="https://example.com/product/lasana-vegetariana"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  required={!productName && !productEan}
                 />
                 <p className="mt-1 text-xs text-gray-500">
-                  💡 Provide a link to the official product page for more accurate results
+                  💡 {productName || productEan
+                    ? 'Provide a link to the official product page for more accurate results'
+                    : 'AI will extract product name, description, images, and other data from this URL'}
                 </p>
               </div>
 
               <div className="text-center">
                 <button
                   onClick={fetchEnrichment}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors inline-flex items-center space-x-2"
+                  disabled={!productName && !productEan && !sourceUrl}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors inline-flex items-center space-x-2 disabled:bg-gray-300 disabled:cursor-not-allowed"
                 >
                   <Sparkles className="w-5 h-5" />
-                  <span>Generate Suggestions</span>
+                  <span>{productName || productEan ? 'Generate Suggestions' : 'Extract & Enrich from URL'}</span>
                 </button>
               </div>
             </div>

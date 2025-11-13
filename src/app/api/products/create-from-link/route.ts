@@ -67,11 +67,11 @@ export async function POST(request: NextRequest) {
 
     const enrichmentData = await enrichmentResponse.json();
     
-    if (!enrichmentData.success || !enrichmentData.data) {
+    if (!enrichmentData.success || !enrichmentData.suggestions) {
       return corsError('No product data could be extracted from the URL', 400, origin);
     }
 
-    const enrichedProduct = enrichmentData.data;
+    const enrichedProduct = enrichmentData.suggestions;
 
     // Generate a unique SKU based on the product name
     const generateSKU = (name: string): string => {

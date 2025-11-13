@@ -165,11 +165,54 @@ export async function POST(request: NextRequest) {
       };
     }
 
-    if (!productData.name && !productData.ean) {
+    // Allow URL-only enrichment for create-from-link feature
+    if (!productData.name && !productData.ean && !sourceUrl) {
       return NextResponse.json(
-        { error: 'Product name or EAN is required' },
+        { error: 'Product name, EAN, or source URL is required' },
         { status: 400 }
       );
+    }
+
+    // If only URL is provided, fetch the webpage content first
+    let webpageContent = '';
+    if (sourceUrl && !productData.name && !productData.ean) {
+      try {
+        console.log('🌐 Fetching webpage content from:', sourceUrl);
+        const pageResponse = await fetch(sourceUrl, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (compatible; ProductEnricher/1.0)',
+          },
+        });
+
+        if (pageResponse.ok) {
+          const html = await pageResponse.text();
+          // Extract basic metadata from HTML
+          const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+          const descMatch = html.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']+)["']/i);
+          const ogTitleMatch = html.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["']/i);
+          const ogDescMatch = html.match(/<meta[^>]*property=["']og:description["'][^>]*content=["']([^"']+)["']/i);
+
+          webpageContent = `
+Contenido extraído de la página web:
+- Título: ${titleMatch?.[1] || ogTitleMatch?.[1] || 'No encontrado'}
+- Descripción: ${descMatch?.[1] || ogDescMatch?.[1] || 'No encontrada'}
+`;
+
+          // Try to extract product name from URL as fallback
+          const urlPath = new URL(sourceUrl).pathname;
+          const pathParts = urlPath.split('/').filter(Boolean);
+          if (pathParts.length > 0) {
+            const lastPart = pathParts[pathParts.length - 1];
+            const urlProductName = lastPart.replace(/-/g, ' ').replace(/\.[^.]+$/, '');
+            webpageContent += `- Nombre del producto (de URL): ${urlProductName}\n`;
+          }
+
+          console.log('✅ Webpage content extracted successfully');
+        }
+      } catch (error) {
+        console.error('❌ Failed to fetch webpage:', error);
+        // Continue without webpage content
+      }
     }
 
     // Build Gemini prompt with search grounding
@@ -180,9 +223,12 @@ ${productData.name ? `- Nombre: ${productData.name}` : ''}
 ${productData.ean ? `- Código EAN: ${productData.ean}` : ''}
 ${productData.brand ? `- Marca: ${productData.brand}` : ''}
 ${sourceUrl ? `- URL del producto: ${sourceUrl}` : ''}
+${webpageContent ? `\n${webpageContent}` : ''}
 
 INSTRUCCIONES IMPORTANTES:
-${sourceUrl ? `1. 🎯 PRIORIDAD MÁXIMA: Usa la información de esta URL específica: ${sourceUrl}` : '1. USA GOOGLE SEARCH para encontrar información REAL y VERIFICABLE de la marca oficial'}
+${sourceUrl ? `1. 🎯 PRIORIDAD MÁXIMA: Usa la información extraída de la página web arriba
+   - Si no se proporcionó nombre arriba, DEBES usar el título de la página o el nombre de la URL como base
+   - Genera un nombre apropiado para el producto basado en el contenido de la página` : '1. USA GOOGLE SEARCH para encontrar información REAL y VERIFICABLE de la marca oficial'}
 2. Busca el sitio web oficial, Instagram, Facebook, o e-commerce chileno del producto
 3. Prioriza información de fuentes chilenas conocidas
 4. Para las imágenes, busca URLs REALES de:
@@ -315,10 +361,26 @@ BUSCA EN GOOGLE AHORA y devuelve SOLO el objeto JSON con información real encon
     suggestions.images = [];
 
     if (!suggestions || (!geminiResult && !openaiResult)) {
-      return NextResponse.json(
-        { error: 'Both AI services failed to respond' },
-        { status: 500 }
-      );
+      // If we have webpage content, at least return something basic
+      if (webpageContent) {
+        const urlObj = new URL(sourceUrl!);
+        const pathParts = urlObj.pathname.split('/').filter(Boolean);
+        const urlProductName = pathParts.length > 0
+          ? pathParts[pathParts.length - 1].replace(/-/g, ' ').replace(/\.[^.]+$/, '')
+          : 'Product from URL';
+
+        suggestions = {
+          name: urlProductName,
+          description: 'Product imported from URL - please update description',
+          type: 'READY_PRODUCT',
+        };
+        console.log('⚠️ Both AIs failed, using basic URL extraction');
+      } else {
+        return NextResponse.json(
+          { error: 'Failed to extract product data. Please ensure the URL is accessible and try again.' },
+          { status: 500 }
+        );
+      }
     }
 
     console.log('🤝 Merged suggestions from both AI models');

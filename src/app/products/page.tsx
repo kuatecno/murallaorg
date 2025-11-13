@@ -66,6 +66,7 @@ export default function ProductsPage() {
   const [selectedProductForEdit, setSelectedProductForEdit] = useState<Product | null>(null);
   const [isEnrichModalOpen, setIsEnrichModalOpen] = useState(false);
   const [selectedProductForEnrich, setSelectedProductForEnrich] = useState<Product | null>(null);
+  const [isCreateFromLinkMode, setIsCreateFromLinkMode] = useState(false);
   const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -303,20 +304,63 @@ export default function ProductsPage() {
   };
 
   const handleApplyEnrichment = async (approvedData: any) => {
-    if (!selectedProductForEnrich) return;
-
     try {
+      if (isCreateFromLinkMode) {
+        // Create a new product from enriched data
+        const generateSKU = (name: string): string => {
+          const cleanName = name
+            .replace(/[^a-zA-Z0-9\s]/g, '') // Remove special characters
+            .replace(/\s+/g, '-') // Replace spaces with hyphens
+            .toUpperCase()
+            .substring(0, 20); // Limit length
 
-      // Update product with approved data
-      const response = await apiClient.put(`/api/products/${selectedProductForEnrich.id}`, approvedData);
+          const timestamp = Date.now().toString().slice(-6); // Last 6 digits of timestamp
+          return `${cleanName}-${timestamp}`;
+        };
 
-      if (response.ok) {
-        // Reload products to show updated data
-        loadProducts();
-        alert('Product enriched successfully!');
+        const productData = {
+          sku: generateSKU(approvedData.name || 'PRODUCT'),
+          name: approvedData.name || 'Unnamed Product',
+          description: approvedData.description || '',
+          type: approvedData.type || 'READY_PRODUCT',
+          category: approvedData.category || '',
+          brand: approvedData.brand || '',
+          ean: approvedData.ean || null,
+          unitPrice: 0, // Default price, user can update later
+          costPrice: null,
+          currentStock: 0,
+          minStock: 0,
+          maxStock: null,
+          unit: 'UNIT',
+          format: null,
+          tags: [],
+          images: approvedData.images || [],
+          isActive: true,
+        };
+
+        const response = await apiClient.post('/api/products', productData);
+
+        if (response.ok) {
+          loadProducts();
+          alert(`Product "${approvedData.name}" created successfully from URL!`);
+          setIsCreateFromLinkMode(false);
+        } else {
+          const error = await response.json();
+          alert(`Failed to create product: ${error.error}`);
+        }
       } else {
-        const error = await response.json();
-        alert(`Failed to update product: ${error.error}`);
+        // Update existing product with approved data
+        if (!selectedProductForEnrich) return;
+
+        const response = await apiClient.put(`/api/products/${selectedProductForEnrich.id}`, approvedData);
+
+        if (response.ok) {
+          loadProducts();
+          alert('Product enriched successfully!');
+        } else {
+          const error = await response.json();
+          alert(`Failed to update product: ${error.error}`);
+        }
       }
     } catch (error) {
       console.error('Error applying enrichment:', error);
@@ -389,29 +433,11 @@ export default function ProductsPage() {
     }
   };
 
-  // Create product from link function
-  const handleCreateFromLink = async () => {
-    const url = prompt('Enter the product URL to import:');
-    if (!url) return;
-
-    try {
-      const response = await apiClient.post('/api/products/create-from-link', {
-        url,
-        type: 'READY_PRODUCT',
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        alert(`Product created successfully from URL! Product: ${result.data.product.name}`);
-        loadProducts();
-      } else {
-        const error = await response.json();
-        alert(`Failed to create product from URL: ${error.error}`);
-      }
-    } catch (error) {
-      console.error('Error creating product from link:', error);
-      alert('Failed to create product from URL');
-    }
+  // Create product from link function - Opens enrichment modal
+  const handleCreateFromLink = () => {
+    setIsCreateFromLinkMode(true);
+    setSelectedProductForEnrich(null); // No existing product
+    setIsEnrichModalOpen(true);
   };
 
   if (isAuthLoading) {
@@ -915,6 +941,7 @@ export default function ProductsPage() {
         onClose={() => {
           setIsEnrichModalOpen(false);
           setSelectedProductForEnrich(null);
+          setIsCreateFromLinkMode(false);
         }}
         productId={selectedProductForEnrich?.id}
         productName={selectedProductForEnrich?.name}

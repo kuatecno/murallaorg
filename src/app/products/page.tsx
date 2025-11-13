@@ -16,6 +16,7 @@ interface Product {
   id: string;
   sku: string;
   ean?: string;
+  sourceUrl?: string;
   name: string;
   description?: string;
   type: 'INPUT' | 'READY_PRODUCT' | 'MANUFACTURED' | 'MADE_TO_ORDER' | 'SERVICE';
@@ -326,6 +327,7 @@ export default function ProductsPage() {
           category: approvedData.category || '',
           brand: approvedData.brand || '',
           ean: approvedData.ean || null,
+          sourceUrl: approvedData.sourceUrl || undefined,
           unitPrice: 0, // Default price, user can update later
           costPrice: null,
           currentStock: 0,
@@ -946,6 +948,7 @@ export default function ProductsPage() {
         productId={selectedProductForEnrich?.id}
         productName={selectedProductForEnrich?.name}
         productEan={selectedProductForEnrich?.ean}
+        productSourceUrl={selectedProductForEnrich?.sourceUrl}
         onApprove={handleApplyEnrichment}
       />
 

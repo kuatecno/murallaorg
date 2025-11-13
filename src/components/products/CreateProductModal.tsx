@@ -374,6 +374,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
       ean: enrichedData.ean || prev.ean,
       type: enrichedData.type || prev.type,
       images: enrichedData.images || prev.images,
+      sourceUrl: enrichedData.sourceUrl || prev.sourceUrl,
     }));
   };
 

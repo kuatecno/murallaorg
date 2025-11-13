@@ -55,6 +55,7 @@ interface EnrichmentSuggestion {
   ean?: string;
   type?: string;
   images?: string[];
+  sourceUrl?: string;
 }
 
 interface FieldMetadata {
@@ -216,6 +217,10 @@ export default function ProductEnrichmentModal({
       approvedData.images = selectedImages.map(originalUrl =>
         cloudinaryUrls.get(originalUrl) || originalUrl
       );
+    }
+
+    if (sourceUrl) {
+      (approvedData as any).sourceUrl = sourceUrl;
     }
 
     onApprove(approvedData);

@@ -172,6 +172,7 @@ export async function GET(request: NextRequest) {
       type: product.type,
       category: product.category,
       brand: product.brand,
+      sourceUrl: product.sourceUrl,
       unitPrice: Number(product.unitPrice),
       costPrice: product.costPrice ? Number(product.costPrice) : null,
       wholesalePrice: product.wholesalePrice ? Number(product.wholesalePrice) : null,

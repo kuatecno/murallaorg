@@ -550,7 +550,7 @@ export default function ProductEnrichmentModal({
                         <span className="text-2xl">⭐</span>
                         <div>
                           <p className="font-medium text-blue-900">Premium Grounding</p>
-                          <p className="text-sm text-blue-700">Verified sources</p>
+                          <p className="text-sm text-blue-700">Verified sources • +${selectedMethod.cost}</p>
                         </div>
                       </>
                     )}

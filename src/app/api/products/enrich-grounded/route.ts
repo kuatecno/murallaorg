@@ -23,15 +23,50 @@ function cleanJsonResponse(text: string): string {
   // Trim whitespace
   cleaned = cleaned.trim();
 
-  // If the model returned extra commentary before/after the JSON,
-  // extract the substring from the first "{" to the last "}".
+  // If the model returned extra commentary, extract the FIRST complete JSON
+  // object by tracking brace depth and ignoring braces inside strings.
   const firstBrace = cleaned.indexOf('{');
-  const lastBrace = cleaned.lastIndexOf('}');
-  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-    cleaned = cleaned.substring(firstBrace, lastBrace + 1).trim();
+  if (firstBrace === -1) {
+    return cleaned;
   }
 
-  return cleaned;
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+
+  for (let i = firstBrace; i < cleaned.length; i++) {
+    const ch = cleaned[i];
+
+    if (escape) {
+      escape = false;
+      continue;
+    }
+
+    if (ch === '\\') {
+      escape = true;
+      continue;
+    }
+
+    if (ch === '"') {
+      inString = !inString;
+      continue;
+    }
+
+    if (!inString) {
+      if (ch === '{') {
+        depth++;
+      } else if (ch === '}') {
+        depth--;
+        if (depth === 0) {
+          // End of the first complete JSON object
+          return cleaned.substring(firstBrace, i + 1).trim();
+        }
+      }
+    }
+  }
+
+  // Fallback: return from first brace to end if we never closed
+  return cleaned.substring(firstBrace).trim();
 }
 
 // Flattened category list for AI prompt

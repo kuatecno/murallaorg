@@ -23,6 +23,14 @@ function cleanJsonResponse(text: string): string {
   // Trim whitespace
   cleaned = cleaned.trim();
 
+  // If the model returned extra commentary before/after the JSON,
+  // extract the substring from the first "{" to the last "}".
+  const firstBrace = cleaned.indexOf('{');
+  const lastBrace = cleaned.lastIndexOf('}');
+  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+    cleaned = cleaned.substring(firstBrace, lastBrace + 1).trim();
+  }
+
   return cleaned;
 }
 

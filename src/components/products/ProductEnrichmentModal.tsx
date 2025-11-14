@@ -94,6 +94,8 @@ interface ProductEnrichmentModalProps {
   productName?: string;
   productEan?: string;
   productSourceUrl?: string; // Product source URL from database
+  productType?: string; // Product type (INPUT, READY_PRODUCT, etc.)
+  productDescription?: string; // Current description from product/form
   variantNames?: string[];
   onApprove: (approvedData: Partial<EnrichmentSuggestion>) => void;
 }
@@ -109,6 +111,8 @@ export default function ProductEnrichmentModal({
   productName,
   productEan,
   productSourceUrl,
+  productType,
+  productDescription,
   variantNames,
   onApprove,
 }: ProductEnrichmentModalProps) {
@@ -126,6 +130,85 @@ export default function ProductEnrichmentModal({
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
   const [cloudinaryUrls, setCloudinaryUrls] = useState<Map<string, string>>(new Map());
   const [sourceUrl, setSourceUrl] = useState<string>(productSourceUrl || ''); // Manual URL input, pre-filled from product
+  const [rewrites, setRewrites] = useState<{ gemini?: string; openai?: string } | null>(null);
+  const [rewriteLoading, setRewriteLoading] = useState(false);
+  const [descriptionsByMethod, setDescriptionsByMethod] = useState<{
+    standard?: string;
+    web_extraction?: string;
+    grounded?: string;
+  }>({});
+
+  const canUseWebSearch = productType === 'INPUT' || productType === 'READY_PRODUCT';
+
+  const fetchRewrites = async () => {
+    setRewriteLoading(true);
+    setError(null);
+
+    try {
+      const baseDescription =
+        suggestions?.description || currentData?.description || productDescription;
+
+      if (!baseDescription || baseDescription.trim() === '') {
+        throw new Error('No description available to rewrite');
+      }
+
+      const response = await fetch('/api/products/rewrite-description', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          productName,
+          productType,
+          description: baseDescription,
+        }),
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to rewrite description');
+      }
+
+      const data = await response.json();
+      setRewrites(data.rewrites || null);
+
+    } catch (err: any) {
+      console.error('Description rewrite error:', err);
+      setError(err.message || 'Failed to rewrite description');
+    } finally {
+      setRewriteLoading(false);
+    }
+  };
+
+  const applyRewrite = (source: 'gemini' | 'openai') => {
+    if (!rewrites) return;
+    const newDescription = rewrites[source];
+    if (!newDescription) return;
+
+    setSuggestions(prev => ({
+      ...(prev || {}),
+      description: newDescription,
+    }));
+
+    setApprovals(prev => ({
+      ...prev,
+      description: true,
+    }));
+  };
+
+  const applyMethodDescription = (method: 'standard' | 'web_extraction' | 'grounded') => {
+    const newDescription = descriptionsByMethod[method];
+    if (!newDescription) return;
+
+    setSuggestions(prev => ({
+      ...(prev || {}),
+      description: newDescription,
+    }));
+
+    setApprovals(prev => ({
+      ...prev,
+      description: true,
+    }));
+  };
 
   const fetchEnrichment = async () => {
     setLoading(true);
@@ -177,6 +260,11 @@ export default function ProductEnrichmentModal({
       setMetadata(data.metadata);
       setEnrichmentMethod(data.enrichmentMethod || 'standard');
       setGroundingInfo(data.grounding);
+
+      setDescriptionsByMethod(prev => ({
+        ...prev,
+        standard: sanitizedSuggestions.description || prev.standard,
+      }));
 
       // Initialize all fields as approved by default
       const initialApprovals: FieldApproval = {};
@@ -332,6 +420,11 @@ export default function ProductEnrichmentModal({
       setMetadata(data.metadata);
       setEnrichmentMethod('web_extraction');
 
+      setDescriptionsByMethod(prev => ({
+        ...prev,
+        web_extraction: data.suggestions.description || prev.web_extraction,
+      }));
+
       // Re-initialize approvals
       const initialApprovals: FieldApproval = {};
       Object.keys(data.suggestions).forEach(key => {
@@ -396,6 +489,11 @@ export default function ProductEnrichmentModal({
       setMetadata(data.metadata);
       setEnrichmentMethod('grounded');
       setGroundingInfo(data.grounding);
+
+      setDescriptionsByMethod(prev => ({
+        ...prev,
+        grounded: data.suggestions.description || prev.grounded,
+      }));
 
       // Re-initialize approvals
       const initialApprovals: FieldApproval = {};
@@ -567,7 +665,7 @@ export default function ProductEnrichmentModal({
                         </div>
                       </>
                     )}
-                    {enrichmentMethod === 'web_extraction' && (
+                    {enrichmentMethod === 'web_extraction' && canUseWebSearch && (
                       <>
                         <span className="text-2xl">📄</span>
                         <div>
@@ -629,6 +727,153 @@ export default function ProductEnrichmentModal({
                 />
               )}
 
+              {/* Side-by-side descriptions by enrichment method (only when web search is allowed) */}
+              {canUseWebSearch && (
+                (() => {
+                  const hasStandard = !!descriptionsByMethod.standard;
+                  const hasWeb = !!descriptionsByMethod.web_extraction;
+                  const hasGrounded = !!descriptionsByMethod.grounded;
+                  const availableCount = [hasStandard, hasWeb, hasGrounded].filter(Boolean).length;
+
+                  if (availableCount <= 1) return null;
+
+                  return (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium text-blue-900">Compare descriptions by method</p>
+                          <p className="text-xs text-blue-800 mt-1">
+                            Choose the description you like best from Standard AI, Web Extraction, or Grounded enrichment.
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        {hasStandard && (
+                          <div className="border border-blue-200 rounded-lg p-3 bg-white space-y-2">
+                            <p className="text-xs font-semibold text-blue-900 flex items-center space-x-1">
+                              <span>🤖 Standard</span>
+                            </p>
+                            <p className="text-sm text-gray-800 whitespace-pre-line max-h-40 overflow-auto">
+                              {descriptionsByMethod.standard}
+                            </p>
+                            <button
+                              onClick={() => applyMethodDescription('standard')}
+                              className="mt-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded-lg font-medium"
+                            >
+                              Use this description
+                            </button>
+                          </div>
+                        )}
+
+                        {hasWeb && (
+                          <div className="border border-blue-200 rounded-lg p-3 bg-white space-y-2">
+                            <p className="text-xs font-semibold text-blue-900 flex items-center space-x-1">
+                              <span>📄 Web Extraction</span>
+                            </p>
+                            <p className="text-sm text-gray-800 whitespace-pre-line max-h-40 overflow-auto">
+                              {descriptionsByMethod.web_extraction}
+                            </p>
+                            <button
+                              onClick={() => applyMethodDescription('web_extraction')}
+                              className="mt-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded-lg font-medium"
+                            >
+                              Use this description
+                            </button>
+                          </div>
+                        )}
+
+                        {hasGrounded && (
+                          <div className="border border-blue-200 rounded-lg p-3 bg-white space-y-2">
+                            <p className="text-xs font-semibold text-blue-900 flex items-center space-x-1">
+                              <span>⚡ Grounded</span>
+                            </p>
+                            <p className="text-sm text-gray-800 whitespace-pre-line max-h-40 overflow-auto">
+                              {descriptionsByMethod.grounded}
+                            </p>
+                            <button
+                              onClick={() => applyMethodDescription('grounded')}
+                              className="mt-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded-lg font-medium"
+                            >
+                              Use this description
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()
+              )}
+
+              {/* Description rewrites for non-web-search types */}
+              {!canUseWebSearch && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-yellow-900">AI Description Rewrites</p>
+                      <p className="text-xs text-yellow-800 mt-1">
+                        Get alternative descriptions from Gemini and OpenAI without searching the web.
+                      </p>
+                    </div>
+                    <button
+                      onClick={fetchRewrites}
+                      disabled={rewriteLoading}
+                      className="px-3 py-2 bg-yellow-600 hover:bg-yellow-700 disabled:bg-yellow-300 text-white rounded-lg text-xs font-medium flex items-center space-x-1"
+                    >
+                      {rewriteLoading ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>Generating...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-4 h-4" />
+                          <span>Get rewrites</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  {rewrites && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {rewrites.gemini && (
+                        <div className="border border-yellow-200 rounded-lg p-3 bg-white space-y-2">
+                          <p className="text-xs font-semibold text-yellow-900 flex items-center space-x-1">
+                            <span>🤖 Gemini</span>
+                          </p>
+                          <p className="text-sm text-gray-800 whitespace-pre-line">
+                            {rewrites.gemini}
+                          </p>
+                          <button
+                            onClick={() => applyRewrite('gemini')}
+                            className="mt-2 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs rounded-lg font-medium"
+                          >
+                            Use this description
+                          </button>
+                        </div>
+                      )}
+
+                      {rewrites.openai && (
+                        <div className="border border-yellow-200 rounded-lg p-3 bg-white space-y-2">
+                          <p className="text-xs font-semibold text-yellow-900 flex items-center space-x-1">
+                            <span>🤖 OpenAI</span>
+                          </p>
+                          <p className="text-sm text-gray-800 whitespace-pre-line">
+                            {rewrites.openai}
+                          </p>
+                          <button
+                            onClick={() => applyRewrite('openai')}
+                            className="mt-2 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs rounded-lg font-medium"
+                          >
+                            Use this description
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Brand */}
               {suggestions.brand && (
                 <FieldSuggestion
@@ -678,7 +923,7 @@ export default function ProductEnrichmentModal({
               )}
 
               {/* Progressive Enhancement Actions */}
-              {enrichmentMethod === 'standard' && (
+              {enrichmentMethod === 'standard' && canUseWebSearch && (
                 <div className="bg-gradient-to-r from-gray-50 to-blue-50 border-2 border-dashed border-gray-300 rounded-lg p-6">
                   <h3 className="font-semibold text-gray-900 mb-3 text-center">Not satisfied with these results?</h3>
                   <p className="text-sm text-gray-600 mb-4 text-center">Try these alternative enrichment methods:</p>

@@ -949,6 +949,8 @@ export default function ProductsPage() {
         productName={selectedProductForEnrich?.name}
         productEan={selectedProductForEnrich?.ean}
         productSourceUrl={selectedProductForEnrich?.sourceUrl}
+        productType={selectedProductForEnrich?.type}
+        productDescription={selectedProductForEnrich?.description}
         onApprove={handleApplyEnrichment}
       />
 

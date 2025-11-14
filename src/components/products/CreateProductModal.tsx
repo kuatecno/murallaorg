@@ -1948,6 +1948,8 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
         productName={formData.name}
         productEan={formData.ean}
         productSourceUrl={formData.sourceUrl}
+        productType={formData.type}
+        productDescription={formData.description}
         variantNames={variants.map(variant => variant.name).filter(Boolean)}
         onApprove={handleEnrichmentApprove}
       />

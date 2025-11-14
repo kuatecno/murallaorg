@@ -340,7 +340,7 @@ export default function ProductsPage() {
           unit: 'UNIT',
           format: approvedData.format || '',
           tags: Array.isArray(approvedData.tags)
-            ? approvedData.tags.filter((tag): tag is string => typeof tag === 'string')
+            ? approvedData.tags.filter((tag: unknown): tag is string => typeof tag === 'string')
             : [],
           images: approvedData.images || [],
           cafePrice: '',

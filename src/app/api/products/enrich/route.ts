@@ -140,15 +140,6 @@ interface EnrichmentWithMetadata {
   [key: string]: FieldMetadata | undefined; // Allow dynamic field access
 }
 
-interface EnrichmentMethod {
-  name: string;
-  description: string;
-  data: EnrichmentSuggestion;
-  metadata?: EnrichmentWithMetadata;
-  cost?: number;
-  confidence?: 'high' | 'medium' | 'low';
-}
-
 export async function POST(request: NextRequest) {
   try {
     const body: EnrichmentRequest = await request.json();
@@ -303,245 +294,56 @@ EJEMPLO de respuesta para "Muffin de zanahoria - Mis Amigos Veganos":
 
 BUSCA EN GOOGLE AHORA y devuelve SOLO el objeto JSON con información real encontrada.`;
 
-    // Run three enrichment methods in parallel
-    console.log('🔍 Running three enrichment methods in parallel...');
+    console.log('🔍 Sending parallel requests to Gemini and OpenAI...');
 
-    const [standardResult, webExtractResult, premiumResult] = await Promise.all([
-      // Method 1: Standard API (Gemini + OpenAI with Google Search)
+    // Call BOTH APIs in parallel for better results
+    const [geminiResult, openaiResult] = await Promise.all([
+      // Gemini with Google Search
       (async () => {
         try {
-          const [geminiResult, openaiResult] = await Promise.all([
-            // Gemini with Google Search
-            (async () => {
-              try {
-                const model = genAI.getGenerativeModel({
-                  model: 'gemini-2.0-flash-exp',
-                  generationConfig: {
-                    temperature: 0.3,
-                    responseMimeType: 'application/json',
-                  }
-                });
-                const result = await model.generateContent(prompt);
-                const responseText = result.response.text();
-                const cleanedText = cleanJsonResponse(responseText);
-                console.log('✅ Gemini response received');
-                return JSON.parse(cleanedText);
-              } catch (error) {
-                console.error('❌ Gemini error:', error);
-                return null;
-              }
-            })(),
-
-            // OpenAI for additional insights
-            (async () => {
-              try {
-                const completion = await openai.chat.completions.create({
-                  model: 'gpt-4o-mini',
-                  messages: [
-                    {
-                      role: 'system',
-                      content: 'Eres un asistente experto en productos chilenos y latinoamericanos. Respondes en ESPAÑOL con información verificable. Responde SOLO con JSON válido.',
-                    },
-                    {
-                      role: 'user',
-                      content: prompt,
-                    },
-                  ],
-                  temperature: 0.3,
-                  response_format: { type: 'json_object' },
-                });
-                const responseContent = completion.choices[0]?.message?.content;
-                console.log('✅ OpenAI response received');
-                if (!responseContent) return null;
-                const cleanedText = cleanJsonResponse(responseContent);
-                return JSON.parse(cleanedText);
-              } catch (error) {
-                console.error('❌ OpenAI error:', error);
-                return null;
-              }
-            })(),
-          ]);
-
-          // Merge results with metadata tracking
-          let suggestions: EnrichmentSuggestion = {};
-          let metadata: EnrichmentWithMetadata = {};
-
-          const fields = ['name', 'description', 'category', 'brand', 'ean', 'type', 'format', 'tags'];
-
-          fields.forEach(field => {
-            const geminiValue = geminiResult?.[field];
-            const openaiValue = openaiResult?.[field];
-
-            if (geminiValue) {
-              suggestions[field] = geminiValue;
-              metadata[field] = {
-                value: geminiValue,
-                source: 'gemini',
-                confidence: calculateConfidence(geminiValue, true, !!openaiValue && openaiValue === geminiValue),
-              };
-            } else if (openaiValue) {
-              suggestions[field] = openaiValue;
-              metadata[field] = {
-                value: openaiValue,
-                source: 'openai',
-                confidence: calculateConfidence(openaiValue, false, true),
-              };
-            }
-          });
-
-          // Clear AI-generated images - will use Google Custom Search
-          suggestions.images = [];
-
-          return { suggestions, metadata, geminiResult, openaiResult };
-        } catch (error) {
-          console.error('❌ Standard method error:', error);
-          return null;
-        }
-      })(),
-
-      // Method 2: Extract from Web (webpage content only)
-      (async () => {
-        try {
-          if (!sourceUrl) return null;
-
-          console.log('🌐 Extracting data from webpage:', sourceUrl);
-          const pageResponse = await fetch(sourceUrl, {
-            headers: {
-              'User-Agent': 'Mozilla/5.0 (compatible; ProductEnricher/1.0)',
-            },
-          });
-
-          if (!pageResponse.ok) return null;
-
-          const html = await pageResponse.text();
-          
-          // Extract structured data from HTML
-          const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
-          const descMatch = html.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']+)["']/i);
-          const ogTitleMatch = html.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["']/i);
-          const ogDescMatch = html.match(/<meta[^>]*property=["']og:description["'][^>]*content=["']([^"']+)["']/i);
-          const ogImageMatch = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i);
-          
-          // Extract product name from URL as fallback
-          const urlPath = new URL(sourceUrl).pathname;
-          const pathParts = urlPath.split('/').filter(Boolean);
-          const urlProductName = pathParts.length > 0
-            ? pathParts[pathParts.length - 1].replace(/-/g, ' ').replace(/\.[^.]+$/, '')
-            : 'Product from URL';
-
-          const webSuggestions: EnrichmentSuggestion = {
-            name: titleMatch?.[1] || ogTitleMatch?.[1] || urlProductName,
-            description: descMatch?.[1] || ogDescMatch?.[1] || 'Product imported from URL - please update description',
-            category: '🍜 Comida', // Default category
-            brand: undefined,
-            ean: undefined,
-            type: 'READY_PRODUCT',
-            format: 'PACKAGED',
-            tags: [],
-            images: ogImageMatch ? [ogImageMatch[1]] : [],
-          };
-
-          const webMetadata: EnrichmentWithMetadata = {
-            name: {
-              value: webSuggestions.name,
-              source: 'google_search',
-              confidence: 'medium'
-            },
-            description: {
-              value: webSuggestions.description,
-              source: 'google_search',
-              confidence: 'medium'
-            },
-            images: {
-              value: webSuggestions.images,
-              source: 'google_search',
-              confidence: 'medium'
-            }
-          };
-
-          return { suggestions: webSuggestions, metadata: webMetadata };
-        } catch (error) {
-          console.error('❌ Web extract error:', error);
-          return null;
-        }
-      })(),
-
-      // Method 3: Premium Grounding (enhanced Gemini with multiple sources)
-      (async () => {
-        try {
-          const premiumPrompt = `Eres un asistente experto en productos chilenos y latinoamericanos con acceso a búsqueda avanzada. Investiga exhaustivamente el siguiente producto usando múltiples fuentes verificadas.
-
-PRODUCTO A INVESTIGAR:
-${productData.name ? `- Nombre: ${productData.name}` : ''}
-${productData.ean ? `- Código EAN: ${productData.ean}` : ''}
-${productData.brand ? `- Marca: ${productData.brand}` : ''}
-${sourceUrl ? `- URL del producto: ${sourceUrl}` : ''}
-${webpageContent ? `\n${webpageContent}` : ''}
-
-INSTRUCCIONES ESPECIALES PARA PREMIUM:
-1. 🔍 BÚSQUEDA MULTI-FUENTE: Usa Google Search para encontrar información de:
-   - Sitio web oficial de la marca
-   - Redes sociales verificadas (Instagram, Facebook)
-   - E-commerce chilenos (Jumbo, Lider, Santa Isabel, etc.)
-   - Distribuidores oficiales
-   - Artículos de prensa o reviews
-
-2. 📊 ANÁLISIS PROFUNDO: Proporciona información detallada sobre:
-   - Ingredientes principales (si aplica)
-   - Información nutricional (si aplica)
-   - Origen y fabricante
-   - Certificaciones (orgánico, vegano, sin gluten, etc.)
-
-3. 🖼️ IMÁGENES VERIFICADAS: Busca imágenes de ALTA CALIDAD desde:
-   - Sitio web oficial
-   - Catálogos de productos
-   - Fotos profesionales del fabricante
-
-4. 🏷️ ETIQUETAS PRECISAS: Basado en investigación real, asigna etiquetas de: ${ALLOWED_TAGS.join(', ')}
-
-CAMPOS A COMPLETAR (JSON detallado):
-{
-  "name": "Nombre completo y preciso del producto",
-  "description": "Descripción extensa (3-4 oraciones) con detalles del fabricante, ingredientes, origen y beneficios",
-  "category": "Categoría exacta: ${CATEGORY_LIST.join(', ')}",
-  "brand": "Marca oficial verificada",
-  "ean": "Código EAN si se encuentra",
-  "type": "Tipo preciso: ${PRODUCT_TYPES.join(', ')}",
-  "format": "Formato: ${PRODUCT_FORMATS.join(', ')}",
-  "tags": ["Etiquetas basadas en investigación real"],
-  "images": ["URLs de imágenes verificadas de alta calidad"]
-}
-
-Realiza búsqueda exhaustiva y devuelve SOLO JSON con información premium verificada.`;
-
           const model = genAI.getGenerativeModel({
             model: 'gemini-2.0-flash-exp',
             generationConfig: {
-              temperature: 0.2, // Lower temperature for more accurate results
+              temperature: 0.3,
               responseMimeType: 'application/json',
             }
           });
-
-          const result = await model.generateContent(premiumPrompt);
+          const result = await model.generateContent(prompt);
           const responseText = result.response.text();
           const cleanedText = cleanJsonResponse(responseText);
-          console.log('✅ Premium grounding response received');
-          const premiumData = JSON.parse(cleanedText);
-
-          const premiumMetadata: EnrichmentWithMetadata = {};
-          Object.keys(premiumData).forEach(field => {
-            if (premiumData[field]) {
-              premiumMetadata[field] = {
-                value: premiumData[field],
-                source: 'gemini',
-                confidence: 'high' // Premium method has higher confidence
-              };
-            }
-          });
-
-          return { suggestions: premiumData, metadata: premiumMetadata };
+          console.log('✅ Gemini response received');
+          return JSON.parse(cleanedText);
         } catch (error) {
-          console.error('❌ Premium grounding error:', error);
+          console.error('❌ Gemini error:', error);
+          return null;
+        }
+      })(),
+
+      // OpenAI for additional insights
+      (async () => {
+        try {
+          const completion = await openai.chat.completions.create({
+            model: 'gpt-4o-mini',
+            messages: [
+              {
+                role: 'system',
+                content: 'Eres un asistente experto en productos chilenos y latinoamericanos. Respondes en ESPAÑOL con información verificable. Responde SOLO con JSON válido.',
+              },
+              {
+                role: 'user',
+                content: prompt,
+              },
+            ],
+            temperature: 0.3,
+            response_format: { type: 'json_object' },
+          });
+          const responseContent = completion.choices[0]?.message?.content;
+          console.log('✅ OpenAI response received');
+          if (!responseContent) return null;
+          const cleanedText = cleanJsonResponse(responseContent);
+          return JSON.parse(cleanedText);
+        } catch (error) {
+          console.error('❌ OpenAI error:', error);
           return null;
         }
       })(),
@@ -555,147 +357,168 @@ Realiza búsqueda exhaustiva y devuelve SOLO JSON con información premium verif
       return 'low';
     };
 
-    // Process and structure the three enrichment methods
-    const enrichmentMethods: EnrichmentMethod[] = [];
+    // Merge results with metadata tracking
+    let suggestions: EnrichmentSuggestion = {};
+    let metadata: EnrichmentWithMetadata = {};
 
-    // Method 1: Standard API
-    if (standardResult) {
-      const { suggestions, metadata, geminiResult, openaiResult } = standardResult;
-      
-      // Validate and normalize standard suggestions
-      const normalizedFormat = PRODUCT_FORMATS.includes(suggestions.format || '')
-        ? suggestions.format
-        : productData.format || undefined;
+    const fields = ['name', 'description', 'category', 'brand', 'ean', 'type', 'format', 'tags'];
 
-      const normalizedTags = Array.isArray(suggestions.tags)
-        ? suggestions.tags
-            .filter((tag: unknown): tag is string => typeof tag === 'string')
-            .map((tag: string) => tag.trim().toLowerCase())
-            .filter((tag: string) => ALLOWED_TAGS.includes(tag))
-        : [];
+    fields.forEach(field => {
+      const geminiValue = geminiResult?.[field];
+      const openaiValue = openaiResult?.[field];
 
-      const standardData: EnrichmentSuggestion = {
-        name: suggestions.name || productData.name,
-        description: suggestions.description || undefined,
-        category: suggestions.category || undefined,
-        brand: suggestions.brand || undefined,
-        ean: suggestions.ean || productData.ean || undefined,
-        type: PRODUCT_TYPES.includes(suggestions.type || '')
-          ? suggestions.type
-          : 'READY_PRODUCT',
-        format: normalizedFormat,
-        tags: normalizedTags.length > 0 ? normalizedTags : undefined,
-        images: [], // Will be filled by Google Custom Search
-      };
+      if (geminiValue) {
+        suggestions[field] = geminiValue;
+        metadata[field] = {
+          value: geminiValue,
+          source: 'gemini',
+          confidence: calculateConfidence(geminiValue, true, !!openaiValue && openaiValue === geminiValue),
+        };
+      } else if (openaiValue) {
+        suggestions[field] = openaiValue;
+        metadata[field] = {
+          value: openaiValue,
+          source: 'openai',
+          confidence: calculateConfidence(openaiValue, false, true),
+        };
+      }
+    });
 
-      enrichmentMethods.push({
-        name: 'Standard API',
-        description: 'Google Gemini + OpenAI with search results',
-        data: standardData,
-        metadata: metadata,
-        cost: 0,
-        confidence: 'medium'
-      });
-    }
+    // Clear any AI-generated images - we only want Google Custom Search results
+    suggestions.images = [];
 
-    // Method 2: Extract from Web
-    if (webExtractResult) {
-      const { suggestions, metadata } = webExtractResult;
-      
-      enrichmentMethods.push({
-        name: 'Extract from Web',
-        description: 'Real Google results • FREE',
-        data: suggestions,
-        metadata: metadata,
-        cost: 0,
-        confidence: 'medium'
-      });
-    }
+    if (!suggestions || (!geminiResult && !openaiResult)) {
+      // If we have webpage content, at least return something basic
+      if (webpageContent) {
+        const urlObj = new URL(sourceUrl!);
+        const pathParts = urlObj.pathname.split('/').filter(Boolean);
+        const urlProductName = pathParts.length > 0
+          ? pathParts[pathParts.length - 1].replace(/-/g, ' ').replace(/\.[^.]+$/, '')
+          : 'Product from URL';
 
-    // Method 3: Premium Grounding
-    if (premiumResult) {
-      const { suggestions, metadata } = premiumResult;
-      
-      // Validate and normalize premium suggestions
-      const normalizedFormat = PRODUCT_FORMATS.includes(suggestions.format || '')
-        ? suggestions.format
-        : productData.format || undefined;
-
-      const normalizedTags = Array.isArray(suggestions.tags)
-        ? suggestions.tags
-            .filter((tag: unknown): tag is string => typeof tag === 'string')
-            .map((tag: string) => tag.trim().toLowerCase())
-            .filter((tag: string) => ALLOWED_TAGS.includes(tag))
-        : [];
-
-      const premiumData: EnrichmentSuggestion = {
-        name: suggestions.name || productData.name,
-        description: suggestions.description || undefined,
-        category: suggestions.category || undefined,
-        brand: suggestions.brand || undefined,
-        ean: suggestions.ean || productData.ean || undefined,
-        type: PRODUCT_TYPES.includes(suggestions.type || '')
-          ? suggestions.type
-          : 'READY_PRODUCT',
-        format: normalizedFormat,
-        tags: normalizedTags.length > 0 ? normalizedTags : undefined,
-        images: Array.isArray(suggestions.images)
-          ? suggestions.images.filter((img: unknown): img is string => typeof img === 'string' && img.startsWith('http'))
-          : [],
-      };
-
-      enrichmentMethods.push({
-        name: 'Premium Grounding',
-        description: 'Verified sources • +$0.035',
-        data: premiumData,
-        metadata: metadata,
-        cost: 0.035,
-        confidence: 'high'
-      });
-    }
-
-    // Fetch additional images from Google Custom Search for standard method
-    if (standardResult && process.env.GOOGLE_CUSTOM_SEARCH_API_KEY && process.env.GOOGLE_SEARCH_ENGINE_ID) {
-      try {
-        const standardSuggestions = standardResult.suggestions;
-        const nameQuery = `${standardSuggestions?.brand || productData.brand || ''} ${standardSuggestions?.name || productData.name}`.trim();
-        
-        console.log('🔍 Searching Google Images for standard method:', nameQuery);
-        const searchUrl = `https://www.googleapis.com/customsearch/v1?key=${process.env.GOOGLE_CUSTOM_SEARCH_API_KEY}&cx=${process.env.GOOGLE_SEARCH_ENGINE_ID}&q=${encodeURIComponent(nameQuery)}&searchType=image&num=10&safe=active`;
-        
-        const searchResponse = await fetch(searchUrl);
-        if (searchResponse.ok) {
-          const searchData = await searchResponse.json();
-          const googleImages = searchData.items?.map((item: any) => item.link).filter((link: string) => link) || [];
-          
-          // Add images to the standard method
-          const standardMethod = enrichmentMethods.find(m => m.name === 'Standard API');
-          if (standardMethod) {
-            standardMethod.data.images = googleImages.slice(0, 20);
-          }
-          
-          console.log('✅ Google Images found for standard method:', googleImages.length);
-        }
-      } catch (error) {
-        console.error('❌ Google Custom Search error for standard method:', error);
+        suggestions = {
+          name: urlProductName,
+          description: 'Product imported from URL - please update description',
+          type: 'READY_PRODUCT',
+        };
+        console.log('⚠️ Both AIs failed, using basic URL extraction');
+      } else {
+        return NextResponse.json(
+          { error: 'Failed to extract product data. Please ensure the URL is accessible and try again.' },
+          { status: 500 }
+        );
       }
     }
 
-    // If no methods succeeded, return error
-    if (enrichmentMethods.length === 0) {
-      return NextResponse.json(
-        { error: 'All enrichment methods failed. Please try again.' },
-        { status: 500 }
-      );
+    console.log('🤝 Merged suggestions from both AI models');
+
+    // Fetch additional real images from Google Custom Search API
+    let googleImagesByName: string[] = [];
+    let googleImagesByBarcode: string[] = [];
+
+    if (process.env.GOOGLE_CUSTOM_SEARCH_API_KEY && process.env.GOOGLE_SEARCH_ENGINE_ID) {
+      try {
+        // Search 1: Brand + Name
+        const nameQuery = `${suggestions.brand || productData.brand || ''} ${suggestions.name || productData.name}`.trim();
+        console.log('🔍 Searching Google Images by name:', nameQuery);
+
+        const nameSearchUrl = `https://www.googleapis.com/customsearch/v1?key=${process.env.GOOGLE_CUSTOM_SEARCH_API_KEY}&cx=${process.env.GOOGLE_SEARCH_ENGINE_ID}&q=${encodeURIComponent(nameQuery)}&searchType=image&num=10&safe=active`;
+
+        // Search 2: Barcode/EAN (if available)
+        let barcodeSearchUrl = '';
+        const ean = suggestions.ean || productData.ean;
+        console.log('📦 Product EAN from AI:', suggestions.ean);
+        console.log('📦 Product EAN from DB:', productData.ean);
+        console.log('📦 Final EAN for search:', ean);
+
+        if (ean) {
+          console.log('🔍 Searching Google Images by barcode:', ean);
+          barcodeSearchUrl = `https://www.googleapis.com/customsearch/v1?key=${process.env.GOOGLE_CUSTOM_SEARCH_API_KEY}&cx=${process.env.GOOGLE_SEARCH_ENGINE_ID}&q=${encodeURIComponent(ean)}&searchType=image&num=10&safe=active`;
+        } else {
+          console.log('⚠️ No EAN available - skipping barcode search');
+        }
+
+        // Fetch both searches in parallel
+        const searchPromises = [fetch(nameSearchUrl)];
+        if (barcodeSearchUrl) {
+          searchPromises.push(fetch(barcodeSearchUrl));
+        }
+
+        const [nameResponse, barcodeResponse] = await Promise.all(searchPromises);
+
+        if (nameResponse.ok) {
+          const nameData = await nameResponse.json();
+          googleImagesByName = nameData.items?.map((item: any) => item.link).filter((link: string) => link) || [];
+          console.log('✅ Google Images by name found:', googleImagesByName.length);
+        }
+
+        if (barcodeResponse && barcodeResponse.ok) {
+          const barcodeData = await barcodeResponse.json();
+          googleImagesByBarcode = barcodeData.items?.map((item: any) => item.link).filter((link: string) => link) || [];
+          console.log('✅ Google Images by barcode found:', googleImagesByBarcode.length);
+        }
+
+      } catch (error) {
+        console.error('❌ Google Custom Search error:', error);
+      }
     }
 
-    console.log('✅ Successfully processed', enrichmentMethods.length, 'enrichment methods');
+    // Combine all image sources: Barcode search > Name search (Google only)
+    const allImages = [
+      ...googleImagesByBarcode,
+      ...googleImagesByName,
+    ]
+      .filter(img => img && img.startsWith('http'))
+      .slice(0, 20); // Up to 20 images total from Google
+
+    suggestions.images = allImages;
+    console.log('🖼️ Total images from Google Custom Search:', allImages.length);
+    console.log('📸 Image URLs:', allImages);
+
+    // Validate, normalize, and clean suggestions
+    const normalizedFormat = PRODUCT_FORMATS.includes(suggestions.format || '')
+      ? suggestions.format
+      : productData.format || undefined;
+
+    const normalizedTags = Array.isArray(suggestions.tags)
+      ? suggestions.tags
+          .filter(tag => typeof tag === 'string')
+          .map(tag => tag.trim().toLowerCase())
+          .filter(tag => ALLOWED_TAGS.includes(tag))
+      : [];
+
+    const enrichedData: EnrichmentSuggestion = {
+      name: suggestions.name || productData.name,
+      description: suggestions.description || undefined,
+      category: suggestions.category || undefined,
+      brand: suggestions.brand || undefined,
+      ean: suggestions.ean || productData.ean || undefined,
+      type: PRODUCT_TYPES.includes(suggestions.type || '')
+        ? suggestions.type
+        : 'READY_PRODUCT',
+      format: normalizedFormat,
+      tags: normalizedTags.length > 0 ? normalizedTags : undefined,
+      images: Array.isArray(suggestions.images)
+        ? suggestions.images.filter(img => img && img.startsWith('http'))
+        : [],
+    };
+
+    console.log('🖼️ Final enriched data:', enrichedData);
 
     return NextResponse.json({
       success: true,
       currentData: productData,
-      enrichmentMethods: enrichmentMethods,
-      message: 'Three enrichment methods completed successfully',
+      suggestions: enrichedData,
+      metadata: metadata,
+      enrichmentMethod: 'standard',
+      message: 'Product data enriched using Google Custom Search + Gemini + OpenAI',
+      sources: {
+        googleImagesByName: googleImagesByName.length,
+        googleImagesByBarcode: googleImagesByBarcode.length,
+        gemini: !!geminiResult,
+        openai: !!openaiResult,
+        totalImages: enrichedData.images?.length || 0,
+      },
     });
 
   } catch (error: any) {

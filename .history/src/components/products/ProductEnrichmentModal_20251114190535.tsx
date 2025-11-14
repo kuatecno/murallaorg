@@ -708,7 +708,7 @@ export default function ProductEnrichmentModal({
                   suggestedValue={selectedMethod?.data.type}
                   approved={approvals.type}
                   onToggle={() => toggleApproval('type')}
-                  metadata={selectedMethod?.metadata?.type}
+                  metadata={metadata?.type}
                 />
               )}
 
@@ -720,7 +720,7 @@ export default function ProductEnrichmentModal({
                   suggestedValue={selectedMethod?.data.ean}
                   approved={approvals.ean}
                   onToggle={() => toggleApproval('ean')}
-                  metadata={selectedMethod?.metadata?.ean}
+                  metadata={metadata?.ean}
                 />
               )}
 

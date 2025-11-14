@@ -640,7 +640,7 @@ Realiza búsqueda exhaustiva y devuelve SOLO JSON con información premium verif
         format: normalizedFormat,
         tags: normalizedTags.length > 0 ? normalizedTags : undefined,
         images: Array.isArray(suggestions.images)
-          ? suggestions.images.filter((img: unknown): img is string => typeof img === 'string' && img.startsWith('http'))
+          ? suggestions.images.filter(img => img && img.startsWith('http'))
           : [],
       };
 

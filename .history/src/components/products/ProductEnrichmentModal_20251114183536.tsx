@@ -578,7 +578,7 @@ export default function ProductEnrichmentModal({
                   suggestedValue={selectedMethod?.data.name}
                   approved={approvals.name}
                   onToggle={() => toggleApproval('name')}
-                  metadata={selectedMethod?.metadata?.name}
+                  metadata={metadata?.name}
                 />
               )}
 
@@ -590,9 +590,87 @@ export default function ProductEnrichmentModal({
                   suggestedValue={selectedMethod?.data.description}
                   approved={approvals.description}
                   onToggle={() => toggleApproval('description')}
-                  metadata={selectedMethod?.metadata?.description}
+                  metadata={metadata?.description}
                   multiline
                 />
+              )}
+
+              {/* Side-by-side descriptions by enrichment method (only when web search is allowed) */}
+              {canUseWebSearch && (
+                (() => {
+                  const hasStandard = !!descriptionsByMethod.standard;
+                  const hasWeb = !!descriptionsByMethod.web_extraction;
+                  const hasGrounded = !!descriptionsByMethod.grounded;
+                  const availableCount = [hasStandard, hasWeb, hasGrounded].filter(Boolean).length;
+
+                  if (availableCount <= 1) return null;
+
+                  return (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium text-blue-900">Compare descriptions by method</p>
+                          <p className="text-xs text-blue-800 mt-1">
+                            Choose the description you like best from Standard AI, Web Extraction, or Grounded enrichment.
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        {hasStandard && (
+                          <div className="border border-blue-200 rounded-lg p-3 bg-white space-y-2">
+                            <p className="text-xs font-semibold text-blue-900 flex items-center space-x-1">
+                              <span>🤖 Standard</span>
+                            </p>
+                            <p className="text-sm text-gray-800 whitespace-pre-line max-h-40 overflow-auto">
+                              {descriptionsByMethod.standard}
+                            </p>
+                            <button
+                              onClick={() => applyMethodDescription('standard')}
+                              className="mt-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded-lg font-medium"
+                            >
+                              Use this description
+                            </button>
+                          </div>
+                        )}
+
+                        {hasWeb && (
+                          <div className="border border-blue-200 rounded-lg p-3 bg-white space-y-2">
+                            <p className="text-xs font-semibold text-blue-900 flex items-center space-x-1">
+                              <span>📄 Web Extraction</span>
+                            </p>
+                            <p className="text-sm text-gray-800 whitespace-pre-line max-h-40 overflow-auto">
+                              {descriptionsByMethod.web_extraction}
+                            </p>
+                            <button
+                              onClick={() => applyMethodDescription('web_extraction')}
+                              className="mt-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded-lg font-medium"
+                            >
+                              Use this description
+                            </button>
+                          </div>
+                        )}
+
+                        {hasGrounded && (
+                          <div className="border border-blue-200 rounded-lg p-3 bg-white space-y-2">
+                            <p className="text-xs font-semibold text-blue-900 flex items-center space-x-1">
+                              <span>⚡ Grounded</span>
+                            </p>
+                            <p className="text-sm text-gray-800 whitespace-pre-line max-h-40 overflow-auto">
+                              {descriptionsByMethod.grounded}
+                            </p>
+                            <button
+                              onClick={() => applyMethodDescription('grounded')}
+                              className="mt-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded-lg font-medium"
+                            >
+                              Use this description
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()
               )}
 
               {/* Description rewrites for non-web-search types */}
@@ -672,7 +750,7 @@ export default function ProductEnrichmentModal({
                   suggestedValue={selectedMethod?.data.brand}
                   approved={approvals.brand}
                   onToggle={() => toggleApproval('brand')}
-                  metadata={selectedMethod?.metadata?.brand}
+                  metadata={metadata?.brand}
                 />
               )}
 
@@ -684,7 +762,7 @@ export default function ProductEnrichmentModal({
                   suggestedValue={selectedMethod?.data.category}
                   approved={approvals.category}
                   onToggle={() => toggleApproval('category')}
-                  metadata={selectedMethod?.metadata?.category}
+                  metadata={metadata?.category}
                 />
               )}
 
@@ -696,7 +774,7 @@ export default function ProductEnrichmentModal({
                   suggestedValue={selectedMethod?.data.format}
                   approved={approvals.format}
                   onToggle={() => toggleApproval('format')}
-                  metadata={selectedMethod?.metadata?.format}
+                  metadata={metadata?.format}
                 />
               )}
 
@@ -708,7 +786,7 @@ export default function ProductEnrichmentModal({
                   suggestedValue={selectedMethod?.data.type}
                   approved={approvals.type}
                   onToggle={() => toggleApproval('type')}
-                  metadata={selectedMethod?.metadata?.type}
+                  metadata={metadata?.type}
                 />
               )}
 
@@ -720,10 +798,64 @@ export default function ProductEnrichmentModal({
                   suggestedValue={selectedMethod?.data.ean}
                   approved={approvals.ean}
                   onToggle={() => toggleApproval('ean')}
-                  metadata={selectedMethod?.metadata?.ean}
+                  metadata={metadata?.ean}
                 />
               )}
 
+              {/* Progressive Enhancement Actions */}
+              {enrichmentMethod === 'standard' && canUseWebSearch && (
+                <div className="bg-gradient-to-r from-gray-50 to-blue-50 border-2 border-dashed border-gray-300 rounded-lg p-6">
+                  <h3 className="font-semibold text-gray-900 mb-3 text-center">Not satisfied with these results?</h3>
+                  <p className="text-sm text-gray-600 mb-4 text-center">Try these alternative enrichment methods:</p>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {/* Web Extraction */}
+                    <button
+                      onClick={fetchWebExtraction}
+                      disabled={loading}
+                      className="flex items-center justify-center space-x-2 px-4 py-3 bg-white hover:bg-blue-50 border-2 border-blue-200 text-blue-700 rounded-lg font-medium transition-all hover:shadow-md disabled:opacity-50"
+                    >
+                      <span className="text-xl">📄</span>
+                      <div className="text-left">
+                        <p className="text-sm font-semibold">Extract from Web</p>
+                        <p className="text-xs text-gray-600">Real Google results • FREE</p>
+                      </div>
+                    </button>
+
+                    {/* Premium Grounding */}
+                    <button
+                      onClick={fetchGroundedEnrichment}
+                      disabled={loading}
+                      className="flex items-center justify-center space-x-2 px-4 py-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-lg font-medium transition-all hover:shadow-lg disabled:opacity-50"
+                    >
+                      <span className="text-xl">⚡</span>
+                      <div className="text-left">
+                        <p className="text-sm font-semibold">Premium Grounding</p>
+                        <p className="text-xs opacity-90">Verified sources • +$0.035</p>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {enrichmentMethod === 'web_extraction' && (
+                <div className="bg-gradient-to-r from-purple-50 to-blue-50 border-2 border-purple-200 rounded-lg p-4">
+                  <p className="text-sm text-gray-700 mb-3 text-center">
+                    Still want more accuracy? Try premium grounding:
+                  </p>
+                  <button
+                    onClick={fetchGroundedEnrichment}
+                    disabled={loading}
+                    className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-lg font-medium transition-all hover:shadow-lg disabled:opacity-50"
+                  >
+                    <span className="text-xl">⚡</span>
+                    <div>
+                      <p className="text-sm font-semibold">Upgrade to Premium Grounding</p>
+                      <p className="text-xs opacity-90">Get verified sources with citations • +$0.035</p>
+                    </div>
+                  </button>
+                </div>
+              )}
 
               {/* Images */}
               {selectedMethod?.data.images && selectedMethod?.data.images.length > 0 && (
@@ -733,18 +865,87 @@ export default function ProductEnrichmentModal({
                     Selecciona imágenes para agregar al producto (click para seleccionar)
                   </p>
 
-                  <div className="grid grid-cols-3 gap-3">
-                    {selectedMethod.data.images.map((imageUrl, index) => (
-                      <ImageCard
-                        key={`image-${index}`}
-                        imageUrl={imageUrl}
-                        index={index}
-                        isSelected={selectedImages.includes(imageUrl)}
-                        isUploading={uploadingImages.has(imageUrl)}
-                        onToggle={() => toggleImageSelection(imageUrl)}
-                      />
-                    ))}
-                  </div>
+                  {/* Barcode Search Results */}
+                  {imageSources?.googleImagesByBarcode > 0 && (
+                    <div className="mb-4">
+                      <div className="flex items-center space-x-2 mb-2">
+                        <div className="h-px flex-1 bg-gray-300"></div>
+                        <p className="text-xs font-medium text-gray-500 uppercase">
+                          Búsqueda por Código de Barras ({imageSources.googleImagesByBarcode} resultados)
+                        </p>
+                        <div className="h-px flex-1 bg-gray-300"></div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-3">
+                        {selectedMethod?.data.images.slice(0, imageSources.googleImagesByBarcode).map((imageUrl, index) => (
+                          <ImageCard
+                            key={`barcode-${index}`}
+                            imageUrl={imageUrl}
+                            index={index}
+                            isSelected={selectedImages.includes(imageUrl)}
+                            isUploading={uploadingImages.has(imageUrl)}
+                            onToggle={() => toggleImageSelection(imageUrl)}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Name/Brand Search Results */}
+                  {imageSources?.googleImagesByName > 0 && (
+                    <div className="mb-4">
+                      <div className="flex items-center space-x-2 mb-2">
+                        <div className="h-px flex-1 bg-gray-300"></div>
+                        <p className="text-xs font-medium text-gray-500 uppercase">
+                          Búsqueda por Nombre/Marca ({imageSources.googleImagesByName} resultados)
+                        </p>
+                        <div className="h-px flex-1 bg-gray-300"></div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-3">
+                        {selectedMethod?.data.images
+                          .slice(
+                            imageSources.googleImagesByBarcode || 0,
+                            (imageSources.googleImagesByBarcode || 0) + imageSources.googleImagesByName
+                          )
+                          .map((imageUrl, index) => (
+                            <ImageCard
+                              key={`name-${index}`}
+                              imageUrl={imageUrl}
+                              index={index}
+                              isSelected={selectedImages.includes(imageUrl)}
+                              isUploading={uploadingImages.has(imageUrl)}
+                              onToggle={() => toggleImageSelection(imageUrl)}
+                            />
+                          ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* AI-Generated Results (Gemini/OpenAI) */}
+                  {selectedMethod?.data.images.length > (imageSources?.googleImagesByBarcode || 0) + (imageSources?.googleImagesByName || 0) && (
+                    <div className="mb-4">
+                      <div className="flex items-center space-x-2 mb-2">
+                        <div className="h-px flex-1 bg-gray-300"></div>
+                        <p className="text-xs font-medium text-gray-500 uppercase">
+                          Sugerencias de IA (Gemini/OpenAI)
+                        </p>
+                        <div className="h-px flex-1 bg-gray-300"></div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-3">
+                        {selectedMethod?.data.images
+                          .slice((imageSources?.googleImagesByBarcode || 0) + (imageSources?.googleImagesByName || 0))
+                          .map((imageUrl, index) => (
+                            <ImageCard
+                              key={`ai-${index}`}
+                              imageUrl={imageUrl}
+                              index={index}
+                              isSelected={selectedImages.includes(imageUrl)}
+                              isUploading={uploadingImages.has(imageUrl)}
+                              onToggle={() => toggleImageSelection(imageUrl)}
+                            />
+                          ))}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Search for More Images Button */}
                   <div className="mt-4 text-center">

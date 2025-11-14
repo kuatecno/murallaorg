@@ -578,7 +578,7 @@ export default function ProductEnrichmentModal({
                   suggestedValue={selectedMethod?.data.name}
                   approved={approvals.name}
                   onToggle={() => toggleApproval('name')}
-                  metadata={selectedMethod?.metadata?.name}
+                  metadata={metadata?.name}
                 />
               )}
 
@@ -590,7 +590,7 @@ export default function ProductEnrichmentModal({
                   suggestedValue={selectedMethod?.data.description}
                   approved={approvals.description}
                   onToggle={() => toggleApproval('description')}
-                  metadata={selectedMethod?.metadata?.description}
+                  metadata={metadata?.description}
                   multiline
                 />
               )}
@@ -672,7 +672,7 @@ export default function ProductEnrichmentModal({
                   suggestedValue={selectedMethod?.data.brand}
                   approved={approvals.brand}
                   onToggle={() => toggleApproval('brand')}
-                  metadata={selectedMethod?.metadata?.brand}
+                  metadata={metadata?.brand}
                 />
               )}
 
@@ -684,7 +684,7 @@ export default function ProductEnrichmentModal({
                   suggestedValue={selectedMethod?.data.category}
                   approved={approvals.category}
                   onToggle={() => toggleApproval('category')}
-                  metadata={selectedMethod?.metadata?.category}
+                  metadata={metadata?.category}
                 />
               )}
 
@@ -696,7 +696,7 @@ export default function ProductEnrichmentModal({
                   suggestedValue={selectedMethod?.data.format}
                   approved={approvals.format}
                   onToggle={() => toggleApproval('format')}
-                  metadata={selectedMethod?.metadata?.format}
+                  metadata={metadata?.format}
                 />
               )}
 
@@ -708,7 +708,7 @@ export default function ProductEnrichmentModal({
                   suggestedValue={selectedMethod?.data.type}
                   approved={approvals.type}
                   onToggle={() => toggleApproval('type')}
-                  metadata={selectedMethod?.metadata?.type}
+                  metadata={metadata?.type}
                 />
               )}
 
@@ -720,7 +720,7 @@ export default function ProductEnrichmentModal({
                   suggestedValue={selectedMethod?.data.ean}
                   approved={approvals.ean}
                   onToggle={() => toggleApproval('ean')}
-                  metadata={selectedMethod?.metadata?.ean}
+                  metadata={metadata?.ean}
                 />
               )}
 
@@ -733,18 +733,87 @@ export default function ProductEnrichmentModal({
                     Selecciona imágenes para agregar al producto (click para seleccionar)
                   </p>
 
-                  <div className="grid grid-cols-3 gap-3">
-                    {selectedMethod.data.images.map((imageUrl, index) => (
-                      <ImageCard
-                        key={`image-${index}`}
-                        imageUrl={imageUrl}
-                        index={index}
-                        isSelected={selectedImages.includes(imageUrl)}
-                        isUploading={uploadingImages.has(imageUrl)}
-                        onToggle={() => toggleImageSelection(imageUrl)}
-                      />
-                    ))}
-                  </div>
+                  {/* Barcode Search Results */}
+                  {imageSources?.googleImagesByBarcode > 0 && (
+                    <div className="mb-4">
+                      <div className="flex items-center space-x-2 mb-2">
+                        <div className="h-px flex-1 bg-gray-300"></div>
+                        <p className="text-xs font-medium text-gray-500 uppercase">
+                          Búsqueda por Código de Barras ({imageSources.googleImagesByBarcode} resultados)
+                        </p>
+                        <div className="h-px flex-1 bg-gray-300"></div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-3">
+                        {selectedMethod?.data.images.slice(0, imageSources.googleImagesByBarcode).map((imageUrl, index) => (
+                          <ImageCard
+                            key={`barcode-${index}`}
+                            imageUrl={imageUrl}
+                            index={index}
+                            isSelected={selectedImages.includes(imageUrl)}
+                            isUploading={uploadingImages.has(imageUrl)}
+                            onToggle={() => toggleImageSelection(imageUrl)}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Name/Brand Search Results */}
+                  {imageSources?.googleImagesByName > 0 && (
+                    <div className="mb-4">
+                      <div className="flex items-center space-x-2 mb-2">
+                        <div className="h-px flex-1 bg-gray-300"></div>
+                        <p className="text-xs font-medium text-gray-500 uppercase">
+                          Búsqueda por Nombre/Marca ({imageSources.googleImagesByName} resultados)
+                        </p>
+                        <div className="h-px flex-1 bg-gray-300"></div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-3">
+                        {selectedMethod?.data.images
+                          .slice(
+                            imageSources.googleImagesByBarcode || 0,
+                            (imageSources.googleImagesByBarcode || 0) + imageSources.googleImagesByName
+                          )
+                          .map((imageUrl, index) => (
+                            <ImageCard
+                              key={`name-${index}`}
+                              imageUrl={imageUrl}
+                              index={index}
+                              isSelected={selectedImages.includes(imageUrl)}
+                              isUploading={uploadingImages.has(imageUrl)}
+                              onToggle={() => toggleImageSelection(imageUrl)}
+                            />
+                          ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* AI-Generated Results (Gemini/OpenAI) */}
+                  {selectedMethod?.data.images.length > (imageSources?.googleImagesByBarcode || 0) + (imageSources?.googleImagesByName || 0) && (
+                    <div className="mb-4">
+                      <div className="flex items-center space-x-2 mb-2">
+                        <div className="h-px flex-1 bg-gray-300"></div>
+                        <p className="text-xs font-medium text-gray-500 uppercase">
+                          Sugerencias de IA (Gemini/OpenAI)
+                        </p>
+                        <div className="h-px flex-1 bg-gray-300"></div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-3">
+                        {selectedMethod?.data.images
+                          .slice((imageSources?.googleImagesByBarcode || 0) + (imageSources?.googleImagesByName || 0))
+                          .map((imageUrl, index) => (
+                            <ImageCard
+                              key={`ai-${index}`}
+                              imageUrl={imageUrl}
+                              index={index}
+                              isSelected={selectedImages.includes(imageUrl)}
+                              isUploading={uploadingImages.has(imageUrl)}
+                              onToggle={() => toggleImageSelection(imageUrl)}
+                            />
+                          ))}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Search for More Images Button */}
                   <div className="mt-4 text-center">

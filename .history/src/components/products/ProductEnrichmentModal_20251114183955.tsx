@@ -672,7 +672,7 @@ export default function ProductEnrichmentModal({
                   suggestedValue={selectedMethod?.data.brand}
                   approved={approvals.brand}
                   onToggle={() => toggleApproval('brand')}
-                  metadata={selectedMethod?.metadata?.brand}
+                  metadata={metadata?.brand}
                 />
               )}
 
@@ -684,7 +684,7 @@ export default function ProductEnrichmentModal({
                   suggestedValue={selectedMethod?.data.category}
                   approved={approvals.category}
                   onToggle={() => toggleApproval('category')}
-                  metadata={selectedMethod?.metadata?.category}
+                  metadata={metadata?.category}
                 />
               )}
 
@@ -696,7 +696,7 @@ export default function ProductEnrichmentModal({
                   suggestedValue={selectedMethod?.data.format}
                   approved={approvals.format}
                   onToggle={() => toggleApproval('format')}
-                  metadata={selectedMethod?.metadata?.format}
+                  metadata={metadata?.format}
                 />
               )}
 
@@ -708,7 +708,7 @@ export default function ProductEnrichmentModal({
                   suggestedValue={selectedMethod?.data.type}
                   approved={approvals.type}
                   onToggle={() => toggleApproval('type')}
-                  metadata={selectedMethod?.metadata?.type}
+                  metadata={metadata?.type}
                 />
               )}
 
@@ -720,7 +720,7 @@ export default function ProductEnrichmentModal({
                   suggestedValue={selectedMethod?.data.ean}
                   approved={approvals.ean}
                   onToggle={() => toggleApproval('ean')}
-                  metadata={selectedMethod?.metadata?.ean}
+                  metadata={metadata?.ean}
                 />
               )}
 

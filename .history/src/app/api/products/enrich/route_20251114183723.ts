@@ -570,8 +570,8 @@ Realiza búsqueda exhaustiva y devuelve SOLO JSON con información premium verif
       const normalizedTags = Array.isArray(suggestions.tags)
         ? suggestions.tags
             .filter((tag: unknown): tag is string => typeof tag === 'string')
-            .map((tag: string) => tag.trim().toLowerCase())
-            .filter((tag: string) => ALLOWED_TAGS.includes(tag))
+            .map(tag => tag.trim().toLowerCase())
+            .filter(tag => ALLOWED_TAGS.includes(tag))
         : [];
 
       const standardData: EnrichmentSuggestion = {
@@ -623,9 +623,9 @@ Realiza búsqueda exhaustiva y devuelve SOLO JSON con información premium verif
 
       const normalizedTags = Array.isArray(suggestions.tags)
         ? suggestions.tags
-            .filter((tag: unknown): tag is string => typeof tag === 'string')
-            .map((tag: string) => tag.trim().toLowerCase())
-            .filter((tag: string) => ALLOWED_TAGS.includes(tag))
+            .filter(tag => typeof tag === 'string')
+            .map(tag => tag.trim().toLowerCase())
+            .filter(tag => ALLOWED_TAGS.includes(tag))
         : [];
 
       const premiumData: EnrichmentSuggestion = {
@@ -640,7 +640,7 @@ Realiza búsqueda exhaustiva y devuelve SOLO JSON con información premium verif
         format: normalizedFormat,
         tags: normalizedTags.length > 0 ? normalizedTags : undefined,
         images: Array.isArray(suggestions.images)
-          ? suggestions.images.filter((img: unknown): img is string => typeof img === 'string' && img.startsWith('http'))
+          ? suggestions.images.filter(img => img && img.startsWith('http'))
           : [],
       };
 

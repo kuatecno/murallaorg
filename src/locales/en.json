@@ -186,6 +186,7 @@
     "removeTag": "Remove Tag",
     "predefinedTags": {
       "vegano": "Vegan",
+      "vegetariano": "Vegetarian",
       "sin azúcar añadido": "No Added Sugar",
       "sin gluten": "Gluten Free",
       "sin procesar": "Unprocessed"

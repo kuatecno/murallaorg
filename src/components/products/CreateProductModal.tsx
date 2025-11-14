@@ -43,11 +43,12 @@ interface CreateProductModalProps {
   onSuccess: () => void;
   onDelete?: (product: Product) => void; // Optional delete callback for edit mode
   product?: Product; // Optional product for edit mode
+  initialData?: Partial<ProductFormData> | null;
 }
 
 type ProductType = 'INPUT' | 'READY_PRODUCT' | 'MANUFACTURED' | 'MADE_TO_ORDER' | 'SERVICE';
 
-interface ProductFormData {
+export interface ProductFormData {
   sku: string;
   name: string;
   description: string;
@@ -123,7 +124,7 @@ interface ModifierGroup {
   modifiers: ProductModifier[];
 }
 
-export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelete, product }: CreateProductModalProps) {
+export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelete, product, initialData }: CreateProductModalProps) {
   const { t } = useTranslation();
   const [formData, setFormData] = useState<ProductFormData>({
     sku: '',
@@ -242,6 +243,21 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
       }
     }
   }, [product]);
+
+  // Apply initial data when creating new products (e.g., from AI enrichment)
+  useEffect(() => {
+    if (!product && initialData) {
+      setFormData(prev => ({
+        ...prev,
+        ...initialData,
+        tags: initialData.tags ?? prev.tags,
+        images: initialData.images ?? prev.images,
+      }));
+      if (initialData.images && initialData.images.length > 0) {
+        setCrossVariantImages(initialData.images);
+      }
+    }
+  }, [initialData, product]);
 
   const fetchCategories = async () => {
     try {
@@ -365,6 +381,14 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
   };
 
   const handleEnrichmentApprove = (enrichedData: any) => {
+    // Only allow AI to suggest predefined tags (etiquetas conocidas)
+    const predefinedTagsObj = t('products.predefinedTags') as any;
+    const predefinedTagKeys = Object.keys(predefinedTagsObj || {});
+
+    const aiTags = Array.isArray(enrichedData.tags)
+      ? enrichedData.tags.filter((tag: string) => predefinedTagKeys.includes(tag))
+      : [];
+
     setFormData((prev) => ({
       ...prev,
       name: enrichedData.name || prev.name,
@@ -373,6 +397,12 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
       brand: enrichedData.brand || prev.brand,
       ean: enrichedData.ean || prev.ean,
       type: enrichedData.type || prev.type,
+      format: enrichedData.format || prev.format,
+      // Merge AI tags with existing ones, keeping only predefined tags
+      tags:
+        aiTags.length > 0
+          ? Array.from(new Set([...prev.tags, ...aiTags]))
+          : prev.tags,
       images: enrichedData.images || prev.images,
       sourceUrl: enrichedData.sourceUrl || prev.sourceUrl,
     }));
@@ -782,15 +812,33 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
                 onClick={() => handleTypeChange(type.value)}
                 className={`p-4 border-2 rounded-lg text-left transition-all ${
                   formData.type === type.value
-                    ? 'border-blue-600 bg-blue-50'
-                    : 'border-gray-200 hover:border-gray-300'
+                    ? 'border-blue-600 bg-blue-50 shadow-sm'
+                    : 'border-gray-200 hover:border-blue-200 hover:bg-blue-50/30'
                 }`}
               >
                 <div className="flex items-center mb-2">
-                  <span className="text-2xl mr-2">{type.icon}</span>
-                  <span className="font-medium">{type.label}</span>
+                  <span
+                    className={`text-2xl mr-2 ${
+                      formData.type === type.value ? 'text-blue-600' : 'text-gray-500'
+                    }`}
+                  >
+                    {type.icon}
+                  </span>
+                  <span
+                    className={`font-semibold ${
+                      formData.type === type.value ? 'text-blue-900' : 'text-gray-800'
+                    }`}
+                  >
+                    {type.label}
+                  </span>
                 </div>
-                <p className="text-sm text-gray-600">{type.description}</p>
+                <p
+                  className={`text-sm ${
+                    formData.type === type.value ? 'text-blue-700' : 'text-gray-600'
+                  }`}
+                >
+                  {type.description}
+                </p>
               </button>
             ))}
           </div>
@@ -1107,22 +1155,45 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
                 <label className="block text-xs font-medium text-gray-600 mb-2">Common Tags:</label>
                 <div className="flex flex-wrap gap-2">
                   {Object.entries(t('products.predefinedTags')).map(([key, label]) => {
+                    // If Vegano is selected, hide Vegetariano as it is implied
+                    if (key === 'vegetariano' && formData.tags.includes('vegano')) {
+                      return null;
+                    }
+
                     const isSelected = formData.tags.includes(key);
                     return (
                       <button
                         key={key}
                         type="button"
                         onClick={() => {
-                          if (isSelected) {
-                            setFormData(prev => ({
-                              ...prev,
-                              tags: prev.tags.filter(tag => tag !== key)
-                            }));
+                          // Special behavior: Vegano implies Vegetariano
+                          if (key === 'vegano') {
+                            if (isSelected) {
+                              setFormData(prev => ({
+                                ...prev,
+                                tags: prev.tags.filter(tag => tag !== 'vegano')
+                              }));
+                            } else {
+                              setFormData(prev => ({
+                                ...prev,
+                                tags: [
+                                  ...prev.tags.filter(tag => tag !== 'vegetariano'),
+                                  'vegano',
+                                ],
+                              }));
+                            }
                           } else {
-                            setFormData(prev => ({
-                              ...prev,
-                              tags: [...prev.tags, key]
-                            }));
+                            if (isSelected) {
+                              setFormData(prev => ({
+                                ...prev,
+                                tags: prev.tags.filter(tag => tag !== key)
+                              }));
+                            } else {
+                              setFormData(prev => ({
+                                ...prev,
+                                tags: [...prev.tags, key]
+                              }));
+                            }
                           }
                         }}
                         className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
@@ -1533,16 +1604,40 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
                                   <label className="block text-xs font-medium text-gray-600 mb-2">Common Tags:</label>
                                   <div className="flex flex-wrap gap-2">
                                     {Object.entries(t('products.predefinedTags')).map(([key, label]) => {
+                                      // If Vegano is selected for this variant, hide Vegetariano
+                                      if (key === 'vegetariano' && variant.tags.includes('vegano')) {
+                                        return null;
+                                      }
+
                                       const isSelected = variant.tags.includes(key);
                                       return (
                                         <button
                                           key={key}
                                           type="button"
                                           onClick={() => {
-                                            if (isSelected) {
-                                              updateVariant(index, 'tags', variant.tags.filter(tag => tag !== key));
+                                            if (key === 'vegano') {
+                                              if (isSelected) {
+                                                updateVariant(
+                                                  index,
+                                                  'tags',
+                                                  variant.tags.filter(tag => tag !== 'vegano')
+                                                );
+                                              } else {
+                                                updateVariant(
+                                                  index,
+                                                  'tags',
+                                                  [
+                                                    ...variant.tags.filter(tag => tag !== 'vegetariano'),
+                                                    'vegano',
+                                                  ]
+                                                );
+                                              }
                                             } else {
-                                              updateVariant(index, 'tags', [...variant.tags, key]);
+                                              if (isSelected) {
+                                                updateVariant(index, 'tags', variant.tags.filter(tag => tag !== key));
+                                              } else {
+                                                updateVariant(index, 'tags', [...variant.tags, key]);
+                                              }
                                             }
                                           }}
                                           className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${

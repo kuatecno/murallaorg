@@ -98,6 +98,19 @@ export async function POST(request: NextRequest) {
       return `${cleanName}-${timestamp}`;
     };
 
+    // Only allow predefined tags from enrichment
+    const allowedTags = [
+      'vegano',
+      'vegetariano',
+      'sin azúcar añadido',
+      'sin gluten',
+      'sin procesar',
+    ];
+
+    const normalizedTags = Array.isArray(enrichedProduct.tags)
+      ? enrichedProduct.tags.filter((tag: string) => allowedTags.includes(tag))
+      : [];
+
     // Use enriched data or fallback to extracted info from URL
     const productName = enrichedProduct.name && enrichedProduct.name !== 'Product from URL' 
       ? enrichedProduct.name 
@@ -119,8 +132,8 @@ export async function POST(request: NextRequest) {
       minStock: 0,
       maxStock: null,
       unit: 'UNIT',
-      format: null,
-      tags: enrichedProduct.tags || [],
+      format: enrichedProduct.format || null,
+      tags: normalizedTags,
       images: enrichedProduct.images || [],
       isActive: true,
       metadata: {

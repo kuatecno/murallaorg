@@ -134,6 +134,7 @@
     "removeTag": "Quitar Etiqueta",
     "predefinedTags": {
       "vegano": "Vegano",
+      "vegetariano": "Vegetariano",
       "sin azúcar añadido": "Sin Azúcar Añadido",
       "sin gluten": "Sin Gluten",
       "sin procesar": "Sin Procesar"

@@ -54,6 +54,8 @@ interface EnrichmentSuggestion {
   brand?: string;
   ean?: string;
   type?: string;
+  format?: string;
+  tags?: string[];
   images?: string[];
   sourceUrl?: string;
 }
@@ -895,6 +897,18 @@ export default function ProductEnrichmentModal({
                   approved={approvals.category}
                   onToggle={() => toggleApproval('category')}
                   metadata={metadata?.category}
+                />
+              )}
+
+              {/* Format */}
+              {suggestions.format && (
+                <FieldSuggestion
+                  label="Format"
+                  currentValue={currentData?.format}
+                  suggestedValue={suggestions.format}
+                  approved={approvals.format}
+                  onToggle={() => toggleApproval('format')}
+                  metadata={metadata?.format}
                 />
               )}
 

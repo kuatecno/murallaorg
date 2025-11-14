@@ -84,6 +84,22 @@ const PRODUCT_TYPES = [
   'SERVICE',
 ];
 
+// Product formats
+const PRODUCT_FORMATS = [
+  'PACKAGED',
+  'FROZEN',
+  'FRESH',
+];
+
+// Allowed tags/etiquetas that AI can suggest
+const ALLOWED_TAGS = [
+  'vegano',
+  'vegetariano',
+  'sin azúcar añadido',
+  'sin gluten',
+  'sin procesar',
+];
+
 interface EnrichmentRequest {
   productId?: string;
   name?: string;
@@ -100,6 +116,8 @@ interface EnrichmentSuggestion {
   brand?: string;
   ean?: string;
   type?: string;
+  format?: string;
+  tags?: string[];
   images?: string[];
   [key: string]: any; // Allow dynamic field access
 }
@@ -117,6 +135,8 @@ interface EnrichmentWithMetadata {
   brand?: FieldMetadata;
   ean?: FieldMetadata;
   type?: FieldMetadata;
+  format?: FieldMetadata;
+  tags?: FieldMetadata;
   [key: string]: FieldMetadata | undefined; // Allow dynamic field access
 }
 
@@ -247,6 +267,11 @@ CAMPOS A COMPLETAR (devuelve SOLO JSON válido):
   "brand": "Nombre oficial de la marca",
   "ean": "Código EAN si lo encuentras",
   "type": "Uno de: ${PRODUCT_TYPES.join(', ')}",
+  "format": "Uno de: ${PRODUCT_FORMATS.join(', ')} o null si no aplica",
+  "tags": [
+    "Lista de etiquetas relevantes elegidas SOLO de: ${ALLOWED_TAGS.join(', ')} (en minúsculas)",
+    "No inventes etiquetas nuevas"
+  ],
   "images": [
     "URL REAL de imagen del producto desde sitio oficial o e-commerce",
     "Segunda URL REAL (opcional)",
@@ -262,6 +287,8 @@ EJEMPLO de respuesta para "Muffin de zanahoria - Mis Amigos Veganos":
   "brand": "Mis Amigos Veganos",
   "ean": null,
   "type": "READY_PRODUCT",
+  "format": "PACKAGED",
+  "tags": ["vegano"],
   "images": ["[URL real del producto]"]
 }
 
@@ -334,7 +361,7 @@ BUSCA EN GOOGLE AHORA y devuelve SOLO el objeto JSON con información real encon
     let suggestions: EnrichmentSuggestion = {};
     let metadata: EnrichmentWithMetadata = {};
 
-    const fields = ['name', 'description', 'category', 'brand', 'ean', 'type'];
+    const fields = ['name', 'description', 'category', 'brand', 'ean', 'type', 'format', 'tags'];
 
     fields.forEach(field => {
       const geminiValue = geminiResult?.[field];
@@ -448,7 +475,18 @@ BUSCA EN GOOGLE AHORA y devuelve SOLO el objeto JSON con información real encon
     console.log('🖼️ Total images from Google Custom Search:', allImages.length);
     console.log('📸 Image URLs:', allImages);
 
-    // Validate and clean suggestions
+    // Validate, normalize, and clean suggestions
+    const normalizedFormat = PRODUCT_FORMATS.includes(suggestions.format || '')
+      ? suggestions.format
+      : productData.format || undefined;
+
+    const normalizedTags = Array.isArray(suggestions.tags)
+      ? suggestions.tags
+          .filter(tag => typeof tag === 'string')
+          .map(tag => tag.trim().toLowerCase())
+          .filter(tag => ALLOWED_TAGS.includes(tag))
+      : [];
+
     const enrichedData: EnrichmentSuggestion = {
       name: suggestions.name || productData.name,
       description: suggestions.description || undefined,
@@ -458,6 +496,8 @@ BUSCA EN GOOGLE AHORA y devuelve SOLO el objeto JSON con información real encon
       type: PRODUCT_TYPES.includes(suggestions.type || '')
         ? suggestions.type
         : 'READY_PRODUCT',
+      format: normalizedFormat,
+      tags: normalizedTags.length > 0 ? normalizedTags : undefined,
       images: Array.isArray(suggestions.images)
         ? suggestions.images.filter(img => img && img.startsWith('http'))
         : [],

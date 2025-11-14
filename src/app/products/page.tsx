@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useTranslation } from '@/contexts/LanguageContext';
-import CreateProductModal from '@/components/products/CreateProductModal';
+import CreateProductModal, { ProductFormData } from '@/components/products/CreateProductModal';
 import ProductEnrichmentModal from '@/components/products/ProductEnrichmentModal';
 import ProductNavigation from '@/components/products/ProductNavigation';
 import LanguageSwitcher from '@/components/shared/LanguageSwitcher';
@@ -68,6 +68,9 @@ export default function ProductsPage() {
   const [isEnrichModalOpen, setIsEnrichModalOpen] = useState(false);
   const [selectedProductForEnrich, setSelectedProductForEnrich] = useState<Product | null>(null);
   const [isCreateFromLinkMode, setIsCreateFromLinkMode] = useState(false);
+  const [isTypeSelectionOpen, setIsTypeSelectionOpen] = useState(false);
+  const [createFromLinkType, setCreateFromLinkType] = useState<'INPUT' | 'READY_PRODUCT' | null>(null);
+  const [createProductInitialData, setCreateProductInitialData] = useState<Partial<ProductFormData> | null>(null);
   const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -307,49 +310,49 @@ export default function ProductsPage() {
   const handleApplyEnrichment = async (approvedData: any) => {
     try {
       if (isCreateFromLinkMode) {
-        // Create a new product from enriched data
+        const enforcedType: 'INPUT' | 'READY_PRODUCT' = createFromLinkType || 'READY_PRODUCT';
+
         const generateSKU = (name: string): string => {
           const cleanName = name
-            .replace(/[^a-zA-Z0-9\s]/g, '') // Remove special characters
-            .replace(/\s+/g, '-') // Replace spaces with hyphens
+            .replace(/[^a-zA-Z0-9\s]/g, '')
+            .replace(/\s+/g, '-')
             .toUpperCase()
-            .substring(0, 20); // Limit length
+            .substring(0, 20);
 
-          const timestamp = Date.now().toString().slice(-6); // Last 6 digits of timestamp
+          const timestamp = Date.now().toString().slice(-6);
           return `${cleanName}-${timestamp}`;
         };
 
-        const productData = {
+        const initialData: Partial<ProductFormData> = {
           sku: generateSKU(approvedData.name || 'PRODUCT'),
-          name: approvedData.name || 'Unnamed Product',
+          name: approvedData.name || '',
           description: approvedData.description || '',
-          type: approvedData.type || 'READY_PRODUCT',
+          type: enforcedType,
           category: approvedData.category || '',
           brand: approvedData.brand || '',
-          ean: approvedData.ean || null,
-          sourceUrl: approvedData.sourceUrl || undefined,
-          unitPrice: 0, // Default price, user can update later
-          costPrice: null,
-          currentStock: 0,
-          minStock: 0,
-          maxStock: null,
+          ean: approvedData.ean || '',
+          sourceUrl: approvedData.sourceUrl || '',
+          unitPrice: '',
+          costPrice: '',
+          currentStock: '0',
+          minStock: '0',
+          maxStock: '',
           unit: 'UNIT',
-          format: null,
-          tags: [],
+          format: approvedData.format || '',
+          tags: Array.isArray(approvedData.tags)
+            ? approvedData.tags.filter((tag): tag is string => typeof tag === 'string')
+            : [],
           images: approvedData.images || [],
-          isActive: true,
+          cafePrice: '',
+          rappiPrice: '',
+          pedidosyaPrice: '',
+          uberPrice: '',
         };
 
-        const response = await apiClient.post('/api/products', productData);
-
-        if (response.ok) {
-          loadProducts();
-          alert(`Product "${approvedData.name}" created successfully from URL!`);
-          setIsCreateFromLinkMode(false);
-        } else {
-          const error = await response.json();
-          alert(`Failed to create product: ${error.error}`);
-        }
+        setCreateProductInitialData(initialData);
+        setIsCreateFromLinkMode(false);
+        setIsCreateModalOpen(true);
+        return;
       } else {
         // Update existing product with approved data
         if (!selectedProductForEnrich) return;
@@ -437,8 +440,15 @@ export default function ProductsPage() {
 
   // Create product from link function - Opens enrichment modal
   const handleCreateFromLink = () => {
+    setCreateFromLinkType(null);
+    setIsTypeSelectionOpen(true);
+  };
+
+  const startCreateFromLinkFlow = (type: 'INPUT' | 'READY_PRODUCT') => {
+    setCreateFromLinkType(type);
+    setIsTypeSelectionOpen(false);
     setIsCreateFromLinkMode(true);
-    setSelectedProductForEnrich(null); // No existing product
+    setSelectedProductForEnrich(null);
     setIsEnrichModalOpen(true);
   };
 
@@ -476,7 +486,10 @@ export default function ProductsPage() {
                 🔗 From Link
               </button>
               <button
-                onClick={() => setIsCreateModalOpen(true)}
+                onClick={() => {
+                  setCreateProductInitialData(null);
+                  setIsCreateModalOpen(true);
+                }}
                 className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
               >
                 + {t('products.newProduct')}
@@ -914,10 +927,15 @@ export default function ProductsPage() {
       {/* Create Product Modal */}
       <CreateProductModal
         isOpen={isCreateModalOpen}
-        onClose={() => setIsCreateModalOpen(false)}
+        initialData={createProductInitialData}
+        onClose={() => {
+          setIsCreateModalOpen(false);
+          setCreateProductInitialData(null);
+        }}
         onSuccess={() => {
           loadProducts();
           setIsCreateModalOpen(false);
+          setCreateProductInitialData(null);
         }}
       />
 
@@ -949,10 +967,55 @@ export default function ProductsPage() {
         productName={selectedProductForEnrich?.name}
         productEan={selectedProductForEnrich?.ean}
         productSourceUrl={selectedProductForEnrich?.sourceUrl}
-        productType={selectedProductForEnrich?.type}
+        productType={isCreateFromLinkMode ? createFromLinkType || undefined : selectedProductForEnrich?.type}
         productDescription={selectedProductForEnrich?.description}
         onApprove={handleApplyEnrichment}
       />
+
+      {/* Create-From-Link Type Selection Modal */}
+      {isTypeSelectionOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-6">
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h3 className="text-xl font-semibold text-gray-900">{t('products.type')}</h3>
+                <p className="text-sm text-gray-600 mt-1">
+                  Selecciona si este producto es un Insumo o un Producto Comprado antes de importar datos externos.
+                </p>
+              </div>
+              <button
+                onClick={() => setIsTypeSelectionOpen(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {(['INPUT', 'READY_PRODUCT'] as ('INPUT' | 'READY_PRODUCT')[]).map(type => (
+                <button
+                  key={type}
+                  onClick={() => startCreateFromLinkFlow(type)}
+                  className="border-2 border-gray-200 rounded-xl p-4 text-left hover:border-blue-600 hover:bg-blue-50 transition-all"
+                >
+                  <div className="text-3xl mb-3">{type === 'INPUT' ? '🥛' : '🛒'}</div>
+                  <h4 className="text-lg font-semibold text-gray-900">{t(`products.types.${type}`)}</h4>
+                  <p className="text-sm text-gray-600 mt-2">{t(`products.typeDescriptions.${type}`)}</p>
+                </button>
+              ))}
+            </div>
+
+            <div className="text-right mt-6">
+              <button
+                onClick={() => setIsTypeSelectionOpen(false)}
+                className="px-4 py-2 text-gray-600 hover:text-gray-800"
+              >
+                {t('common.cancel')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (

@@ -14,13 +14,21 @@ const openai = new OpenAI({
 const MAX_PAGE_TEXT_LENGTH = 12000;
 
 const sanitizeHtmlToText = (html: string) => {
-  const withoutScripts = html
+  // Remove common non-content sections first
+  let cleaned = html
     .replace(/<script[\s\S]*?<\/script>/gi, '')
     .replace(/<style[\s\S]*?<\/style>/gi, '')
-    .replace(/<noscript[\s\S]*?<\/noscript>/gi, '');
+    .replace(/<noscript[\s\S]*?<\/noscript>/gi, '')
+    // Remove header, footer, nav, and sidebar elements
+    .replace(/<header[\s\S]*?<\/header>/gi, '')
+    .replace(/<footer[\s\S]*?<\/footer>/gi, '')
+    .replace(/<nav[\s\S]*?<\/nav>/gi, '')
+    .replace(/<aside[\s\S]*?<\/aside>/gi, '')
+    // Remove elements with common non-content class/id patterns
+    .replace(/<[^>]*(class|id)="[^"]*?(header|footer|nav|menu|sidebar|cookie|banner|popup|modal)[^"]*?"[^>]*>[\s\S]*?<\/[^>]+>/gi, '');
 
   // Preserve formatting: line breaks, paragraphs, list items
-  const withLineBreaks = withoutScripts
+  const withLineBreaks = cleaned
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<\/p>/gi, '\n\n')
     .replace(/<\/div>/gi, '\n')
@@ -244,13 +252,16 @@ INSTRUCCIONES CRÍTICAS:
 
 ⚠️ REGLA ABSOLUTA - EXTRACCIÓN VERBATIM (PRIORIDAD MÁXIMA):
 3. Si se proporcionó CONTENIDO COMPLETO DEL SITIO WEB arriba:
-   - Busca el párrafo o sección principal que describe el producto (usualmente cerca del nombre del producto)
-   - COPIA EXACTAMENTE ese texto, palabra por palabra, sin cambiar NADA
+   - IGNORA completamente cualquier texto genérico sobre la empresa, misión, historia, o información del footer
+   - Busca SOLO el párrafo o sección que describe ESTE PRODUCTO ESPECÍFICO (usualmente cerca del nombre del producto)
+   - Identifica el texto que habla de las características, ingredientes, o beneficios del producto
+   - COPIA EXACTAMENTE ese texto descriptivo del producto, palabra por palabra, sin cambiar NADA
    - NO resumas, NO parafrasees, NO reformules, NO acortes
    - NO cambies ni una sola palabra, acento, tilde, coma o punto
-   - Incluye TODO el texto descriptivo del producto tal como aparece en el sitio
-   - Si hay múltiples párrafos descriptivos, cópialos todos separados por saltos de línea
-   - La descripción debe ser una TRANSCRIPCIÓN LITERAL del sitio web
+   - NO incluyas texto genérico de la empresa como "nació de una necesidad personal..." - eso es del footer, NO del producto
+   - Incluye TODO el texto descriptivo del PRODUCTO tal como aparece en el sitio
+   - Si hay múltiples párrafos descriptivos DEL PRODUCTO, cópialos todos separados por saltos de línea
+   - La descripción debe ser una TRANSCRIPCIÓN LITERAL del texto del PRODUCTO del sitio web
    - Ejemplo: Si el sitio dice "Descubre una preparación típica italiana...", tu descripción debe comenzar EXACTAMENTE con "Descubre una preparación típica italiana..."
 
 4. Si NO hay CONTENIDO DEL SITIO WEB, sintetiza información usando los snippets de búsqueda

@@ -115,6 +115,22 @@ const PRODUCT_TYPES = [
   'SERVICE',
 ];
 
+// Product formats
+const PRODUCT_FORMATS = [
+  'PACKAGED',
+  'FROZEN',
+  'FRESH',
+];
+
+// Allowed tags/etiquetas that AI can suggest
+const ALLOWED_TAGS = [
+  'vegano',
+  'vegetariano',
+  'sin azúcar añadido',
+  'sin gluten',
+  'sin procesar',
+];
+
 interface GroundedRequest {
   productName: string;
   productEan?: string;
@@ -183,10 +199,16 @@ INFORMACIÓN A EXTRAER:
 {
   "name": "Nombre oficial y completo del producto",
   "description": "Descripción detallada (2-3 oraciones) con información REAL de la fuente oficial. Menciona si la info es oficial o genérica, pero nunca incluyas '(Fuente: ...)' ni URLs en este texto.",
+  "shortDescription": "Descripción corta y concisa del producto (máximo 80 caracteres). Debe capturar la esencia del producto en pocas palabras.",
   "category": "Mejor coincidencia de estas categorías: ${CATEGORY_LIST.join(', ')}",
   "brand": "Nombre oficial de la marca",
   "ean": "Código EAN/barcode si lo encuentras",
   "type": "El tipo más apropiado de: ${PRODUCT_TYPES.join(', ')}",
+  "format": "Uno de: ${PRODUCT_FORMATS.join(', ')} o null si no aplica",
+  "tags": [
+    "Lista de etiquetas relevantes elegidas SOLO de: ${ALLOWED_TAGS.join(', ')} (en minúsculas)",
+    "No inventes etiquetas nuevas"
+  ],
   "confidence": "high si encontraste fuentes oficiales, medium si es de retailers, low si es información genérica",
   "verified": true si encontraste el producto en fuentes verificables, false si es información genérica
 }
@@ -242,23 +264,46 @@ BUSCA EN GOOGLE AHORA y devuelve el JSON con la información más precisa que en
 
     const cleanedDescription = stripSourceAnnotations(groundedData.description);
 
+    // Validate and truncate short description to 80 characters
+    const shortDesc = groundedData.shortDescription
+      ? groundedData.shortDescription.slice(0, 80)
+      : undefined;
+
+    // Validate and normalize format and tags
+    const normalizedFormat = PRODUCT_FORMATS.includes(groundedData.format || '')
+      ? groundedData.format
+      : undefined;
+
+    const normalizedTags = Array.isArray(groundedData.tags)
+      ? groundedData.tags
+          .filter((tag: any) => typeof tag === 'string')
+          .map((tag: string) => tag.trim().toLowerCase())
+          .filter((tag: string) => ALLOWED_TAGS.includes(tag))
+      : [];
+
     return NextResponse.json({
       success: true,
       suggestions: {
         name: groundedData.name,
         description: cleanedDescription,
+        shortDescription: shortDesc,
         category: groundedData.category,
         brand: groundedData.brand,
         ean: groundedData.ean,
         type: groundedData.type,
+        format: normalizedFormat,
+        tags: normalizedTags.length > 0 ? normalizedTags : undefined,
       },
       metadata: {
         name: { value: groundedData.name, source: 'google_search', confidence: groundedData.confidence },
         description: { value: cleanedDescription, source: 'google_search', confidence: groundedData.confidence },
+        shortDescription: { value: shortDesc, source: 'google_search', confidence: groundedData.confidence },
         category: { value: groundedData.category, source: 'google_search', confidence: groundedData.confidence },
         brand: { value: groundedData.brand, source: 'google_search', confidence: groundedData.confidence },
         ean: { value: groundedData.ean, source: 'google_search', confidence: groundedData.confidence },
         type: { value: groundedData.type, source: 'google_search', confidence: groundedData.confidence },
+        format: { value: normalizedFormat, source: 'google_search', confidence: groundedData.confidence },
+        tags: { value: normalizedTags, source: 'google_search', confidence: groundedData.confidence },
       },
       enrichmentMethod: 'grounded',
       grounding: {

@@ -8,7 +8,8 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
-const MAX_PAGE_TEXT_LENGTH = 3000;
+// Increased limit to capture more content for verbatim extraction
+const MAX_PAGE_TEXT_LENGTH = 8000;
 
 const sanitizeHtmlToText = (html: string) => {
   const withoutScripts = html
@@ -16,16 +17,22 @@ const sanitizeHtmlToText = (html: string) => {
     .replace(/<style[\s\S]*?<\/style>/gi, '')
     .replace(/<noscript[\s\S]*?<\/noscript>/gi, '');
 
+  // Preserve formatting: line breaks, paragraphs, list items
   const withLineBreaks = withoutScripts
-    .replace(/<br\s*\/?>(?=\s*<)/gi, '\n')
-    .replace(/<br\s*\/?>(?!\n)/gi, '\n')
-    .replace(/<\/p>/gi, '\n\n');
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n\n')
+    .replace(/<\/div>/gi, '\n')
+    .replace(/<\/li>/gi, '\n')
+    .replace(/<\/h[1-6]>/gi, '\n\n');
 
   const plainText = withLineBreaks.replace(/<[^>]+>/g, ' ');
 
+  // Preserve accents and special characters, only normalize excessive whitespace
   return plainText
     .replace(/\u00a0/g, ' ')
     .replace(/[ \t]+/g, ' ')
+    .replace(/\n[ \t]+/g, '\n') // Remove leading spaces on new lines
+    .replace(/[ \t]+\n/g, '\n') // Remove trailing spaces before new lines
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 };
@@ -89,6 +96,22 @@ const PRODUCT_TYPES = [
   'MANUFACTURED',
   'MADE_TO_ORDER',
   'SERVICE',
+];
+
+// Product formats
+const PRODUCT_FORMATS = [
+  'PACKAGED',
+  'FROZEN',
+  'FRESH',
+];
+
+// Allowed tags/etiquetas that AI can suggest
+const ALLOWED_TAGS = [
+  'vegano',
+  'vegetariano',
+  'sin azúcar añadido',
+  'sin gluten',
+  'sin procesar',
 ];
 
 interface ExtractRequest {
@@ -208,16 +231,24 @@ URL: ${result.link}
 PRODUCTO: ${productName}
 ${productBrand ? `MARCA: ${productBrand}` : ''}
 ${productEan ? `EAN: ${productEan}` : ''}
-${pageText ? `\nCONTENIDO DEL SITIO OFICIAL (${pageSource || productUrl}):\n"""${pageText}"""` : ''}
+${pageText ? `\n📄 CONTENIDO COMPLETO DEL SITIO WEB (${pageSource || productUrl}):\n"""${pageText}"""` : ''}
 
 RESULTADOS DE BÚSQUEDA WEB:
 ${searchContext}
 
-INSTRUCCIONES:
+INSTRUCCIONES CRÍTICAS:
 1. Analiza los resultados de búsqueda para extraer información REAL y VERIFICABLE
 2. Prioriza información de sitios oficiales y e-commerce conocidos (lider.cl, jumbo.cl, sitios de marca)
-3. Si se proporcionó CONTENIDO DEL SITIO OFICIAL, DEBES copiar textualmente el párrafo más relevante sobre el producto sin resumir ni reformular. Respeta acentos, saltos de línea y tono original.
-4. Si no hay CONTENIDO DEL SITIO OFICIAL, sintetiza la información usando los snippets.
+
+⚠️ IMPORTANTE - EXTRACCIÓN VERBATIM (NO RESUMIR):
+3. Si se proporcionó CONTENIDO COMPLETO DEL SITIO WEB arriba:
+   - DEBES copiar TEXTUALMENTE el párrafo o sección que describe el producto
+   - NO resumas, NO reformules, NO cambies palabras
+   - COPIA EXACTA: respeta acentos, tildes, puntuación, saltos de línea y tono original
+   - Incluye el texto completo de la descripción del producto tal como aparece
+   - La descripción debe ser una CITA DIRECTA del sitio web
+
+4. Si NO hay CONTENIDO DEL SITIO WEB, sintetiza información usando los snippets de búsqueda
 5. Si encuentras precios, ignóralos (solo queremos metadata descriptiva)
 6. TODAS las respuestas en ESPAÑOL
 
@@ -225,14 +256,20 @@ Devuelve SOLO un objeto JSON con esta estructura:
 
 {
   "name": "Nombre mejorado del producto basado en los resultados",
-  "description": "Si se proporcionó CONTENIDO DEL SITIO OFICIAL, copia literal del párrafo principal. De lo contrario, descripción detallada sintetizada (2-3 oraciones).",
+  "description": "COPIA TEXTUAL Y VERBATIM del párrafo del sitio web si está disponible, o síntesis de snippets si no lo está. NO RESUMIR contenido del sitio web.",
+  "shortDescription": "Descripción corta y concisa del producto (máximo 80 caracteres). Debe capturar la esencia del producto en pocas palabras.",
   "category": "Mejor coincidencia de estas categorías: ${CATEGORY_LIST.join(', ')}",
   "brand": "Marca oficial extraída",
   "ean": "EAN si lo encuentras en los resultados",
   "type": "Uno de: ${PRODUCT_TYPES.join(', ')}",
-  "verbatimSource": "URL exacta del sitio citado o vacío",
+  "format": "Uno de: ${PRODUCT_FORMATS.join(', ')} o null si no aplica",
+  "tags": [
+    "Lista de etiquetas relevantes elegidas SOLO de: ${ALLOWED_TAGS.join(', ')} (en minúsculas)",
+    "No inventes etiquetas nuevas"
+  ],
+  "verbatimSource": "URL exacta del sitio citado para la descripción verbatim, o vacío si se sintetizó",
   "sources": ["displayLink del sitio más relevante", "otro sitio relevante"],
-  "confidence": "high si encontraste información de sitio oficial, medium si es de retailer, low si es genérica"
+  "confidence": "high si encontraste información de sitio oficial con contenido verbatim, medium si es de retailer, low si es genérica"
 }
 
 Devuelve SOLO el JSON, sin explicaciones adicionales.`;
@@ -251,18 +288,41 @@ Devuelve SOLO el JSON, sin explicaciones adicionales.`;
 
     console.log('✅ Web metadata extracted:', extractedData);
 
-    const sources = [pageSource, ...(extractedData.sources || [])].filter(Boolean);
+    // Track the actual source URL for verbatim descriptions
+    const actualSourceUrl = pageSource || extractedData.verbatimSource || null;
+    const sources = [actualSourceUrl, ...(extractedData.sources || [])].filter(Boolean);
     const descriptionValue = extractedData.description;
+
+    // Validate and normalize format and tags
+    const normalizedFormat = PRODUCT_FORMATS.includes(extractedData.format || '')
+      ? extractedData.format
+      : undefined;
+
+    const normalizedTags = Array.isArray(extractedData.tags)
+      ? extractedData.tags
+          .filter((tag: any) => typeof tag === 'string')
+          .map((tag: string) => tag.trim().toLowerCase())
+          .filter((tag: string) => ALLOWED_TAGS.includes(tag))
+      : [];
+
+    // Validate and truncate short description to 80 characters
+    const shortDesc = extractedData.shortDescription
+      ? extractedData.shortDescription.slice(0, 80)
+      : undefined;
 
     return NextResponse.json({
       success: true,
       suggestions: {
         name: extractedData.name,
         description: descriptionValue,
+        shortDescription: shortDesc,
         category: extractedData.category,
         brand: extractedData.brand,
         ean: extractedData.ean,
         type: extractedData.type,
+        format: normalizedFormat,
+        tags: normalizedTags.length > 0 ? normalizedTags : undefined,
+        sourceUrl: actualSourceUrl, // Store the source URL separately
       },
       metadata: {
         name: { value: extractedData.name, source: 'google_search', confidence: extractedData.confidence },
@@ -270,17 +330,23 @@ Devuelve SOLO el JSON, sin explicaciones adicionales.`;
           value: descriptionValue,
           source: pageSource ? 'direct_site' : 'google_search',
           confidence: extractedData.confidence,
+          sourceUrl: actualSourceUrl, // Track source URL in metadata
         },
+        shortDescription: { value: shortDesc, source: 'google_search', confidence: extractedData.confidence },
         category: { value: extractedData.category, source: 'google_search', confidence: extractedData.confidence },
         brand: { value: extractedData.brand, source: 'google_search', confidence: extractedData.confidence },
         ean: { value: extractedData.ean, source: 'google_search', confidence: extractedData.confidence },
         type: { value: extractedData.type, source: 'google_search', confidence: extractedData.confidence },
+        format: { value: normalizedFormat, source: 'google_search', confidence: extractedData.confidence },
+        tags: { value: normalizedTags, source: 'google_search', confidence: extractedData.confidence },
       },
       enrichmentMethod: 'web_extraction',
       sources,
-      pageSource: pageSource || extractedData.verbatimSource || null,
+      pageSource: actualSourceUrl,
       searchResultsCount: searchResults.length,
-      message: 'Metadata extracted from real web search results',
+      message: pageSource
+        ? `Verbatim content extracted from ${actualSourceUrl}`
+        : 'Metadata synthesized from web search results',
     });
 
   } catch (error: any) {

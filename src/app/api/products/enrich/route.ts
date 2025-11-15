@@ -126,6 +126,7 @@ interface EnrichmentRequest {
 interface EnrichmentSuggestion {
   name?: string;
   description?: string;
+  shortDescription?: string;
   category?: string;
   brand?: string;
   ean?: string;
@@ -145,6 +146,7 @@ interface FieldMetadata {
 interface EnrichmentWithMetadata {
   name?: FieldMetadata;
   description?: FieldMetadata;
+  shortDescription?: FieldMetadata;
   category?: FieldMetadata;
   brand?: FieldMetadata;
   ean?: FieldMetadata;
@@ -278,6 +280,7 @@ CAMPOS A COMPLETAR (devuelve SOLO JSON válido):
 {
   "name": "Nombre mejorado del producto en español",
   "description": "Descripción detallada en español (2-3 oraciones) con información REAL de la marca. Si no encuentras info verificada, indica 'Información genérica'. Nunca incluyas '(Fuente: ...)' ni URLs aquí",
+  "shortDescription": "Descripción corta y concisa del producto (máximo 80 caracteres). Debe capturar la esencia del producto en pocas palabras.",
   "category": "Mejor coincidencia de estas categorías: ${CATEGORY_LIST.join(', ')}",
   "brand": "Nombre oficial de la marca",
   "ean": "Código EAN si lo encuentras",
@@ -298,6 +301,7 @@ EJEMPLO de respuesta para "Muffin de zanahoria - Mis Amigos Veganos":
 {
   "name": "Muffin de Zanahoria Vegano",
   "description": "Muffin vegano de zanahoria elaborado por Mis Amigos Veganos, marca chilena especializada en productos plant-based. Hecho con ingredientes naturales, sin productos de origen animal.",
+  "shortDescription": "Muffin vegano de zanahoria con ingredientes naturales",
   "category": "🍰 Antojitos",
   "brand": "Mis Amigos Veganos",
   "ean": null,
@@ -376,7 +380,7 @@ BUSCA EN GOOGLE AHORA y devuelve SOLO el objeto JSON con información real encon
     let suggestions: EnrichmentSuggestion = {};
     let metadata: EnrichmentWithMetadata = {};
 
-    const fields = ['name', 'description', 'category', 'brand', 'ean', 'type', 'format', 'tags'];
+    const fields = ['name', 'description', 'shortDescription', 'category', 'brand', 'ean', 'type', 'format', 'tags'];
 
     fields.forEach(field => {
       const geminiValue = geminiResult?.[field];
@@ -511,9 +515,15 @@ BUSCA EN GOOGLE AHORA y devuelve SOLO el objeto JSON con información real encon
           .filter(tag => ALLOWED_TAGS.includes(tag))
       : [];
 
+    // Validate and truncate short description to 80 characters
+    const shortDesc = suggestions.shortDescription
+      ? suggestions.shortDescription.slice(0, 80)
+      : undefined;
+
     const enrichedData: EnrichmentSuggestion = {
       name: suggestions.name || productData.name,
       description: stripSourceAnnotations(suggestions.description) || undefined,
+      shortDescription: shortDesc,
       category: suggestions.category || undefined,
       brand: suggestions.brand || undefined,
       ean: suggestions.ean || productData.ean || undefined,

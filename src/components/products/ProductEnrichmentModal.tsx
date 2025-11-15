@@ -12,6 +12,22 @@ const DISALLOWED_IMAGE_HOSTS = new Set([
   'avatars.githubusercontent.com',
 ]);
 
+// Translation mappings for product types
+const PRODUCT_TYPE_TRANSLATIONS: Record<string, string> = {
+  'INPUT': 'Insumo',
+  'READY_PRODUCT': 'Producto Comprado',
+  'MANUFACTURED': 'Manufacturado',
+  'MADE_TO_ORDER': 'Hecho a Pedido',
+  'SERVICE': 'Servicio',
+};
+
+// Translation mappings for product formats
+const PRODUCT_FORMAT_TRANSLATIONS: Record<string, string> = {
+  'PACKAGED': 'Empaquetado',
+  'FROZEN': 'Congelado',
+  'FRESH': 'Fresco',
+};
+
 const sanitizeImageUrls = (urls?: string[]): string[] => {
   if (!urls) return [];
 
@@ -437,13 +453,22 @@ export default function ProductEnrichmentModal({
     return a === b;
   };
 
-  const formatFieldValue = (value: any) => {
+  const formatFieldValue = (value: any, field?: keyof EnrichmentSuggestion) => {
     if (Array.isArray(value)) {
       return value.join(', ');
     }
     if (typeof value === 'object' && value !== null) {
       return JSON.stringify(value, null, 2);
     }
+
+    // Translate product type and format
+    if (field === 'type' && typeof value === 'string') {
+      return PRODUCT_TYPE_TRANSLATIONS[value] || value;
+    }
+    if (field === 'format' && typeof value === 'string') {
+      return PRODUCT_FORMAT_TRANSLATIONS[value] || value;
+    }
+
     return String(value);
   };
 
@@ -495,7 +520,39 @@ export default function ProductEnrichmentModal({
 
     if (entries.length <= 1) return null;
 
+    // Check if all values are equal
+    const allEqual = entries.every(entry => valuesAreEqual(entry.value, entries[0].value));
+
+    // If all three methods have the same value, hide the comparison entirely
+    if (allEqual) return null;
+
     const targetLabel = buttonLabel || title.toLowerCase();
+
+    // Group entries by value to combine matching methods
+    const valueGroups = new Map<string, MethodKey[]>();
+    entries.forEach(entry => {
+      const serializedValue = typeof entry.value === 'object' ? JSON.stringify(entry.value) : String(entry.value);
+      const existing = valueGroups.get(serializedValue) || [];
+      valueGroups.set(serializedValue, [...existing, entry.method]);
+    });
+
+    // Convert groups to renderable cards
+    const cards = Array.from(valueGroups.entries()).map(([serializedValue, methods]) => {
+      const value = entries.find(e => {
+        const sv = typeof e.value === 'object' ? JSON.stringify(e.value) : String(e.value);
+        return sv === serializedValue;
+      })?.value;
+
+      const isCombined = methods.length > 1;
+      const isActiveValue = valuesAreEqual(suggestions?.[field], value);
+
+      return {
+        methods,
+        value,
+        isCombined,
+        isActiveValue,
+      };
+    });
 
     return (
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
@@ -509,33 +566,47 @@ export default function ProductEnrichmentModal({
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          {entries.map(entry => {
-            const config = METHOD_CONFIG[entry.method];
-            const isActiveValue = valuesAreEqual(suggestions?.[field], entry.value);
+          {cards.map((card, idx) => {
+            const combinedTitle = card.methods.map(m => METHOD_CONFIG[m].title).join(' + ');
+            const combinedIcons = card.methods.map(m => METHOD_CONFIG[m].icon).join(' ');
+
             return (
               <div
-                key={`${field}-${entry.method}`}
-                className={`border border-blue-200 rounded-lg p-3 bg-white space-y-2 ${
-                  isActiveValue ? 'ring-1 ring-green-300' : ''
+                key={`${field}-${idx}`}
+                className={`border rounded-lg p-3 bg-white space-y-2 ${
+                  card.isCombined
+                    ? 'border-purple-400 ring-2 ring-purple-200 bg-purple-50'
+                    : 'border-blue-200'
+                } ${
+                  card.isActiveValue ? 'ring-1 ring-green-300' : ''
                 }`}
               >
-                <p className="text-xs font-semibold text-blue-900 flex items-center space-x-1">
-                  <span>{config.icon}</span>
-                  <span>{config.title}</span>
+                <p className={`text-xs font-semibold flex items-center space-x-1 ${
+                  card.isCombined ? 'text-purple-900' : 'text-blue-900'
+                }`}>
+                  <span>{combinedIcons}</span>
+                  <span>{combinedTitle}</span>
                 </p>
+                {card.isCombined && (
+                  <p className="text-xs text-purple-700 font-medium">
+                    ✨ Both methods agree
+                  </p>
+                )}
                 <p className="text-sm text-gray-800 whitespace-pre-line max-h-40 overflow-auto">
-                  {formatFieldValue(entry.value)}
+                  {formatFieldValue(card.value, field)}
                 </p>
                 <button
-                  onClick={() => applyMethodField(field, entry.method)}
-                  disabled={isActiveValue}
+                  onClick={() => applyMethodField(field, card.methods[0])}
+                  disabled={card.isActiveValue}
                   className={`mt-2 px-3 py-1.5 rounded-lg text-xs font-medium ${
-                    isActiveValue
+                    card.isActiveValue
                       ? 'bg-green-100 text-green-700 cursor-default'
+                      : card.isCombined
+                      ? 'bg-purple-600 hover:bg-purple-700 text-white'
                       : 'bg-blue-600 hover:bg-blue-700 text-white'
                   }`}
                 >
-                  {isActiveValue ? `Using this ${targetLabel}` : `Use this ${targetLabel}`}
+                  {card.isActiveValue ? `Using this ${targetLabel}` : `Use this ${targetLabel}`}
                 </button>
               </div>
             );
@@ -1040,6 +1111,7 @@ export default function ProductEnrichmentModal({
                   approved={approvals.format}
                   onToggle={() => toggleApproval('format')}
                   metadata={metadata?.format}
+                  fieldKey="format"
                 />
               )}
               {renderFieldComparisons('format', { title: 'Format' })}
@@ -1053,6 +1125,7 @@ export default function ProductEnrichmentModal({
                   approved={approvals.type}
                   onToggle={() => toggleApproval('type')}
                   metadata={metadata?.type}
+                  fieldKey="type"
                 />
               )}
               {renderFieldComparisons('type', { title: 'Product Type' })}
@@ -1230,6 +1303,7 @@ interface FieldSuggestionProps {
   onToggle: () => void;
   metadata?: FieldMetadata;
   multiline?: boolean;
+  fieldKey?: string; // Added to identify field type for translations
 }
 
 function FieldSuggestion({
@@ -1240,6 +1314,7 @@ function FieldSuggestion({
   onToggle,
   metadata,
   multiline = false,
+  fieldKey,
 }: FieldSuggestionProps) {
   const getSourceBadge = (source?: string) => {
     switch (source) {
@@ -1265,6 +1340,18 @@ function FieldSuggestion({
       default:
         return null;
     }
+  };
+
+  // Translate values based on field type
+  const translateValue = (value: any) => {
+    if (!value) return value;
+    if (fieldKey === 'type' && typeof value === 'string') {
+      return PRODUCT_TYPE_TRANSLATIONS[value] || value;
+    }
+    if (fieldKey === 'format' && typeof value === 'string') {
+      return PRODUCT_FORMAT_TRANSLATIONS[value] || value;
+    }
+    return value;
   };
 
   const sourceBadge = getSourceBadge(metadata?.source);
@@ -1307,7 +1394,7 @@ function FieldSuggestion({
           <div>
             <p className="text-xs text-gray-500 mb-1">Current:</p>
             <p className={`text-sm ${multiline ? '' : 'truncate'} text-gray-600`}>
-              {currentValue}
+              {translateValue(currentValue)}
             </p>
           </div>
         )}
@@ -1317,7 +1404,7 @@ function FieldSuggestion({
           <p className={`text-sm ${multiline ? '' : 'truncate'} font-medium ${
             approved ? 'text-green-900' : 'text-gray-900'
           }`}>
-            {suggestedValue}
+            {translateValue(suggestedValue)}
           </p>
         </div>
       </div>

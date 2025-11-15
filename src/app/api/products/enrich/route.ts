@@ -24,6 +24,20 @@ function cleanJsonResponse(text: string): string {
   return cleaned;
 }
 
+function stripSourceAnnotations(text?: string | null): string | undefined {
+  if (!text) return text ?? undefined;
+
+  const cleaned = text
+    .replace(/\s*\(\s*(fuente|source)\s*:[^)]+\)/gi, '')
+    .replace(/\s*\[\s*(fuente|source)\s*:[^\]]+\]/gi, '')
+    .replace(/\s*(fuente|source)\s*:\s*https?:\S+/gi, '')
+    .replace(/\s*(fuente|source)\s*:\s*[^\.]+/gi, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+
+  return cleaned || undefined;
+}
+
 // Available categories with hierarchical structure
 const CATEGORIES = {
   'Barra': {
@@ -257,12 +271,13 @@ ${sourceUrl ? `1. 🎯 PRIORIDAD MÁXIMA: Usa la información extraída de la p�
    - E-commerce chileno (Jumbo, Lider, Santa Isabel, etc.)
    - Páginas de productos verificadas
 5. TODAS las respuestas en ESPAÑOL
+6. No incluyas textos como "(Fuente: ...)", URLs ni citas dentro de la descripción; guarda las fuentes para el panel de referencias
 
 CAMPOS A COMPLETAR (devuelve SOLO JSON válido):
 
 {
   "name": "Nombre mejorado del producto en español",
-  "description": "Descripción detallada en español (2-3 oraciones) con información REAL de la marca. Si no encuentras info verificada, indica 'Información genérica'",
+  "description": "Descripción detallada en español (2-3 oraciones) con información REAL de la marca. Si no encuentras info verificada, indica 'Información genérica'. Nunca incluyas '(Fuente: ...)' ni URLs aquí",
   "category": "Mejor coincidencia de estas categorías: ${CATEGORY_LIST.join(', ')}",
   "brand": "Nombre oficial de la marca",
   "ean": "Código EAN si lo encuentras",
@@ -367,19 +382,28 @@ BUSCA EN GOOGLE AHORA y devuelve SOLO el objeto JSON con información real encon
       const geminiValue = geminiResult?.[field];
       const openaiValue = openaiResult?.[field];
 
-      if (geminiValue) {
-        suggestions[field] = geminiValue;
+      const normalizedGeminiValue =
+        field === 'description' ? stripSourceAnnotations(geminiValue) : geminiValue;
+      const normalizedOpenaiValue =
+        field === 'description' ? stripSourceAnnotations(openaiValue) : openaiValue;
+
+      if (normalizedGeminiValue) {
+        suggestions[field] = normalizedGeminiValue;
         metadata[field] = {
-          value: geminiValue,
+          value: normalizedGeminiValue,
           source: 'gemini',
-          confidence: calculateConfidence(geminiValue, true, !!openaiValue && openaiValue === geminiValue),
+          confidence: calculateConfidence(
+            normalizedGeminiValue,
+            true,
+            !!normalizedOpenaiValue && normalizedOpenaiValue === normalizedGeminiValue
+          ),
         };
-      } else if (openaiValue) {
-        suggestions[field] = openaiValue;
+      } else if (normalizedOpenaiValue) {
+        suggestions[field] = normalizedOpenaiValue;
         metadata[field] = {
-          value: openaiValue,
+          value: normalizedOpenaiValue,
           source: 'openai',
-          confidence: calculateConfidence(openaiValue, false, true),
+          confidence: calculateConfidence(normalizedOpenaiValue, false, true),
         };
       }
     });
@@ -489,7 +513,7 @@ BUSCA EN GOOGLE AHORA y devuelve SOLO el objeto JSON con información real encon
 
     const enrichedData: EnrichmentSuggestion = {
       name: suggestions.name || productData.name,
-      description: suggestions.description || undefined,
+      description: stripSourceAnnotations(suggestions.description) || undefined,
       category: suggestions.category || undefined,
       brand: suggestions.brand || undefined,
       ean: suggestions.ean || productData.ean || undefined,

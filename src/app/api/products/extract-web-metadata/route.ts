@@ -8,6 +8,57 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
+const MAX_PAGE_TEXT_LENGTH = 3000;
+
+const sanitizeHtmlToText = (html: string) => {
+  const withoutScripts = html
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<noscript[\s\S]*?<\/noscript>/gi, '');
+
+  const withLineBreaks = withoutScripts
+    .replace(/<br\s*\/?>(?=\s*<)/gi, '\n')
+    .replace(/<br\s*\/?>(?!\n)/gi, '\n')
+    .replace(/<\/p>/gi, '\n\n');
+
+  const plainText = withLineBreaks.replace(/<[^>]+>/g, ' ');
+
+  return plainText
+    .replace(/\u00a0/g, ' ')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+};
+
+const fetchPageText = async (url?: string) => {
+  if (!url) return { text: '', source: '' };
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; MurallaBot/1.0; +https://murallaorg.com)',
+      },
+    });
+
+    if (!response.ok) {
+      return { text: '', source: '' };
+    }
+
+    const html = await response.text();
+    const text = sanitizeHtmlToText(html);
+    if (!text) {
+      return { text: '', source: '' };
+    }
+
+    return {
+      text: text.length > MAX_PAGE_TEXT_LENGTH ? text.slice(0, MAX_PAGE_TEXT_LENGTH) : text,
+      source: url,
+    };
+  } catch (error) {
+    console.error('❌ Failed to fetch page content:', url, error);
+    return { text: '', source: '' };
+  }
+};
+
 // Flattened category list for AI prompt
 const CATEGORY_LIST = [
   // Barra - Café
@@ -44,6 +95,7 @@ interface ExtractRequest {
   productName: string;
   productEan?: string;
   productBrand?: string;
+  productUrl?: string;
   tenantId: string;
 }
 
@@ -57,7 +109,7 @@ interface SearchResult {
 export async function POST(request: NextRequest) {
   try {
     const body: ExtractRequest = await request.json();
-    const { productName, productEan, productBrand, tenantId } = body;
+    const { productName, productEan, productBrand, productUrl, tenantId } = body;
 
     const finalTenantId = request.headers.get('x-tenant-id') || tenantId;
 
@@ -137,6 +189,8 @@ export async function POST(request: NextRequest) {
 
     console.log(`📄 Total web results found: ${searchResults.length}`);
 
+    const { text: pageText, source: pageSource } = await fetchPageText(productUrl);
+
     // Use Gemini to synthesize the search results into structured product data
     const searchContext = searchResults
       .slice(0, 10) // Limit to top 10 results
@@ -154,6 +208,7 @@ URL: ${result.link}
 PRODUCTO: ${productName}
 ${productBrand ? `MARCA: ${productBrand}` : ''}
 ${productEan ? `EAN: ${productEan}` : ''}
+${pageText ? `\nCONTENIDO DEL SITIO OFICIAL (${pageSource || productUrl}):\n"""${pageText}"""` : ''}
 
 RESULTADOS DE BÚSQUEDA WEB:
 ${searchContext}
@@ -161,19 +216,21 @@ ${searchContext}
 INSTRUCCIONES:
 1. Analiza los resultados de búsqueda para extraer información REAL y VERIFICABLE
 2. Prioriza información de sitios oficiales y e-commerce conocidos (lider.cl, jumbo.cl, sitios de marca)
-3. Extrae y sintetiza la información en formato JSON
-4. Si encuentras precios, ignóralos (solo queremos metadata descriptiva)
-5. TODAS las respuestas en ESPAÑOL
+3. Si se proporcionó CONTENIDO DEL SITIO OFICIAL, DEBES copiar textualmente el párrafo más relevante sobre el producto sin resumir ni reformular. Respeta acentos, saltos de línea y tono original.
+4. Si no hay CONTENIDO DEL SITIO OFICIAL, sintetiza la información usando los snippets.
+5. Si encuentras precios, ignóralos (solo queremos metadata descriptiva)
+6. TODAS las respuestas en ESPAÑOL
 
 Devuelve SOLO un objeto JSON con esta estructura:
 
 {
   "name": "Nombre mejorado del producto basado en los resultados",
-  "description": "Descripción detallada sintetizada de los snippets (2-3 oraciones). Menciona la fuente si es sitio oficial.",
+  "description": "Si se proporcionó CONTENIDO DEL SITIO OFICIAL, copia literal del párrafo principal. De lo contrario, descripción detallada sintetizada (2-3 oraciones).",
   "category": "Mejor coincidencia de estas categorías: ${CATEGORY_LIST.join(', ')}",
   "brand": "Marca oficial extraída",
   "ean": "EAN si lo encuentras en los resultados",
   "type": "Uno de: ${PRODUCT_TYPES.join(', ')}",
+  "verbatimSource": "URL exacta del sitio citado o vacío",
   "sources": ["displayLink del sitio más relevante", "otro sitio relevante"],
   "confidence": "high si encontraste información de sitio oficial, medium si es de retailer, low si es genérica"
 }
@@ -194,11 +251,14 @@ Devuelve SOLO el JSON, sin explicaciones adicionales.`;
 
     console.log('✅ Web metadata extracted:', extractedData);
 
+    const sources = [pageSource, ...(extractedData.sources || [])].filter(Boolean);
+    const descriptionValue = extractedData.description;
+
     return NextResponse.json({
       success: true,
       suggestions: {
         name: extractedData.name,
-        description: extractedData.description,
+        description: descriptionValue,
         category: extractedData.category,
         brand: extractedData.brand,
         ean: extractedData.ean,
@@ -206,14 +266,19 @@ Devuelve SOLO el JSON, sin explicaciones adicionales.`;
       },
       metadata: {
         name: { value: extractedData.name, source: 'google_search', confidence: extractedData.confidence },
-        description: { value: extractedData.description, source: 'google_search', confidence: extractedData.confidence },
+        description: {
+          value: descriptionValue,
+          source: pageSource ? 'direct_site' : 'google_search',
+          confidence: extractedData.confidence,
+        },
         category: { value: extractedData.category, source: 'google_search', confidence: extractedData.confidence },
         brand: { value: extractedData.brand, source: 'google_search', confidence: extractedData.confidence },
         ean: { value: extractedData.ean, source: 'google_search', confidence: extractedData.confidence },
         type: { value: extractedData.type, source: 'google_search', confidence: extractedData.confidence },
       },
       enrichmentMethod: 'web_extraction',
-      sources: extractedData.sources || [],
+      sources,
+      pageSource: pageSource || extractedData.verbatimSource || null,
       searchResultsCount: searchResults.length,
       message: 'Metadata extracted from real web search results',
     });

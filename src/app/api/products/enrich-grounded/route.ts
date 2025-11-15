@@ -11,6 +11,20 @@ if (!process.env.GEMINI_API_KEY) {
   console.warn('⚠️ GEMINI_API_KEY is not set. Grounded enrichment will return 500 errors.');
 }
 
+function stripSourceAnnotations(text?: string | null): string | undefined {
+  if (!text) return text ?? undefined;
+
+  const cleaned = text
+    .replace(/\s*\(\s*(fuente|source)\s*:[^)]+\)/gi, '')
+    .replace(/\s*\[\s*(fuente|source)\s*:[^\]]+\]/gi, '')
+    .replace(/\s*(fuente|source)\s*:\s*https?:\S+/gi, '')
+    .replace(/\s*(fuente|source)\s*:\s*[^\.]+/gi, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+
+  return cleaned || undefined;
+}
+
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
 /**
@@ -162,12 +176,13 @@ ${sourceUrl ? `1. 🎯 PRIORIDAD MÁXIMA: Visita y usa la información de esta U
 4. Extrae información verificable y cita tus fuentes
 5. Si no encuentras información verificada, indícalo claramente
 6. TODAS las respuestas en ESPAÑOL
+7. No coloques textos como "(Fuente: ...)", URLs ni citas dentro de la descripción; esas irán en el panel de referencias
 
 INFORMACIÓN A EXTRAER:
 
 {
   "name": "Nombre oficial y completo del producto",
-  "description": "Descripción detallada (2-3 oraciones) con información REAL de la fuente oficial. Menciona si la info es oficial o genérica.",
+  "description": "Descripción detallada (2-3 oraciones) con información REAL de la fuente oficial. Menciona si la info es oficial o genérica, pero nunca incluyas '(Fuente: ...)' ni URLs en este texto.",
   "category": "Mejor coincidencia de estas categorías: ${CATEGORY_LIST.join(', ')}",
   "brand": "Nombre oficial de la marca",
   "ean": "Código EAN/barcode si lo encuentras",
@@ -225,11 +240,13 @@ BUSCA EN GOOGLE AHORA y devuelve el JSON con la información más precisa que en
       .filter((url: any) => url)
       .slice(0, 5);
 
+    const cleanedDescription = stripSourceAnnotations(groundedData.description);
+
     return NextResponse.json({
       success: true,
       suggestions: {
         name: groundedData.name,
-        description: groundedData.description,
+        description: cleanedDescription,
         category: groundedData.category,
         brand: groundedData.brand,
         ean: groundedData.ean,
@@ -237,7 +254,7 @@ BUSCA EN GOOGLE AHORA y devuelve el JSON con la información más precisa que en
       },
       metadata: {
         name: { value: groundedData.name, source: 'google_search', confidence: groundedData.confidence },
-        description: { value: groundedData.description, source: 'google_search', confidence: groundedData.confidence },
+        description: { value: cleanedDescription, source: 'google_search', confidence: groundedData.confidence },
         category: { value: groundedData.category, source: 'google_search', confidence: groundedData.confidence },
         brand: { value: groundedData.brand, source: 'google_search', confidence: groundedData.confidence },
         ean: { value: groundedData.ean, source: 'google_search', confidence: groundedData.confidence },

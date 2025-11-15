@@ -200,6 +200,19 @@ export default function ProductEnrichmentModal({
   const canUseWebSearch = productType === 'INPUT' || productType === 'READY_PRODUCT';
   const methodOrder: MethodKey[] = ['standard', 'web_extraction', 'grounded'];
 
+  // Aggregate all source URLs from all methods
+  const aggregatedSources = useMemo(() => {
+    const allSources: string[] = [];
+    methodOrder.forEach(method => {
+      const result = methodStates[method]?.result;
+      if (result?.grounding?.sourceUrls) {
+        allSources.push(...result.grounding.sourceUrls);
+      }
+    });
+    // Remove duplicates
+    return Array.from(new Set(allSources));
+  }, [methodStates]);
+
   const normalizeSuggestions = (data?: EnrichmentSuggestion | null): EnrichmentSuggestion | null => {
     if (!data) return data ?? null;
     const normalized = { ...data } as EnrichmentSuggestion;
@@ -965,17 +978,17 @@ export default function ProductEnrichmentModal({
 
           {suggestions && (
             <div className="space-y-6">
-              {/* Grounding Info */}
-              {groundingInfo && groundingInfo.sourceUrls && groundingInfo.sourceUrls.length > 0 && (
+              {/* Grounding Info - Show all aggregated sources from all methods */}
+              {aggregatedSources.length > 0 && (
                 <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                   <h4 className="font-medium text-green-900 mb-2">✓ Verified Sources</h4>
                   <ul className="text-sm text-green-700 space-y-1">
-                    {groundingInfo.sourceUrls.slice(0, 3).map((url: string, idx: number) => (
+                    {aggregatedSources.map((url: string, idx: number) => (
                       <li key={idx}>• {url}</li>
                     ))}
                   </ul>
                   <p className="text-xs text-green-600 mt-2">
-                    {groundingInfo.searchQueriesUsed?.length || 0} search queries used
+                    Sources from all enrichment methods
                   </p>
                 </div>
               )}

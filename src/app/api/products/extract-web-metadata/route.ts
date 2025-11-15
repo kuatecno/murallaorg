@@ -9,7 +9,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
 // Increased limit to capture more content for verbatim extraction
-const MAX_PAGE_TEXT_LENGTH = 8000;
+const MAX_PAGE_TEXT_LENGTH = 12000;
 
 const sanitizeHtmlToText = (html: string) => {
   const withoutScripts = html
@@ -240,13 +240,16 @@ INSTRUCCIONES CRÍTICAS:
 1. Analiza los resultados de búsqueda para extraer información REAL y VERIFICABLE
 2. Prioriza información de sitios oficiales y e-commerce conocidos (lider.cl, jumbo.cl, sitios de marca)
 
-⚠️ IMPORTANTE - EXTRACCIÓN VERBATIM (NO RESUMIR):
+⚠️ REGLA ABSOLUTA - EXTRACCIÓN VERBATIM (PRIORIDAD MÁXIMA):
 3. Si se proporcionó CONTENIDO COMPLETO DEL SITIO WEB arriba:
-   - DEBES copiar TEXTUALMENTE el párrafo o sección que describe el producto
-   - NO resumas, NO reformules, NO cambies palabras
-   - COPIA EXACTA: respeta acentos, tildes, puntuación, saltos de línea y tono original
-   - Incluye el texto completo de la descripción del producto tal como aparece
-   - La descripción debe ser una CITA DIRECTA del sitio web
+   - Busca el párrafo o sección principal que describe el producto (usualmente cerca del nombre del producto)
+   - COPIA EXACTAMENTE ese texto, palabra por palabra, sin cambiar NADA
+   - NO resumas, NO parafrasees, NO reformules, NO acortes
+   - NO cambies ni una sola palabra, acento, tilde, coma o punto
+   - Incluye TODO el texto descriptivo del producto tal como aparece en el sitio
+   - Si hay múltiples párrafos descriptivos, cópialos todos separados por saltos de línea
+   - La descripción debe ser una TRANSCRIPCIÓN LITERAL del sitio web
+   - Ejemplo: Si el sitio dice "Descubre una preparación típica italiana...", tu descripción debe comenzar EXACTAMENTE con "Descubre una preparación típica italiana..."
 
 4. Si NO hay CONTENIDO DEL SITIO WEB, sintetiza información usando los snippets de búsqueda
 5. Si encuentras precios, ignóralos (solo queremos metadata descriptiva)
@@ -256,7 +259,7 @@ Devuelve SOLO un objeto JSON con esta estructura:
 
 {
   "name": "Nombre mejorado del producto basado en los resultados",
-  "description": "COPIA TEXTUAL Y VERBATIM del párrafo del sitio web si está disponible, o síntesis de snippets si no lo está. NO RESUMIR contenido del sitio web.",
+  "description": "TRANSCRIPCIÓN LITERAL Y COMPLETA del texto descriptivo del producto del sitio web. Si hay contenido del sitio, DEBES copiar el texto EXACTO sin modificar. Si no hay contenido del sitio, sintetiza de los snippets.",
   "shortDescription": "Descripción corta y concisa del producto (máximo 80 caracteres). Debe capturar la esencia del producto en pocas palabras.",
   "category": "Mejor coincidencia de estas categorías: ${CATEGORY_LIST.join(', ')}",
   "brand": "Marca oficial extraída",
@@ -277,7 +280,7 @@ Devuelve SOLO el JSON, sin explicaciones adicionales.`;
     const model = genAI.getGenerativeModel({
       model: 'gemini-2.0-flash-exp',
       generationConfig: {
-        temperature: 0.2,
+        temperature: 0, // Zero temperature for exact verbatim extraction
         responseMimeType: 'application/json',
       },
     });

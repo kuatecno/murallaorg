@@ -135,12 +135,12 @@ const createInitialMethodStates = (): MethodStateMap => ({
 const METHOD_CONFIG: Record<MethodKey, { icon: string; title: string; subtitle: string; badge?: string }> = {
   standard: {
     icon: '🤖',
-    title: 'Standard API',
+    title: 'Gemini API',
     subtitle: 'Gemini + OpenAI + Google Images',
   },
   web_extraction: {
     icon: '📄',
-    title: 'Extract from Web',
+    title: 'Web Extraction',
     subtitle: 'Real Google results • FREE',
   },
   grounded: {
@@ -560,7 +560,7 @@ export default function ProductEnrichmentModal({
           <div>
             <p className="font-medium text-blue-900">Compare {title}</p>
             <p className="text-xs text-blue-800 mt-1">
-              Choose the {targetLabel} from Standard API, Extract from Web, or Premium Grounding.
+              Choose the {targetLabel} from Gemini API, Web Extraction, or Premium Grounding.
             </p>
           </div>
         </div>

@@ -411,6 +411,124 @@ export default function ProductEnrichmentModal({
     };
   };
 
+  const methodIsAvailable = (method: MethodKey) => method === 'standard' || canUseWebSearch;
+
+  const valuesAreEqual = (a: any, b: any) => {
+    if (Array.isArray(a) || Array.isArray(b)) {
+      return JSON.stringify(a ?? []) === JSON.stringify(b ?? []);
+    }
+    if (typeof a === 'object' || typeof b === 'object') {
+      return JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+    }
+    return a === b;
+  };
+
+  const formatFieldValue = (value: any) => {
+    if (Array.isArray(value)) {
+      return value.join(', ');
+    }
+    if (typeof value === 'object' && value !== null) {
+      return JSON.stringify(value, null, 2);
+    }
+    return String(value);
+  };
+
+  const applyMethodField = (field: keyof EnrichmentSuggestion, method: MethodKey) => {
+    const result = methodStates[method]?.result;
+    if (!result) return;
+    const newValue = result.suggestions?.[field];
+    if (newValue === undefined || newValue === null) return;
+
+    setSuggestions(prev => ({
+      ...(prev || {}),
+      [field]: newValue,
+    }));
+
+    setApprovals(prev => ({
+      ...prev,
+      [field]: true,
+    }));
+
+    const fieldMetadata = result.metadata?.[field];
+    if (fieldMetadata) {
+      setMetadata((prev: Record<string, any> | null) => ({
+        ...(prev || {}),
+        [field]: fieldMetadata,
+      }));
+    }
+
+    if (field === 'images' && Array.isArray(newValue) && newValue.length > 0) {
+      setSelectedImages([newValue[0]]);
+    }
+  };
+
+  const renderFieldComparisons = (
+    field: keyof EnrichmentSuggestion,
+    { title, buttonLabel }: { title: string; buttonLabel?: string }
+  ) => {
+    const entries = methodOrder
+      .filter(methodIsAvailable)
+      .map(method => {
+        const result = methodStates[method]?.result;
+        if (!result) return null;
+        const value = result.suggestions?.[field];
+        if (value === undefined || value === null || value === '') return null;
+        return { method, value };
+      })
+      .filter((entry): entry is { method: MethodKey; value: any } => entry !== null);
+
+    if (entries.length <= 1) return null;
+
+    const targetLabel = buttonLabel || title.toLowerCase();
+
+    return (
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="font-medium text-blue-900">Compare {title}</p>
+            <p className="text-xs text-blue-800 mt-1">
+              Choose the {targetLabel} from Standard API, Extract from Web, or Premium Grounding.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {entries.map(entry => {
+            const config = METHOD_CONFIG[entry.method];
+            const isActiveValue = valuesAreEqual(suggestions?.[field], entry.value);
+            return (
+              <div
+                key={`${field}-${entry.method}`}
+                className={`border border-blue-200 rounded-lg p-3 bg-white space-y-2 ${
+                  isActiveValue ? 'ring-1 ring-green-300' : ''
+                }`}
+              >
+                <p className="text-xs font-semibold text-blue-900 flex items-center space-x-1">
+                  <span>{config.icon}</span>
+                  <span>{config.title}</span>
+                </p>
+                <p className="text-sm text-gray-800 whitespace-pre-line max-h-40 overflow-auto">
+                  {formatFieldValue(entry.value)}
+                </p>
+                <button
+                  onClick={() => applyMethodField(field, entry.method)}
+                  disabled={isActiveValue}
+                  className={`mt-2 px-3 py-1.5 rounded-lg text-xs font-medium ${
+                    isActiveValue
+                      ? 'bg-green-100 text-green-700 cursor-default'
+                      : 'bg-blue-600 hover:bg-blue-700 text-white'
+                  }`}
+                >
+                  {isActiveValue ? `Using this ${targetLabel}` : `Use this ${targetLabel}`}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
   const fetchRewrites = async () => {
     setRewriteLoading(true);
     setError(null);
@@ -876,6 +994,7 @@ export default function ProductEnrichmentModal({
                   metadata={metadata?.name}
                 />
               )}
+              {renderFieldComparisons('name', { title: 'Product Name' })}
 
               {/* Description */}
               {suggestions.description && (
@@ -889,52 +1008,7 @@ export default function ProductEnrichmentModal({
                   multiline
                 />
               )}
-
-              {/* Side-by-side descriptions by enrichment method */}
-              {(() => {
-                const descriptionEntries = methodOrder
-                  .filter(method => (method === 'standard' ? true : canUseWebSearch))
-                  .map(method => ({
-                    method,
-                    description: methodStates[method]?.result?.suggestions?.description,
-                  }))
-                  .filter(entry => !!entry.description);
-
-                if (descriptionEntries.length <= 1) return null;
-
-                return (
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium text-blue-900">Compare descriptions by method</p>
-                        <p className="text-xs text-blue-800 mt-1">
-                          Choose the description you like best from Standard API, Web Extraction, or Premium Grounding.
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                      {descriptionEntries.map(entry => (
-                        <div key={entry.method} className="border border-blue-200 rounded-lg p-3 bg-white space-y-2">
-                          <p className="text-xs font-semibold text-blue-900 flex items-center space-x-1">
-                            <span>{METHOD_CONFIG[entry.method].icon}</span>
-                            <span>{METHOD_CONFIG[entry.method].title}</span>
-                          </p>
-                          <p className="text-sm text-gray-800 whitespace-pre-line max-h-40 overflow-auto">
-                            {entry.description}
-                          </p>
-                          <button
-                            onClick={() => applyMethodDescription(entry.method)}
-                            className="mt-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded-lg font-medium"
-                          >
-                            Use this description
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })()}
+              {renderFieldComparisons('description', { title: 'Description' })}
 
               {/* Description rewrites for non-web-search types */}
               {!canUseWebSearch && (
@@ -1016,6 +1090,7 @@ export default function ProductEnrichmentModal({
                   metadata={metadata?.brand}
                 />
               )}
+              {renderFieldComparisons('brand', { title: 'Brand' })}
 
               {/* Category */}
               {suggestions.category && (
@@ -1028,6 +1103,7 @@ export default function ProductEnrichmentModal({
                   metadata={metadata?.category}
                 />
               )}
+              {renderFieldComparisons('category', { title: 'Category' })}
 
               {/* Format */}
               {suggestions.format && (
@@ -1040,6 +1116,7 @@ export default function ProductEnrichmentModal({
                   metadata={metadata?.format}
                 />
               )}
+              {renderFieldComparisons('format', { title: 'Format' })}
 
               {/* Product Type */}
               {suggestions.type && (
@@ -1052,6 +1129,7 @@ export default function ProductEnrichmentModal({
                   metadata={metadata?.type}
                 />
               )}
+              {renderFieldComparisons('type', { title: 'Product Type' })}
 
               {/* EAN */}
               {suggestions.ean && (
@@ -1064,7 +1142,20 @@ export default function ProductEnrichmentModal({
                   metadata={metadata?.ean}
                 />
               )}
+              {renderFieldComparisons('ean', { title: 'EAN/Barcode' })}
 
+              {/* Tags */}
+              {suggestions.tags && suggestions.tags.length > 0 && (
+                <FieldSuggestion
+                  label="Tags"
+                  currentValue={currentData?.tags?.join(', ')}
+                  suggestedValue={suggestions.tags.join(', ')}
+                  approved={approvals.tags}
+                  onToggle={() => toggleApproval('tags')}
+                  metadata={metadata?.tags}
+                />
+              )}
+              {renderFieldComparisons('tags', { title: 'Tags' })}
 
               {/* Images */}
               {suggestions.images && suggestions.images.length > 0 && (

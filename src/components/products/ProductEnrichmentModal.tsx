@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { X, Check, Loader2, Sparkles, AlertCircle } from 'lucide-react';
+import { normalizeCategoryValue } from '@/lib/enrichment/category-utils';
 
 const FALLBACK_IMAGE =
   'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="300" height="200" viewBox="0 0 300 200"><rect width="300" height="200" fill="%23f3f4f6"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="Arial" font-size="16" fill="%236b7280">Imagen no disponible</text></svg>';
@@ -183,6 +184,18 @@ export default function ProductEnrichmentModal({
   const canUseWebSearch = productType === 'INPUT' || productType === 'READY_PRODUCT';
   const methodOrder: MethodKey[] = ['standard', 'web_extraction', 'grounded'];
 
+  const normalizeSuggestions = (data?: EnrichmentSuggestion | null): EnrichmentSuggestion | null => {
+    if (!data) return data ?? null;
+    const normalized = { ...data } as EnrichmentSuggestion;
+    const normalizedCategory = normalizeCategoryValue(normalized.category);
+    if (normalizedCategory) {
+      normalized.category = normalizedCategory;
+    } else {
+      delete normalized.category;
+    }
+    return normalized;
+  };
+
   const getUserContext = () => {
     const userData = localStorage.getItem('user');
     if (!userData) throw new Error('User not authenticated');
@@ -191,7 +204,8 @@ export default function ProductEnrichmentModal({
 
   const applyMethodResultToView = (method: MethodKey, result: MethodResult) => {
     setEnrichmentMethod(method);
-    setSuggestions(result.suggestions);
+    const normalizedSuggestions = normalizeSuggestions(result.suggestions);
+    setSuggestions(normalizedSuggestions);
     setMetadata(result.metadata ?? null);
     setImageSources(result.sources ?? null);
     setGroundingInfo(result.grounding ?? null);
@@ -201,15 +215,15 @@ export default function ProductEnrichmentModal({
     }
 
     const nextApprovals: FieldApproval = {};
-    Object.keys(result.suggestions || {}).forEach(key => {
-      if (key !== 'images' && result.suggestions[key as keyof EnrichmentSuggestion]) {
+    Object.keys(normalizedSuggestions || {}).forEach(key => {
+      if (key !== 'images' && normalizedSuggestions?.[key as keyof EnrichmentSuggestion]) {
         nextApprovals[key] = true;
       }
     });
     setApprovals(nextApprovals);
 
-    if (result.suggestions.images && result.suggestions.images.length > 0) {
-      setSelectedImages([result.suggestions.images[0]]);
+    if (normalizedSuggestions?.images && normalizedSuggestions.images.length > 0) {
+      setSelectedImages([normalizedSuggestions.images[0]]);
     } else {
       setSelectedImages([]);
     }
@@ -436,7 +450,9 @@ export default function ProductEnrichmentModal({
   const applyMethodField = (field: keyof EnrichmentSuggestion, method: MethodKey) => {
     const result = methodStates[method]?.result;
     if (!result) return;
-    const newValue = result.suggestions?.[field];
+    const rawValue = result.suggestions?.[field];
+    const newValue =
+      field === 'category' ? normalizeCategoryValue(rawValue as string | undefined) : rawValue;
     if (newValue === undefined || newValue === null) return;
 
     setSuggestions(prev => ({
@@ -453,7 +469,7 @@ export default function ProductEnrichmentModal({
     if (fieldMetadata) {
       setMetadata((prev: Record<string, any> | null) => ({
         ...(prev || {}),
-        [field]: fieldMetadata,
+        [field]: field === 'category' ? { ...fieldMetadata, value: newValue } : fieldMetadata,
       }));
     }
 

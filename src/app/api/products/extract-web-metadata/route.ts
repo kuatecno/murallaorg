@@ -4,9 +4,11 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import OpenAI from 'openai';
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
 // Increased limit to capture more content for verbatim extraction
 const MAX_PAGE_TEXT_LENGTH = 12000;
@@ -277,16 +279,23 @@ Devuelve SOLO un objeto JSON con esta estructura:
 
 Devuelve SOLO el JSON, sin explicaciones adicionales.`;
 
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-2.0-flash-exp',
-      generationConfig: {
-        temperature: 0, // Zero temperature for exact verbatim extraction
-        responseMimeType: 'application/json',
-      },
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o-2024-11-20',
+      messages: [
+        {
+          role: 'system',
+          content: 'Eres un experto en extracción de datos de productos. Sigues instrucciones al pie de la letra, especialmente para copiar texto verbatim sin modificaciones.',
+        },
+        {
+          role: 'user',
+          content: prompt,
+        },
+      ],
+      temperature: 0, // Zero temperature for exact verbatim extraction
+      response_format: { type: 'json_object' },
     });
 
-    const result = await model.generateContent(prompt);
-    const responseText = result.response.text();
+    const responseText = completion.choices[0].message.content || '{}';
     const extractedData = JSON.parse(responseText);
 
     console.log('✅ Web metadata extracted:', extractedData);

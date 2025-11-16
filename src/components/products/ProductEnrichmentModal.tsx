@@ -537,8 +537,57 @@ export default function ProductEnrichmentModal({
     // Check if all values are equal
     const allEqual = entries.every(entry => valuesAreEqual(entry.value, entries[0].value));
 
-    // If all three methods have the same value, hide the comparison entirely
-    if (allEqual) return null;
+    // If all three methods have the same value, show a single combined card
+    if (allEqual) {
+      const targetLabel = buttonLabel || title.toLowerCase();
+      const value = entries[0].value;
+      const isActiveValue = valuesAreEqual(suggestions?.[field], value);
+
+      return (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-medium text-blue-900">Compare {title}</p>
+              <p className="text-xs text-blue-800 mt-1">
+                All methods agree on the {targetLabel}.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3">
+            <div
+              className={`border rounded-lg p-3 bg-white space-y-2 ${
+                'border-purple-400 ring-2 ring-purple-200 bg-purple-50'
+              } ${
+                isActiveValue ? 'ring-1 ring-green-300' : ''
+              }`}
+            >
+              <p className="text-xs font-semibold flex items-center space-x-1 text-purple-900">
+                <span>🤖📄⚡</span>
+                <span>Gemini API + Web Extraction + Premium Grounding</span>
+              </p>
+              <p className="text-xs text-purple-700 font-medium">
+                ✨ All methods agree
+              </p>
+              <p className="text-sm text-gray-800 whitespace-pre-line max-h-40 overflow-auto">
+                {formatFieldValue(value, field)}
+              </p>
+              <button
+                onClick={() => applyMethodField(field, entries[0].method)}
+                disabled={isActiveValue}
+                className={`mt-2 px-3 py-1.5 rounded-lg text-xs font-medium ${
+                  isActiveValue
+                    ? 'bg-green-100 text-green-700 cursor-default'
+                    : 'bg-purple-600 hover:bg-purple-700 text-white'
+                }`}
+              >
+                {isActiveValue ? `Using this ${targetLabel}` : `Use this ${targetLabel}`}
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
 
     const targetLabel = buttonLabel || title.toLowerCase();
 

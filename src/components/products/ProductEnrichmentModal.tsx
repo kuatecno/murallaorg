@@ -67,6 +67,7 @@ const sanitizeImageUrls = (urls?: string[]): string[] => {
 interface EnrichmentSuggestion {
   name?: string;
   description?: string;
+  shortDescription?: string;
   category?: string;
   brand?: string;
   ean?: string;
@@ -1019,6 +1020,22 @@ export default function ProductEnrichmentModal({
                 />
               )}
               {renderFieldComparisons('description', { title: 'Description' })}
+
+              {/* Short Description */}
+              {suggestions.shortDescription && (
+                <FieldSuggestion
+                  label="Descripción Corta"
+                  currentValue={currentData?.shortDescription}
+                  suggestedValue={suggestions.shortDescription}
+                  approved={approvals.shortDescription}
+                  onToggle={() => toggleApproval('shortDescription')}
+                  metadata={metadata?.shortDescription}
+                />
+              )}
+              {renderFieldComparisons('shortDescription', {
+                title: 'Short Description',
+                buttonLabel: 'short description',
+              })}
 
               {/* Description rewrites for non-web-search types */}
               {!canUseWebSearch && (

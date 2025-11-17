@@ -4,17 +4,16 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
+import { authenticate } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { getGoogleChatService } from '@/lib/googleChatService';
 import { getGoogleTasksSyncService } from '@/lib/googleTasksSyncService';
-import { authOptions } from '@/lib/auth';
 
 // GET /api/tasks - List tasks for current tenant
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.tenantId) {
+    const auth = await authenticate(request);
+    if (!auth.success || !auth.tenantId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -27,24 +26,17 @@ export async function GET(request: NextRequest) {
     const skip = (page - 1) * limit;
 
     const where: any = {
-      tenantId: session.user.tenantId,
-    };
-
-    if (status) {
-      where.status = status;
-    }
-
-    if (priority) {
-      where.priority = priority;
-    }
-
-    if (assignedTo) {
-      where.assignments = {
-        some: {
-          staffId: assignedTo,
+      tenantId: auth.tenantId,
+      ...(assignedTo && {
+        assignments: {
+          some: {
+            staffId: assignedTo,
+          },
         },
-      };
-    }
+      }),
+      ...(status && { status }),
+      ...(priority && { priority }),
+    };
 
     const [tasks, total] = await Promise.all([
       prisma.task.findMany({
@@ -124,42 +116,30 @@ export async function GET(request: NextRequest) {
 // POST /api/tasks - Create new task
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.tenantId || !session.user.id) {
+    const auth = await authenticate(request);
+    if (!auth.success || !auth.tenantId || !auth.userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const body = await request.json();
-    const {
-      title,
-      description,
-      priority = 'MEDIUM',
-      dueDate,
-      assignedStaff = [],
-      createChatSpace = false,
-    } = body;
+    const { title, description, priority, dueDate, assignedStaff, createGoogleChatSpace } = body;
 
-    if (!title?.trim()) {
-      return NextResponse.json(
-        { error: 'Title is required' },
-        { status: 400 }
-      );
+    // Validate required fields
+    if (!title) {
+      return NextResponse.json({ error: 'Title is required' }, { status: 400 });
     }
 
-    // Validate assigned staff
-    if (assignedStaff.length > 0) {
+    // Validate assigned staff if provided
+    if (assignedStaff && Array.isArray(assignedStaff)) {
       const staffCount = await prisma.staff.count({
         where: {
           id: { in: assignedStaff },
-          tenantId: session.user.tenantId,
+          tenantId: auth.tenantId,
         },
       });
 
       if (staffCount !== assignedStaff.length) {
-        return NextResponse.json(
-          { error: 'One or more assigned staff members not found' },
-          { status: 400 }
-        );
+        return NextResponse.json({ error: 'Invalid staff assignments' }, { status: 400 });
       }
     }
 
@@ -168,42 +148,32 @@ export async function POST(request: NextRequest) {
       description: description?.trim() || null,
       priority,
       dueDate: dueDate ? new Date(dueDate) : null,
-      tenantId: session.user.tenantId,
-      createdById: session.user.id,
+      tenantId: auth.tenantId,
+      createdById: auth.userId,
     };
 
     let googleChatSpaceId = null;
     let googleChatMessageId = null;
 
     // Create Google Chat space if requested
-    if (createChatSpace) {
+    if (createGoogleChatSpace) {
       try {
         const googleChatService = getGoogleChatService();
         
-        // Get assigned staff emails for Google Chat
-        const assignedStaffData = await prisma.staff.findMany({
-          where: {
-            id: { in: assignedStaff },
-            tenantId: session.user.tenantId,
-          },
-          select: { email: true },
-        });
-
         const taskNotificationData = {
-          taskId: '', // Will be set after task creation
-          title: taskData.title,
-          description: taskData.description,
+          taskId: 'temp', // Will be updated after task creation
+          title: title.trim(),
+          description: description?.trim() || null,
           status: 'TODO',
-          priority: taskData.priority,
-          dueDate: taskData.dueDate?.toISOString(),
-          createdBy: `${session.user.firstName} ${session.user.lastName}`,
-          assignedTo: assignedStaffData.map(s => s.email),
+          priority,
+          dueDate: dueDate ? new Date(dueDate).toISOString() : null,
+          createdBy: auth.userId, // Will be updated with actual name after creation
         };
 
         googleChatSpaceId = await googleChatService.createTaskSpace(taskNotificationData);
       } catch (chatError) {
         console.error('Failed to create Google Chat space:', chatError);
-        // Continue with task creation even if chat space fails
+        // Continue even if Chat creation fails
       }
     }
 
@@ -213,11 +183,11 @@ export async function POST(request: NextRequest) {
         ...taskData,
         googleChatSpaceId,
         googleChatMessageId,
-        assignments: assignedStaff.length > 0
+        assignments: assignedStaff && assignedStaff.length > 0
           ? {
               create: assignedStaff.map((staffId: string) => ({
                 staffId,
-                assignedBy: session.user.id,
+                assignedBy: auth.userId,
               })),
             }
           : undefined,
@@ -253,7 +223,7 @@ export async function POST(request: NextRequest) {
         const assignedStaffData = await prisma.staff.findMany({
           where: {
             id: { in: assignedStaff },
-            tenantId: session.user.tenantId,
+            tenantId: auth.tenantId,
           },
           select: { email: true },
         });
@@ -265,7 +235,7 @@ export async function POST(request: NextRequest) {
           status: task.status,
           priority: task.priority,
           dueDate: task.dueDate?.toISOString(),
-          createdBy: `${session.user.firstName} ${session.user.lastName}`,
+          createdBy: `${task.createdBy.firstName} ${task.createdBy.lastName}`,
           assignedTo: assignedStaffData.map(s => s.email),
         };
 

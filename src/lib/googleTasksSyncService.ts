@@ -97,7 +97,7 @@ class GoogleTasksSyncService {
       return googleTaskId;
     } catch (error) {
       console.error('Error creating Google Task:', error);
-      await this.markTaskSyncError(taskId, error.message);
+      await this.markTaskSyncError(taskId, (error as Error).message);
       return null;
     }
   }
@@ -147,7 +147,7 @@ class GoogleTasksSyncService {
       return true;
     } catch (error) {
       console.error('Error updating Google Task:', error);
-      await this.markTaskSyncError(taskId, error.message);
+      await this.markTaskSyncError(taskId, (error as Error).message);
       return false;
     }
   }
@@ -204,7 +204,7 @@ class GoogleTasksSyncService {
       return true;
     } catch (error) {
       console.error('Error syncing from Google Tasks:', error);
-      await this.markTaskSyncError(taskId, error.message);
+      await this.markTaskSyncError(taskId, (error as Error).message);
       return false;
     }
   }
@@ -346,7 +346,7 @@ class GoogleTasksSyncService {
     notes += `Status: ${task.status}\n`;
 
     if (task.assignments && task.assignments.length > 0) {
-      notes += `Assigned to: ${task.assignments.map(a => `${a.staff.firstName} ${a.staff.lastName}`).join(', ')}\n`;
+      notes += `Assigned to: ${task.assignments.map((a: any) => `${a.staff.firstName} ${a.staff.lastName}`).join(', ')}\n`;
     }
 
     notes += `\n---\nSynced from Muralla Task Management`;
@@ -432,4 +432,5 @@ export function getGoogleTasksSyncService(): GoogleTasksSyncService {
   return googleTasksSyncServiceInstance;
 }
 
-export { GoogleTasksSyncService, SyncConflict };
+export { GoogleTasksSyncService };
+export type { SyncConflict };

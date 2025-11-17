@@ -4,26 +4,26 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
+import { authenticate } from '@/lib/auth';
 import prisma from '@/lib/prisma';
-import { authOptions } from '@/lib/auth';
 
 // GET /api/tasks/[id]/comments - Get task comments
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.tenantId) {
+    const { id } = await params;
+    const auth = await authenticate(request);
+    if (!auth.success || !auth.tenantId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     // Verify task exists and belongs to tenant
     const task = await prisma.task.findFirst({
       where: {
-        id: params.id,
-        tenantId: session.user.tenantId,
+        id: id,
+        tenantId: auth.tenantId,
       },
       select: { id: true },
     });
@@ -34,7 +34,7 @@ export async function GET(
 
     const comments = await prisma.taskComment.findMany({
       where: {
-        taskId: params.id,
+        taskId: id,
       },
       include: {
         staff: {
@@ -64,11 +64,12 @@ export async function GET(
 // POST /api/tasks/[id]/comments - Create task comment
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.tenantId || !session.user.id) {
+    const { id } = await params;
+    const auth = await authenticate(request);
+    if (!auth.success || !auth.tenantId || !auth.userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -85,8 +86,8 @@ export async function POST(
     // Verify task exists and belongs to tenant
     const task = await prisma.task.findFirst({
       where: {
-        id: params.id,
-        tenantId: session.user.tenantId,
+        id: id,
+        tenantId: auth.tenantId,
       },
       select: { id: true },
     });
@@ -97,8 +98,8 @@ export async function POST(
 
     const comment = await prisma.taskComment.create({
       data: {
-        taskId: params.id,
-        staffId: session.user.id,
+        taskId: id,
+        staffId: auth.userId,
         content: content.trim(),
       },
       include: {

@@ -4,15 +4,15 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
+import { authenticate } from '@/lib/auth';
+import prisma from '@/lib/prisma';
 import { getGoogleTasksSyncService } from '@/lib/googleTasksSyncService';
-import { authOptions } from '@/lib/auth';
 
 // POST /api/tasks/sync - Manual sync for all pending tasks
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.tenantId) {
+    const auth = await authenticate(request);
+    if (!auth.success || !auth.tenantId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -66,8 +66,8 @@ export async function POST(request: NextRequest) {
 // GET /api/tasks/sync/status - Get sync status for tasks
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.tenantId) {
+    const auth = await authenticate(request);
+    if (!auth.success || !auth.tenantId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -79,7 +79,7 @@ export async function GET(request: NextRequest) {
       const task = await prisma.task.findFirst({
         where: {
           id: taskId,
-          tenantId: session.user.tenantId,
+          tenantId: auth.tenantId,
         },
         select: {
           id: true,
@@ -101,14 +101,14 @@ export async function GET(request: NextRequest) {
       const syncSummary = await prisma.task.groupBy({
         by: ['syncStatus'],
         where: {
-          tenantId: session.user.tenantId,
+          tenantId: auth.tenantId,
         },
         _count: {
           syncStatus: true,
         },
       });
 
-      const summary = syncSummary.reduce((acc, item) => {
+      const summary = syncSummary.reduce((acc: Record<string, number>, item: any) => {
         acc[item.syncStatus] = item._count.syncStatus;
         return acc;
       }, {} as Record<string, number>);

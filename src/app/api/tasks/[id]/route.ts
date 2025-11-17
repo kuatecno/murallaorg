@@ -4,27 +4,27 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
+import { authenticate } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { getGoogleChatService } from '@/lib/googleChatService';
 import { getGoogleTasksSyncService } from '@/lib/googleTasksSyncService';
-import { authOptions } from '@/lib/auth';
 
 // GET /api/tasks/[id] - Get specific task
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.tenantId) {
+    const { id } = await params;
+    const auth = await authenticate(request);
+    if (!auth.success || !auth.tenantId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const task = await prisma.task.findFirst({
       where: {
-        id: params.id,
-        tenantId: session.user.tenantId,
+        id: id,
+        tenantId: auth.tenantId,
       },
       include: {
         createdBy: {
@@ -82,11 +82,12 @@ export async function GET(
 // PUT /api/tasks/[id] - Update task
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.tenantId || !session.user.id) {
+    const { id } = await params;
+    const auth = await authenticate(request);
+    if (!auth.success || !auth.tenantId || !auth.userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -103,8 +104,8 @@ export async function PUT(
     // Check if task exists and belongs to tenant
     const existingTask = await prisma.task.findFirst({
       where: {
-        id: params.id,
-        tenantId: session.user.tenantId,
+        id: id,
+        tenantId: auth.tenantId,
       },
       include: {
         assignments: true,
@@ -120,7 +121,7 @@ export async function PUT(
       const staffCount = await prisma.staff.count({
         where: {
           id: { in: assignedStaff },
-          tenantId: session.user.tenantId,
+          tenantId: auth.tenantId,
         },
       });
 
@@ -193,7 +194,7 @@ export async function PUT(
         const assignedStaffData = await prisma.staff.findMany({
           where: {
             id: { in: assignedStaff },
-            tenantId: session.user.tenantId,
+            tenantId: auth.tenantId,
           },
           select: { email: true },
         });
@@ -265,19 +266,20 @@ export async function PUT(
 // DELETE /api/tasks/[id] - Delete task
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.tenantId) {
+    const { id } = await params;
+    const auth = await authenticate(request);
+    if (!auth.success || !auth.tenantId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     // Check if task exists and belongs to tenant
     const existingTask = await prisma.task.findFirst({
       where: {
-        id: params.id,
-        tenantId: session.user.tenantId,
+        id: id,
+        tenantId: auth.tenantId,
       },
       select: {
         id: true,
@@ -313,7 +315,7 @@ export async function DELETE(
 
     // Delete task (cascades will delete assignments and comments)
     await prisma.task.delete({
-      where: { id: params.id },
+      where: { id: id },
     });
 
     return NextResponse.json({ message: 'Task deleted successfully' });

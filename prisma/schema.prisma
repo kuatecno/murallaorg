@@ -62,6 +62,11 @@ model Staff {
   payrollRuns PayrollRun[]
   ptoRequests PTORequest[]
 
+  // Task Management Relations
+  tasksCreated      Task[]               @relation("TaskCreatedBy")
+  taskAssignments   TaskAssignment[]     @relation("StaffTaskAssignments")
+  taskComments      TaskComment[]        @relation("StaffTaskComments")
+
   @@index([tenantId])
   @@map("staff")
 }
@@ -983,6 +988,7 @@ model Tenant {
   transactions   Transaction[]
   taxDocuments   TaxDocument[]
   movements      ProductMovement[]
+  tasks          Task[]
   purchaseOrders PurchaseOrder[]
   inventory      InventoryRecord[]
 
@@ -1045,6 +1051,27 @@ enum StaffRole {
   EMPLOYEE
   CONTRACTOR
   INTERN
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  IN_REVIEW
+  COMPLETED
+  CANCELLED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum AssignmentRole {
+  ASSIGNEE
+  REVIEWER
+  OBSERVER
 }
 
 // ContactType enum removed - now using ContactTypeConfig for flexible contact types
@@ -1296,6 +1323,72 @@ model PTORequest {
   @@index([tenantId, staffId])
   @@index([status])
   @@map("pto_requests")
+}
+
+// ==========================================
+// PLANNING & TASK MANAGEMENT
+// ==========================================
+
+model Task {
+  id          String     @id @default(cuid())
+  title       String
+  description String?
+  status      TaskStatus @default(TODO)
+  priority    Priority   @default(MEDIUM)
+  dueDate     DateTime?
+  completedAt DateTime?
+  googleChatSpaceId String? // Google Chat space ID for this task
+  googleChatMessageId String? // Google Chat message ID for this task
+  tenantId    String
+  createdById String
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  // Relations
+  tenant      Tenant @relation(fields: [tenantId], references: [id])
+  createdBy   Staff  @relation("TaskCreatedBy", fields: [createdById], references: [id])
+  assignments TaskAssignment[]
+  comments    TaskComment[]
+
+  @@index([tenantId])
+  @@index([status])
+  @@index([dueDate])
+  @@index([createdById])
+  @@map("tasks")
+}
+
+model TaskAssignment {
+  id     String @id @default(cuid())
+  taskId String
+  staffId String
+  role   AssignmentRole @default(ASSIGNEE)
+  assignedAt DateTime @default(now())
+  assignedBy String // Staff ID who made the assignment
+
+  // Relations
+  task   Task  @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  staff  Staff @relation("StaffTaskAssignments", fields: [staffId], references: [id])
+
+  @@unique([taskId, staffId])
+  @@index([staffId])
+  @@map("task_assignments")
+}
+
+model TaskComment {
+  id        String   @id @default(cuid())
+  taskId    String
+  staffId   String
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  task  Task  @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  staff Staff @relation("StaffTaskComments", fields: [staffId], references: [id])
+
+  @@index([taskId])
+  @@index([staffId])
+  @@map("task_comments")
 }
 
 // ==========================================

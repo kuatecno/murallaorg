@@ -150,14 +150,14 @@ export async function PUT(
 
     // Update task
     const task = await prisma.task.update({
-      where: { id: params.id },
+      where: { id: id },
       data: {
         ...updateData,
         assignments: {
           deleteMany: {}, // Remove all existing assignments
           create: assignedStaff.map((staffId: string) => ({
             staffId,
-            assignedBy: session.user.id,
+            assignedBy: auth.userId,
           })),
         },
       },
@@ -202,7 +202,7 @@ export async function PUT(
         const taskNotificationData = {
           taskId: task.id,
           title: task.title,
-          description: task.description,
+          description: task.description || undefined,
           status: task.status,
           priority: task.priority,
           dueDate: task.dueDate?.toISOString(),

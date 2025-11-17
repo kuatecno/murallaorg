@@ -249,4 +249,5 @@ export function getGoogleChatService(): GoogleChatService {
   return googleChatServiceInstance;
 }
 
-export { GoogleChatService, TaskNotificationData };
+export { GoogleChatService };
+export type { TaskNotificationData };

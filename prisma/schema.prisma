@@ -1,90 +1,69 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
   provider  = "postgresql"
-  url       = env("POSTGRES_PRISMA_URL") // Pooled connection for queries
-  directUrl = env("POSTGRES_URL_NON_POOLING") // Direct connection for migrations
+  url       = env("POSTGRES_PRISMA_URL")
+  directUrl = env("POSTGRES_URL_NON_POOLING")
 }
 
-// ==========================================
-// CORE ENTITIES
-// ==========================================
-
 model Staff {
-  id         String    @id @default(cuid())
-  email      String    @unique
-  username   String?   @unique
-  password   String
-  firstName  String
-  lastName   String
-  role       StaffRole @default(EMPLOYEE)
-  department String?
-  position   String?
-  phone      String?
-  rut        String? // Chilean RUT for tax purposes
-  isActive   Boolean   @default(true)
-  hireDate   DateTime?
-  metadata   Json      @default("{}")
-  tenantId   String
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-
-  // Salary & Payroll fields
-  salary            Decimal?   @db.Decimal(12, 2)
-  salaryType        SalaryType @default(MONTHLY)
-  hourlyRate        Decimal?   @db.Decimal(10, 2)
-  vacationDaysTotal Int        @default(15)
-  vacationDaysUsed  Int        @default(0)
-
-  // Relations
-  tenant Tenant @relation(fields: [tenantId], references: [id])
-
-  // M:M Relationships
-  contactRelations  StaffContact[]    // Unified contact relations
-  productsOwned     StaffProduct[]    @relation("StaffOwnsProduct")
-  productReceived   ProductMovement[] @relation("ReceivedByStaff")
-  productDelivered  ProductMovement[] @relation("DeliveredByStaff")
-  transactions      Transaction[]     @relation("TransactionCreatedBy")
+  id                String                  @id @default(cuid())
+  email             String                  @unique
+  username          String?                 @unique
+  password          String
+  firstName         String
+  lastName          String
+  role              StaffRole               @default(EMPLOYEE)
+  department        String?
+  position          String?
+  phone             String?
+  rut               String?
+  isActive          Boolean                 @default(true)
+  hireDate          DateTime?
+  metadata          Json                    @default("{}")
+  tenantId          String
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
+  salary            Decimal?                @db.Decimal(12, 2)
+  salaryType        SalaryType              @default(MONTHLY)
+  hourlyRate        Decimal?                @db.Decimal(10, 2)
+  vacationDaysTotal Int                     @default(15)
+  vacationDaysUsed  Int                     @default(0)
+  attendances       Attendance[]
   auditLogs         AuditLog[]
-
-  // Expense Management Relations
-  expenses       Expense[]
-  reimbursements EmployeeReimbursement[]
-
-  // Staff Management & Attendance Relations
-  shifts      Shift[]
-  attendances Attendance[]
-  payrollRuns PayrollRun[]
-  ptoRequests PTORequest[]
-
-  // Task Management Relations
-  tasksCreated      Task[]               @relation("TaskCreatedBy")
-  taskAssignments   TaskAssignment[]     @relation("StaffTaskAssignments")
-  taskComments      TaskComment[]        @relation("StaffTaskComments")
+  reimbursements    EmployeeReimbursement[]
+  expenses          Expense[]
+  payrollRuns       PayrollRun[]
+  productDelivered  ProductMovement[]       @relation("DeliveredByStaff")
+  productReceived   ProductMovement[]       @relation("ReceivedByStaff")
+  ptoRequests       PTORequest[]
+  shifts            Shift[]
+  tenant            Tenant                  @relation(fields: [tenantId], references: [id])
+  contactRelations  StaffContact[]
+  productsOwned     StaffProduct[]          @relation("StaffOwnsProduct")
+  taskAssignments   TaskAssignment[]        @relation("StaffTaskAssignments")
+  taskComments      TaskComment[]           @relation("StaffTaskComments")
+  tasksCreated      Task[]                  @relation("TaskCreatedBy")
+  transactions      Transaction[]           @relation("TransactionCreatedBy")
 
   @@index([tenantId])
   @@map("staff")
 }
 
 model Category {
-  id          String   @id @default(cuid())
+  id          String         @id @default(cuid())
   name        String
   description String?
-  emoji       String   @default("📦")
-  color       String   @default("#3B82F6")
-  format      ProductFormat? // Default format for all products in this category
-  isActive    Boolean  @default(true)
+  emoji       String         @default("📦")
+  color       String         @default("#3B82F6")
+  isActive    Boolean        @default(true)
   tenantId    String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  // Relations
-  tenant Tenant @relation(fields: [tenantId], references: [id])
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  format      ProductFormat?
+  tenant      Tenant         @relation(fields: [tenantId], references: [id])
 
   @@unique([name, tenantId])
   @@index([tenantId])
@@ -92,68 +71,51 @@ model Category {
 }
 
 model Product {
-  id           String      @id @default(cuid())
-  sku          String
-  ean          String? // Barcode
-  name         String
-  description  String?
-  shortDescription String? // Short description for menus and quick displays
-  type         ProductType @default(INPUT)
-  category     String?
-  brand        String?
-  unitPrice    Decimal     @db.Decimal(12, 2)
-  costPrice    Decimal?    @db.Decimal(12, 2)
-  currentStock Int         @default(0)
-  minStock     Int         @default(0)
-  maxStock     Int?
-  unit         String      @default("UNIT")
-  format       ProductFormat? // Product format: PACKAGED, FROZEN, FRESH
-  tags         String[]    @default([]) // Product tags/features: vegano, sin gluten, etc.
-  hasRecipe    Boolean     @default(false)
-
-  // Pricing fields (input only wholesalePrice, others are calculated)
-  wholesalePrice Decimal? @db.Decimal(12, 2) // Base wholesale price without tax (PRECIO MAYORISTA S/IVA)
-  retailPrice    Decimal? @db.Decimal(12, 2) // Retail price including tax (PRECIO VENTA IVA INCLUIDO)
-
-  // Menu configuration
-  menuSection String? // Menu section: "Comidas", "Dulces", "Bebidas Calientes", "Ice Coffee", "Frapés", "Mocktails", "Jugos y Limonadas"
-  hoy         Boolean @default(false) // Today's special/featured item
-
-  // Platform integration
-  cafePrice      Decimal? @db.Decimal(12, 2)
-  rappiPrice     Decimal? @db.Decimal(12, 2)
-  pedidosyaPrice Decimal? @db.Decimal(12, 2)
-  uberPrice      Decimal? @db.Decimal(12, 2)
-
-  // Product images and source
-  images    Json     @default("[]") // Array of image URLs
-  sourceUrl String?  // Original product URL (for AI enrichment and reference)
-
-  isActive  Boolean  @default(true)
-  metadata  Json     @default("{}")
-  tenantId  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  tenant Tenant @relation(fields: [tenantId], references: [id])
-
-  // Recipe relations
-  recipesAsProduct       Recipe[]                @relation("ProductRecipes")
-  recipesAsIngredient    RecipeIngredient[]      @relation("IngredientInRecipes")
+  id                     String                  @id @default(cuid())
+  sku                    String
+  ean                    String?
+  name                   String
+  description            String?
+  type                   ProductType             @default(INPUT)
+  category               String?
+  brand                  String?
+  unitPrice              Decimal                 @db.Decimal(12, 2)
+  costPrice              Decimal?                @db.Decimal(12, 2)
+  currentStock           Int                     @default(0)
+  minStock               Int                     @default(0)
+  maxStock               Int?
+  unit                   String                  @default("UNIT")
+  hasRecipe              Boolean                 @default(false)
+  wholesalePrice         Decimal?                @db.Decimal(12, 2)
+  retailPrice            Decimal?                @db.Decimal(12, 2)
+  menuSection            String?
+  hoy                    Boolean                 @default(false)
+  cafePrice              Decimal?                @db.Decimal(12, 2)
+  rappiPrice             Decimal?                @db.Decimal(12, 2)
+  pedidosyaPrice         Decimal?                @db.Decimal(12, 2)
+  uberPrice              Decimal?                @db.Decimal(12, 2)
+  images                 Json                    @default("[]")
+  isActive               Boolean                 @default(true)
+  metadata               Json                    @default("{}")
+  tenantId               String
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  format                 ProductFormat?
+  tags                   String[]                @default([])
+  sourceUrl              String?
+  shortDescription       String?
   ingredientConsumptions IngredientConsumption[] @relation("ConsumedIngredients")
-
-  // M:M Relationships
-  suppliers          ProductSupplier[]
-  staffOwners        StaffProduct[]       @relation("ProductOwnedByStaff")
-  movements          ProductMovement[]
-  transactionItems   TransactionItem[]
-  purchaseOrderItems PurchaseOrderItem[]
-  inventoryRecords   InventoryRecord[]
-
-  // Variants and Modifiers
-  variants       ProductVariant[]
-  modifierGroups ModifierGroup[]
+  inventoryRecords       InventoryRecord[]
+  modifierGroups         ModifierGroup[]
+  movements              ProductMovement[]
+  suppliers              ProductSupplier[]
+  variants               ProductVariant[]
+  tenant                 Tenant                  @relation(fields: [tenantId], references: [id])
+  purchaseOrderItems     PurchaseOrderItem[]
+  recipesAsIngredient    RecipeIngredient[]      @relation("IngredientInRecipes")
+  recipesAsProduct       Recipe[]                @relation("ProductRecipes")
+  staffOwners            StaffProduct[]          @relation("ProductOwnedByStaff")
+  transactionItems       TransactionItem[]
 
   @@unique([tenantId, sku])
   @@index([tenantId, type])
@@ -161,214 +123,160 @@ model Product {
   @@map("products")
 }
 
-// Product Variants (e.g., Small/Medium/Large, or Flavor variants)
 model ProductVariant {
-  id          String   @id @default(cuid())
-  productId   String
-  name        String // e.g., "Small", "Medium", "Large", "Strawberry", "Mango"
-  displayName String? // Custom override name (e.g., "Fresa Deluxe" instead of "Lemonade Strawberry")
-  useCustomName Boolean @default(false) // If true, use displayName instead of auto-generated name
-  description String? // Variant-specific description
-  sku         String? // Optional variant-specific SKU
-
-  // Pricing
-  price        Decimal? @db.Decimal(12, 2) // Absolute price for this variant (if null, uses base product price)
-  costPrice    Decimal? @db.Decimal(12, 2) // Variant-specific cost
-
-  // Channel-specific pricing
+  id             String   @id @default(cuid())
+  productId      String
+  name           String
+  sku            String?
+  sortOrder      Int      @default(0)
+  isDefault      Boolean  @default(false)
+  isActive       Boolean  @default(true)
+  metadata       Json     @default("{}")
+  tenantId       String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
   cafePrice      Decimal? @db.Decimal(12, 2)
-  rappiPrice     Decimal? @db.Decimal(12, 2)
+  costPrice      Decimal? @db.Decimal(12, 2)
+  description    String?
+  displayName    String?
+  images         Json     @default("[]")
+  maxStock       Int?
+  minStock       Int?
   pedidosyaPrice Decimal? @db.Decimal(12, 2)
+  rappiPrice     Decimal? @db.Decimal(12, 2)
   uberPrice      Decimal? @db.Decimal(12, 2)
-
-  // Inventory
-  minStock    Int?
-  maxStock    Int?
-
-  // Images and source
-  images      Json     @default("[]") // Variant-specific images
-  sourceUrl   String?  // Original variant URL (for AI enrichment and reference)
-  tags        String[] @default([]) // Variant-specific tags: vegano, sin gluten, etc.
-
-  sortOrder   Int      @default(0)
-  isDefault   Boolean  @default(false) // Mark one variant as default
-  isActive    Boolean  @default(true)
-  metadata    Json     @default("{}") // Store additional variant data
-  tenantId    String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  // Relations
-  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
-  tenant  Tenant  @relation(fields: [tenantId], references: [id])
+  useCustomName  Boolean  @default(false)
+  price          Decimal? @db.Decimal(12, 2)
+  sourceUrl      String?
+  tags           String[] @default([])
+  product        Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  tenant         Tenant   @relation(fields: [tenantId], references: [id])
 
   @@index([productId])
   @@index([tenantId])
   @@map("product_variants")
 }
 
-// Modifier Groups (e.g., "Milk Options", "Ice Options", "Extras")
 model ModifierGroup {
-  id              String   @id @default(cuid())
-  productId       String?  // If null, it's a global modifier group
-  name            String // e.g., "Milk Options", "Ice Options"
-  description     String?
-  isRequired      Boolean  @default(false) // Must customer select at least one?
-  allowMultiple   Boolean  @default(true) // Can select multiple modifiers?
-  minSelections   Int      @default(0) // Minimum number of selections required
-  maxSelections   Int?     // Maximum number of selections allowed
-  sortOrder       Int      @default(0)
-  isActive        Boolean  @default(true)
-  tenantId        String
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  // Relations
-  product   Product?          @relation(fields: [productId], references: [id], onDelete: Cascade)
-  tenant    Tenant            @relation(fields: [tenantId], references: [id])
-  modifiers ProductModifier[]
+  id            String            @id @default(cuid())
+  productId     String?
+  name          String
+  description   String?
+  isRequired    Boolean           @default(false)
+  allowMultiple Boolean           @default(true)
+  minSelections Int               @default(0)
+  maxSelections Int?
+  sortOrder     Int               @default(0)
+  isActive      Boolean           @default(true)
+  tenantId      String
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  product       Product?          @relation(fields: [productId], references: [id], onDelete: Cascade)
+  tenant        Tenant            @relation(fields: [tenantId], references: [id])
+  modifiers     ProductModifier[]
 
   @@index([productId])
   @@index([tenantId])
   @@map("modifier_groups")
 }
 
-// Product Modifiers (individual add-ons or removals)
 model ProductModifier {
-  id              String        @id @default(cuid())
-  modifierGroupId String
-  name            String // e.g., "Coconut Milk", "Remove Ice", "Extra Shot"
-  type            ModifierType  @default(ADD)
-
-  // Default price adjustment
-  priceAdjustment Decimal       @default(0) @db.Decimal(12, 2) // Price change (positive for add-ons, negative for removals)
-
-  // Channel-specific price adjustments (optional, if null uses default priceAdjustment)
-  cafePriceAdjustment      Decimal? @db.Decimal(12, 2)
-  rappiPriceAdjustment     Decimal? @db.Decimal(12, 2)
-  pedidosyaPriceAdjustment Decimal? @db.Decimal(12, 2)
-  uberPriceAdjustment      Decimal? @db.Decimal(12, 2)
-
-  sortOrder       Int           @default(0)
-  isActive        Boolean       @default(true)
-  tenantId        String
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-
-  // Relations
-  modifierGroup ModifierGroup             @relation(fields: [modifierGroupId], references: [id], onDelete: Cascade)
-  tenant        Tenant                    @relation(fields: [tenantId], references: [id])
-  transactionItems TransactionItemModifier[]
+  id                       String                    @id @default(cuid())
+  modifierGroupId          String
+  name                     String
+  type                     ModifierType              @default(ADD)
+  priceAdjustment          Decimal                   @default(0) @db.Decimal(12, 2)
+  sortOrder                Int                       @default(0)
+  isActive                 Boolean                   @default(true)
+  tenantId                 String
+  createdAt                DateTime                  @default(now())
+  updatedAt                DateTime                  @updatedAt
+  cafePriceAdjustment      Decimal?                  @db.Decimal(12, 2)
+  pedidosyaPriceAdjustment Decimal?                  @db.Decimal(12, 2)
+  rappiPriceAdjustment     Decimal?                  @db.Decimal(12, 2)
+  uberPriceAdjustment      Decimal?                  @db.Decimal(12, 2)
+  modifierGroup            ModifierGroup             @relation(fields: [modifierGroupId], references: [id], onDelete: Cascade)
+  tenant                   Tenant                    @relation(fields: [tenantId], references: [id])
+  transactionItems         TransactionItemModifier[]
 
   @@index([modifierGroupId])
   @@index([tenantId])
   @@map("product_modifiers")
 }
 
-enum ModifierType {
-  ADD    // Add-on (e.g., Extra shot, Coconut milk)
-  REMOVE // Removal (e.g., No ice, No sugar)
-}
-
-// Contact Type Configuration (allows custom contact types)
 model ContactTypeConfig {
-  id          String   @id @default(cuid())
-  name        String   // e.g., "CUSTOMER", "SUPPLIER", "BRAND", or custom like "DISTRIBUTOR"
-  label       String   // Display name: "Customer", "Supplier", etc.
+  id          String               @id @default(cuid())
+  name        String
+  label       String
   description String?
-  icon        String?  // Emoji or icon identifier
-  color       String?  // Color code for badges
-  isSystem    Boolean  @default(false) // true for built-in types, false for custom
-  isActive    Boolean  @default(true)
-  order       Int      @default(0) // Display order
+  icon        String?
+  color       String?
+  isSystem    Boolean              @default(false)
+  isActive    Boolean              @default(true)
+  order       Int                  @default(0)
   tenantId    String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  // Relations
-  tenant Tenant              @relation(fields: [tenantId], references: [id])
-  fields ContactFieldConfig[]
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  fields      ContactFieldConfig[]
+  tenant      Tenant               @relation(fields: [tenantId], references: [id])
 
   @@unique([tenantId, name])
   @@index([tenantId, isActive])
   @@map("contact_type_configs")
 }
 
-// Field Configuration for Contact Types
 model ContactFieldConfig {
-  id               String   @id @default(cuid())
-  contactTypeId    String
-  fieldName        String   // e.g., "email", "phone", "rut", "creditLimit"
-  fieldLabel       String   // Display label: "Email Address", "Phone Number"
-  fieldType        String   // "text", "email", "phone", "number", "select", "textarea", "date"
-  isRequired       Boolean  @default(false)
-  isVisible        Boolean  @default(true)
-  order            Int      @default(0)
-  placeholder      String?
-  helpText         String?
-  validation       Json?    // Validation rules: { "min": 0, "max": 100, "pattern": "..." }
-  options          Json?    // For select fields: ["option1", "option2"]
-  defaultValue     String?
-  tenantId         String
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-
-  // Relations
-  contactType ContactTypeConfig @relation(fields: [contactTypeId], references: [id], onDelete: Cascade)
-  tenant      Tenant            @relation(fields: [tenantId], references: [id])
+  id            String            @id @default(cuid())
+  contactTypeId String
+  fieldName     String
+  fieldLabel    String
+  fieldType     String
+  isRequired    Boolean           @default(false)
+  isVisible     Boolean           @default(true)
+  order         Int               @default(0)
+  placeholder   String?
+  helpText      String?
+  validation    Json?
+  options       Json?
+  defaultValue  String?
+  tenantId      String
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  contactType   ContactTypeConfig @relation(fields: [contactTypeId], references: [id], onDelete: Cascade)
+  tenant        Tenant            @relation(fields: [tenantId], references: [id])
 
   @@unique([contactTypeId, fieldName])
   @@index([contactTypeId, isVisible])
   @@map("contact_field_configs")
 }
 
-// Unified Contact model (replaces Customer and Supplier)
 model Contact {
-  id           String  @id @default(cuid())
-  code         String
-  name         String
-  contactType  String  // Now stores the custom type name from ContactTypeConfig
-
-  // Contact Information
-  rut          String?
-  email        String?
-  phone        String?
-  contactName  String? // For companies: specific contact person name
-
-  // Address
-  address String?
-  city    String?
-  country String?
-
-  // Business-specific fields
-  // For customers:
-  creditLimit Decimal? @db.Decimal(12, 2)
-  currentDebt Decimal  @default(0) @db.Decimal(12, 2)
-
-  // For suppliers:
-  paymentTerms String?
-  rating       Int?
-
-  // Common
-  isActive  Boolean  @default(true)
-  metadata  Json     @default("{}") // Stores custom field values
-  tenantId  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  tenant Tenant @relation(fields: [tenantId], references: [id])
-
-  // M:M Relationships
-  staffRelations StaffContact[]
-
-  // Customer-specific relations
-  salesTransactions Transaction[] @relation("ContactSales")
-
-  // Supplier-specific relations
-  products       ProductSupplier[]
-  movements      ProductMovement[]
-  purchaseOrders PurchaseOrder[]
+  id                String            @id @default(cuid())
+  code              String
+  name              String
+  contactType       String
+  rut               String?
+  email             String?
+  phone             String?
+  contactName       String?
+  address           String?
+  city              String?
+  country           String?
+  creditLimit       Decimal?          @db.Decimal(12, 2)
+  currentDebt       Decimal           @default(0) @db.Decimal(12, 2)
+  paymentTerms      String?
+  rating            Int?
+  isActive          Boolean           @default(true)
+  metadata          Json              @default("{}")
+  tenantId          String
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  tenant            Tenant            @relation(fields: [tenantId], references: [id])
+  movements         ProductMovement[]
+  products          ProductSupplier[]
+  purchaseOrders    PurchaseOrder[]
+  staffRelations    StaffContact[]
+  salesTransactions Transaction[]     @relation("ContactSales")
 
   @@unique([tenantId, code])
   @@unique([tenantId, rut])
@@ -377,23 +285,17 @@ model Contact {
   @@map("contacts")
 }
 
-// ==========================================
-// JUNCTION TABLES (M:M RELATIONSHIPS)
-// ==========================================
-
-// Unified Staff-Contact junction table (replaces StaffSupplier and StaffCustomer)
 model StaffContact {
   id             String    @id @default(cuid())
   staffId        String
   contactId      String
-  relationship   String // e.g., "ACCOUNT_MANAGER", "SALES_REP", "SUPPORT", "PRIMARY_CONTACT", "BUYER"
+  relationship   String
   startDate      DateTime  @default(now())
   endDate        DateTime?
-  commissionRate Decimal?  @db.Decimal(5, 2) // For sales reps
+  commissionRate Decimal?  @db.Decimal(5, 2)
   notes          String?
-
-  staff   Staff   @relation(fields: [staffId], references: [id])
-  contact Contact @relation(fields: [contactId], references: [id])
+  contact        Contact   @relation(fields: [contactId], references: [id])
+  staff          Staff     @relation(fields: [staffId], references: [id])
 
   @@unique([staffId, contactId, relationship])
   @@index([staffId])
@@ -405,14 +307,13 @@ model StaffProduct {
   id           String    @id @default(cuid())
   staffId      String
   productId    String
-  relationship String // e.g., "OWNER", "MANAGER", "PRODUCER", "RESPONSIBLE"
+  relationship String
   startDate    DateTime  @default(now())
   endDate      DateTime?
-  permissions  Json      @default("[]") // Array of permissions
+  permissions  Json      @default("[]")
   notes        String?
-
-  staff   Staff   @relation("StaffOwnsProduct", fields: [staffId], references: [id])
-  product Product @relation("ProductOwnedByStaff", fields: [productId], references: [id])
+  product      Product   @relation("ProductOwnedByStaff", fields: [productId], references: [id])
+  staff        Staff     @relation("StaffOwnsProduct", fields: [staffId], references: [id])
 
   @@unique([staffId, productId, relationship])
   @@index([staffId])
@@ -423,7 +324,7 @@ model StaffProduct {
 model ProductSupplier {
   id            String    @id @default(cuid())
   productId     String
-  supplierId    String // References Contact with contactType = SUPPLIER or BOTH
+  supplierId    String
   supplierSKU   String?
   supplierPrice Decimal   @db.Decimal(12, 2)
   leadTimeDays  Int?
@@ -432,19 +333,14 @@ model ProductSupplier {
   isActive      Boolean   @default(true)
   lastPurchase  DateTime?
   notes         String?
-
-  product  Product @relation(fields: [productId], references: [id])
-  supplier Contact @relation(fields: [supplierId], references: [id])
+  product       Product   @relation(fields: [productId], references: [id])
+  supplier      Contact   @relation(fields: [supplierId], references: [id])
 
   @@unique([productId, supplierId])
   @@index([productId])
   @@index([supplierId])
   @@map("product_suppliers")
 }
-
-// ==========================================
-// MOVEMENT & TRACKING
-// ==========================================
 
 model ProductMovement {
   id            String       @id @default(cuid())
@@ -453,23 +349,21 @@ model ProductMovement {
   quantity      Int
   fromLocation  String?
   toLocation    String?
-  supplierId    String? // References Contact (supplier)
+  supplierId    String?
   receivedById  String?
   deliveredById String?
-  referenceType String? // e.g., "PURCHASE_ORDER", "SALE", "ADJUSTMENT"
+  referenceType String?
   referenceId   String?
   cost          Decimal?     @db.Decimal(12, 2)
   notes         String?
   metadata      Json         @default("{}")
   tenantId      String
   createdAt     DateTime     @default(now())
-
-  // Relations
-  product     Product  @relation(fields: [productId], references: [id])
-  supplier    Contact? @relation(fields: [supplierId], references: [id])
-  receivedBy  Staff?   @relation("ReceivedByStaff", fields: [receivedById], references: [id])
-  deliveredBy Staff?   @relation("DeliveredByStaff", fields: [deliveredById], references: [id])
-  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  deliveredBy   Staff?       @relation("DeliveredByStaff", fields: [deliveredById], references: [id])
+  product       Product      @relation(fields: [productId], references: [id])
+  receivedBy    Staff?       @relation("ReceivedByStaff", fields: [receivedById], references: [id])
+  supplier      Contact?     @relation(fields: [supplierId], references: [id])
+  tenant        Tenant       @relation(fields: [tenantId], references: [id])
 
   @@index([productId])
   @@index([supplierId])
@@ -477,35 +371,29 @@ model ProductMovement {
   @@map("product_movements")
 }
 
-// ==========================================
-// TRANSACTIONS & ORDERS
-// ==========================================
-
 model Transaction {
-  id            String            @id @default(cuid())
-  type          TransactionType
-  status        TransactionStatus
-  contactId     String? // References Contact (customer)
-  subtotal      Decimal           @db.Decimal(12, 2)
-  tax           Decimal           @db.Decimal(12, 2)
-  discount      Decimal           @default(0) @db.Decimal(12, 2)
-  total         Decimal           @db.Decimal(12, 2)
-  paymentMethod PaymentMethod?
-  paymentStatus PaymentStatus     @default(PENDING)
-  notes         String?
-  metadata      Json              @default("{}")
-  tenantId      String
-  createdById   String?
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
-
-  // Relations
-  tenant                 Tenant                  @relation(fields: [tenantId], references: [id])
+  id                     String                  @id @default(cuid())
+  type                   TransactionType
+  status                 TransactionStatus
+  contactId              String?
+  subtotal               Decimal                 @db.Decimal(12, 2)
+  tax                    Decimal                 @db.Decimal(12, 2)
+  discount               Decimal                 @default(0) @db.Decimal(12, 2)
+  total                  Decimal                 @db.Decimal(12, 2)
+  paymentMethod          PaymentMethod?
+  paymentStatus          PaymentStatus           @default(PENDING)
+  notes                  String?
+  metadata               Json                    @default("{}")
+  tenantId               String
+  createdById            String?
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  ingredientConsumptions IngredientConsumption[]
+  taxDocuments           TaxDocument[]
+  items                  TransactionItem[]
   contact                Contact?                @relation("ContactSales", fields: [contactId], references: [id])
   createdBy              Staff?                  @relation("TransactionCreatedBy", fields: [createdById], references: [id])
-  items                  TransactionItem[]
-  taxDocuments           TaxDocument[]
-  ingredientConsumptions IngredientConsumption[]
+  tenant                 Tenant                  @relation(fields: [tenantId], references: [id])
 
   @@index([tenantId, status])
   @@index([tenantId, createdAt])
@@ -514,66 +402,59 @@ model Transaction {
 }
 
 model TransactionItem {
-  id            String  @id @default(cuid())
+  id            String                    @id @default(cuid())
   transactionId String
   productId     String?
   productName   String
-  variantId     String? // Selected variant (if any)
-  variantName   String? // Variant name at time of purchase
   quantity      Int
-  unitPrice     Decimal @db.Decimal(12, 2)
-  discount      Decimal @default(0) @db.Decimal(12, 2)
-  totalPrice    Decimal @db.Decimal(12, 2)
-
-  // Relations
-  transaction Transaction               @relation(fields: [transactionId], references: [id], onDelete: Cascade)
-  product     Product?                  @relation(fields: [productId], references: [id])
-  modifiers   TransactionItemModifier[] // Selected modifiers
+  unitPrice     Decimal                   @db.Decimal(12, 2)
+  discount      Decimal                   @default(0) @db.Decimal(12, 2)
+  totalPrice    Decimal                   @db.Decimal(12, 2)
+  variantId     String?
+  variantName   String?
+  modifiers     TransactionItemModifier[]
+  product       Product?                  @relation(fields: [productId], references: [id])
+  transaction   Transaction               @relation(fields: [transactionId], references: [id], onDelete: Cascade)
 
   @@map("transaction_items")
 }
 
-// Track modifiers selected for each transaction item
 model TransactionItemModifier {
-  id                String   @id @default(cuid())
+  id                String          @id @default(cuid())
   transactionItemId String
   modifierId        String
-  modifierName      String // Name at time of purchase
+  modifierName      String
   modifierType      ModifierType
-  priceAdjustment   Decimal  @db.Decimal(12, 2) // Price at time of purchase
-  createdAt         DateTime @default(now())
-
-  // Relations
-  transactionItem TransactionItem @relation(fields: [transactionItemId], references: [id], onDelete: Cascade)
-  modifier        ProductModifier @relation(fields: [modifierId], references: [id])
+  priceAdjustment   Decimal         @db.Decimal(12, 2)
+  createdAt         DateTime        @default(now())
+  modifier          ProductModifier @relation(fields: [modifierId], references: [id])
+  transactionItem   TransactionItem @relation(fields: [transactionItemId], references: [id], onDelete: Cascade)
 
   @@index([transactionItemId])
   @@map("transaction_item_modifiers")
 }
 
 model PurchaseOrder {
-  id           String         @id @default(cuid())
+  id           String              @id @default(cuid())
   orderNumber  String
-  supplierId   String // References Contact (supplier)
+  supplierId   String
   status       PurchaseStatus
-  orderDate    DateTime       @default(now())
+  orderDate    DateTime            @default(now())
   expectedDate DateTime?
   receivedDate DateTime?
-  subtotal     Decimal        @db.Decimal(12, 2)
-  tax          Decimal        @db.Decimal(12, 2)
-  shipping     Decimal        @default(0) @db.Decimal(12, 2)
-  total        Decimal        @db.Decimal(12, 2)
+  subtotal     Decimal             @db.Decimal(12, 2)
+  tax          Decimal             @db.Decimal(12, 2)
+  shipping     Decimal             @default(0) @db.Decimal(12, 2)
+  total        Decimal             @db.Decimal(12, 2)
   notes        String?
-  metadata     Json           @default("{}")
+  metadata     Json                @default("{}")
   tenantId     String
   createdById  String?
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
-
-  // Relations
-  supplier Contact             @relation(fields: [supplierId], references: [id])
-  tenant   Tenant              @relation(fields: [tenantId], references: [id])
-  items    PurchaseOrderItem[]
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+  items        PurchaseOrderItem[]
+  supplier     Contact             @relation(fields: [supplierId], references: [id])
+  tenant       Tenant              @relation(fields: [tenantId], references: [id])
 
   @@unique([tenantId, orderNumber])
   @@index([supplierId])
@@ -582,148 +463,112 @@ model PurchaseOrder {
 }
 
 model PurchaseOrderItem {
-  id              String  @id @default(cuid())
+  id              String        @id @default(cuid())
   purchaseOrderId String
   productId       String?
   productName     String
   quantity        Int
-  unitPrice       Decimal @db.Decimal(12, 2)
-  totalPrice      Decimal @db.Decimal(12, 2)
-  receivedQty     Int     @default(0)
-
-  // Relations
-  purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
-  product       Product?      @relation(fields: [productId], references: [id])
+  unitPrice       Decimal       @db.Decimal(12, 2)
+  totalPrice      Decimal       @db.Decimal(12, 2)
+  receivedQty     Int           @default(0)
+  product         Product?      @relation(fields: [productId], references: [id])
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
 
   @@map("purchase_order_items")
 }
 
-// ==========================================
-// RECIPES & PRODUCTION
-// ==========================================
-
-// Recipe master (for MANUFACTURED & MADE_TO_ORDER products)
 model Recipe {
-  id          String  @id @default(cuid())
-  productId   String
-  name        String
-  description String?
-
-  // Recipe metadata
-  servingSize  Int              @default(1)
-  prepTime     Int? // minutes
-  cookTime     Int? // minutes
-  difficulty   RecipeDifficulty @default(EASY)
-  instructions String?          @db.Text
-
-  // Costing
-  estimatedCost Decimal? @db.Decimal(12, 2)
-  laborCost     Decimal? @db.Decimal(12, 2)
-  overheadCost  Decimal? @db.Decimal(12, 2)
-  totalCost     Decimal? @db.Decimal(12, 2)
-
-  // Version control
-  version   Int     @default(1)
-  isActive  Boolean @default(true)
-  isDefault Boolean @default(false)
-
-  tenantId  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
+  id                String             @id @default(cuid())
+  productId         String
+  name              String
+  description       String?
+  servingSize       Int                @default(1)
+  prepTime          Int?
+  cookTime          Int?
+  difficulty        RecipeDifficulty   @default(EASY)
+  instructions      String?
+  estimatedCost     Decimal?           @db.Decimal(12, 2)
+  laborCost         Decimal?           @db.Decimal(12, 2)
+  overheadCost      Decimal?           @db.Decimal(12, 2)
+  totalCost         Decimal?           @db.Decimal(12, 2)
+  version           Int                @default(1)
+  isActive          Boolean            @default(true)
+  isDefault         Boolean            @default(false)
+  tenantId          String
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  productionBatches ProductionBatch[]
+  ingredients       RecipeIngredient[]
   product           Product            @relation("ProductRecipes", fields: [productId], references: [id], onDelete: Cascade)
   tenant            Tenant             @relation(fields: [tenantId], references: [id])
-  ingredients       RecipeIngredient[]
-  productionBatches ProductionBatch[]
 
   @@index([productId])
   @@index([tenantId, isActive])
   @@map("recipes")
 }
 
-// Recipe ingredients/components (BOM)
 model RecipeIngredient {
-  id           String @id @default(cuid())
+  id           String   @id @default(cuid())
   recipeId     String
-  ingredientId String // References Product (type = PURCHASED or MANUFACTURED)
-
-  quantity   Decimal @db.Decimal(12, 4)
-  unit       String
-  isOptional Boolean @default(false)
-  notes      String?
-
-  // Costing
-  unitCost  Decimal? @db.Decimal(12, 2)
-  totalCost Decimal? @db.Decimal(12, 2)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  recipe     Recipe  @relation(fields: [recipeId], references: [id], onDelete: Cascade)
-  ingredient Product @relation("IngredientInRecipes", fields: [ingredientId], references: [id])
+  ingredientId String
+  quantity     Decimal  @db.Decimal(12, 4)
+  unit         String
+  isOptional   Boolean  @default(false)
+  notes        String?
+  unitCost     Decimal? @db.Decimal(12, 2)
+  totalCost    Decimal? @db.Decimal(12, 2)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  ingredient   Product  @relation("IngredientInRecipes", fields: [ingredientId], references: [id])
+  recipe       Recipe   @relation(fields: [recipeId], references: [id], onDelete: Cascade)
 
   @@index([recipeId])
   @@index([ingredientId])
   @@map("recipe_ingredients")
 }
 
-// Production batches (for MANUFACTURED products)
 model ProductionBatch {
-  id          String @id @default(cuid())
-  batchNumber String
-  recipeId    String
-  productId   String
-
+  id              String           @id @default(cuid())
+  batchNumber     String
+  recipeId        String
+  productId       String
   plannedQuantity Int
   actualQuantity  Int?
   status          ProductionStatus @default(PLANNED)
-
-  startedAt   DateTime?
-  completedAt DateTime?
-
-  // Costing
-  ingredientCost Decimal? @db.Decimal(12, 2)
-  laborCost      Decimal? @db.Decimal(12, 2)
-  overheadCost   Decimal? @db.Decimal(12, 2)
-  totalCost      Decimal? @db.Decimal(12, 2)
-  costPerUnit    Decimal? @db.Decimal(12, 2)
-
-  notes       String?
-  tenantId    String
-  createdById String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  // Relations
-  recipe Recipe @relation(fields: [recipeId], references: [id])
-  tenant Tenant @relation(fields: [tenantId], references: [id])
+  startedAt       DateTime?
+  completedAt     DateTime?
+  ingredientCost  Decimal?         @db.Decimal(12, 2)
+  laborCost       Decimal?         @db.Decimal(12, 2)
+  overheadCost    Decimal?         @db.Decimal(12, 2)
+  totalCost       Decimal?         @db.Decimal(12, 2)
+  costPerUnit     Decimal?         @db.Decimal(12, 2)
+  notes           String?
+  tenantId        String
+  createdById     String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  recipe          Recipe           @relation(fields: [recipeId], references: [id])
+  tenant          Tenant           @relation(fields: [tenantId], references: [id])
 
   @@unique([tenantId, batchNumber])
   @@index([tenantId, status])
   @@map("production_batches")
 }
 
-// Ingredient consumption tracking (for MADE_TO_ORDER)
 model IngredientConsumption {
-  id            String  @id @default(cuid())
-  transactionId String? // Links to sale transaction
-  productId     String // The MADE_TO_ORDER product sold
+  id            String       @id @default(cuid())
+  transactionId String?
+  productId     String
   recipeId      String
   ingredientId  String
-
-  quantityUsed Decimal  @db.Decimal(12, 4)
-  unit         String
-  cost         Decimal? @db.Decimal(12, 2)
-
-  consumedAt DateTime @default(now())
-  tenantId   String
-
-  // Relations
-  tenant      Tenant       @relation(fields: [tenantId], references: [id])
-  transaction Transaction? @relation(fields: [transactionId], references: [id])
-  ingredient  Product      @relation("ConsumedIngredients", fields: [ingredientId], references: [id])
+  quantityUsed  Decimal      @db.Decimal(12, 4)
+  unit          String
+  cost          Decimal?     @db.Decimal(12, 2)
+  consumedAt    DateTime     @default(now())
+  tenantId      String
+  ingredient    Product      @relation("ConsumedIngredients", fields: [ingredientId], references: [id])
+  tenant        Tenant       @relation(fields: [tenantId], references: [id])
+  transaction   Transaction? @relation(fields: [transactionId], references: [id])
 
   @@index([transactionId])
   @@index([productId])
@@ -731,10 +576,6 @@ model IngredientConsumption {
   @@index([tenantId, consumedAt])
   @@map("ingredient_consumptions")
 }
-
-// ==========================================
-// INVENTORY & STOCK
-// ==========================================
 
 model InventoryRecord {
   id            String    @id @default(cuid())
@@ -747,18 +588,12 @@ model InventoryRecord {
   notes         String?
   tenantId      String
   updatedAt     DateTime  @updatedAt
-
-  // Relations
-  product Product @relation(fields: [productId], references: [id])
-  tenant  Tenant  @relation(fields: [tenantId], references: [id])
+  product       Product   @relation(fields: [productId], references: [id])
+  tenant        Tenant    @relation(fields: [tenantId], references: [id])
 
   @@unique([productId, location, tenantId])
   @@map("inventory_records")
 }
-
-// ==========================================
-// TAX & COMPLIANCE
-// ==========================================
 
 model TaxDocument {
   id            String            @id @default(cuid())
@@ -782,12 +617,10 @@ model TaxDocument {
   tenantId      String
   createdAt     DateTime          @default(now())
   updatedAt     DateTime          @updatedAt
-
-  // Relations
-  tenant      Tenant            @relation(fields: [tenantId], references: [id])
-  transaction Transaction?      @relation(fields: [transactionId], references: [id])
-  items       TaxDocumentItem[]
-  expenses    Expense[] // Auto-generated expenses from this invoice
+  expenses      Expense[]
+  items         TaxDocumentItem[]
+  tenant        Tenant            @relation(fields: [tenantId], references: [id])
+  transaction   Transaction?      @relation(fields: [transactionId], references: [id])
 
   @@unique([emitterRUT, folio, tenantId])
   @@index([tenantId, status])
@@ -795,228 +628,171 @@ model TaxDocument {
 }
 
 model TaxDocumentItem {
-  id            String  @id @default(cuid())
+  id            String      @id @default(cuid())
   taxDocumentId String
   productName   String
   quantity      Int
-  unitPrice     Decimal @db.Decimal(12, 2)
-  totalPrice    Decimal @db.Decimal(12, 2)
-
-  taxDocument TaxDocument @relation(fields: [taxDocumentId], references: [id], onDelete: Cascade)
+  unitPrice     Decimal     @db.Decimal(12, 2)
+  totalPrice    Decimal     @db.Decimal(12, 2)
+  taxDocument   TaxDocument @relation(fields: [taxDocumentId], references: [id], onDelete: Cascade)
 
   @@map("tax_document_items")
 }
 
-// ==========================================
-// EXPENSE MANAGEMENT
-// ==========================================
-
-// Company payment accounts (bank accounts, credit cards, cash)
 model PaymentAccount {
-  id            String      @id @default(cuid())
-  name          String // "Cuenta Corriente Banco Estado", "Tarjeta Crédito VISA", "Caja Chica"
-  type          AccountType
-  accountNumber String? // Bank account number, card last 4 digits, etc.
-  bank          String? // Bank name
-  currency      String      @default("CLP")
-  balance       Decimal?    @db.Decimal(12, 2) // Optional current balance tracking
-  isActive      Boolean     @default(true)
-
-  tenantId String
-  tenant   Tenant @relation(fields: [tenantId], references: [id])
-
-  // Relations
-  expenses       Expense[]
+  id             String                  @id @default(cuid())
+  name           String
+  type           AccountType
+  accountNumber  String?
+  bank           String?
+  currency       String                  @default("CLP")
+  balance        Decimal?                @db.Decimal(12, 2)
+  isActive       Boolean                 @default(true)
+  tenantId       String
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
   reimbursements EmployeeReimbursement[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  expenses       Expense[]
+  tenant         Tenant                  @relation(fields: [tenantId], references: [id])
 
   @@map("payment_accounts")
 }
 
-// Employee reimbursement tracking
 model EmployeeReimbursement {
-  id          String              @id @default(cuid())
-  staffId     String
-  description String // "Reembolso gastos Septiembre 2025"
-  totalAmount Decimal             @db.Decimal(12, 2)
-  currency    String              @default("CLP")
-  status      ReimbursementStatus @default(PENDING)
-
-  // Payment details when reimbursed
+  id               String              @id @default(cuid())
+  staffId          String
+  description      String
+  totalAmount      Decimal             @db.Decimal(12, 2)
+  currency         String              @default("CLP")
+  status           ReimbursementStatus @default(PENDING)
   paidDate         DateTime?
-  paidAmount       Decimal?  @db.Decimal(12, 2)
-  paymentAccountId String? // Which account was used to pay
-  paymentReference String? // Transfer reference, check number, etc.
+  paidAmount       Decimal?            @db.Decimal(12, 2)
+  paymentAccountId String?
+  paymentReference String?
   notes            String?
-
-  tenantId String
-
-  // Relations
-  staff          Staff           @relation(fields: [staffId], references: [id])
-  tenant         Tenant          @relation(fields: [tenantId], references: [id])
-  paymentAccount PaymentAccount? @relation(fields: [paymentAccountId], references: [id])
-  expenses       Expense[] // Expenses included in this reimbursement
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  tenantId         String
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  paymentAccount   PaymentAccount?     @relation(fields: [paymentAccountId], references: [id])
+  staff            Staff               @relation(fields: [staffId], references: [id])
+  tenant           Tenant              @relation(fields: [tenantId], references: [id])
+  expenses         Expense[]
 
   @@map("employee_reimbursements")
 }
 
-// Enhanced expense categories
 model ExpenseCategory {
-  id          String  @id @default(cuid())
+  id          String         @id @default(cuid())
   name        String
   emoji       String?
   description String?
-  color       String  @default("#64748B")
-  format      ProductFormat? // Default format for products in this category
-  isActive    Boolean @default(true)
-
-  tenantId String
-  tenant   Tenant @relation(fields: [tenantId], references: [id])
-
-  expenses Expense[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  color       String         @default("#64748B")
+  isActive    Boolean        @default(true)
+  tenantId    String
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  format      ProductFormat?
+  tenant      Tenant         @relation(fields: [tenantId], references: [id])
+  expenses    Expense[]
 
   @@map("expense_categories")
 }
 
-// Expense status tracking
 model ExpenseStatus {
-  id        String  @id @default(cuid())
+  id        String    @id @default(cuid())
   name      String
-  color     String  @default("#64748B")
-  isDefault Boolean @default(false)
-
-  tenantId String
-  tenant   Tenant @relation(fields: [tenantId], references: [id])
-
-  expenses Expense[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  color     String    @default("#64748B")
+  isDefault Boolean   @default(false)
+  tenantId  String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  tenant    Tenant    @relation(fields: [tenantId], references: [id])
+  expenses  Expense[]
 
   @@map("expense_statuses")
 }
 
-// Main expenses table with comprehensive payment tracking
 model Expense {
-  id          String   @id @default(cuid())
-  date        DateTime
-  supplier    String
-  description String
-  amount      Decimal  @db.Decimal(12, 2)
-  currency    String   @default("CLP")
-
-  // Document information
-  documentType        String // FACTURA, BOLETA, RECIBO, OTRO
+  id                  String                 @id @default(cuid())
+  date                DateTime
+  supplier            String
+  description         String
+  amount              Decimal                @db.Decimal(12, 2)
+  currency            String                 @default("CLP")
+  documentType        String
   documentNumber      String?
-  thirdPartyDocType   String? // Type from supplier
+  thirdPartyDocType   String?
   thirdPartyDocNumber String?
   notes               String?
-
-  // PAYMENT TRACKING - This is the key enhancement
-  paymentType      ExpensePaymentType
-  paymentAccountId String? // Which company account paid (if company paid)
-  staffId          String? // Which employee paid (if employee paid)
-  reimbursementId  String? // Link to reimbursement if applicable
-
-  // Company expense classification
-  isCompanyExpense   Boolean @default(true) // Can be set to false for personal items
-  excludeFromReports Boolean @default(false) // Exclude from company reports
-
-  // Auto-generation from invoices
-  isFromInvoice Boolean @default(false)
-  taxDocumentId String? // Link to TaxDocument if auto-generated
-
-  // Receipt/Boleta image attachment (Cloudinary)
-  receiptImageUrl String? // Cloudinary URL
-  receiptPublicId String? // Cloudinary public ID for deletion
-  hasReceipt      Boolean @default(false)
-
-  // Categorization
-  categoryId String
-  statusId   String
-  tenantId   String
-
-  // Relations
-  category       ExpenseCategory        @relation(fields: [categoryId], references: [id])
-  status         ExpenseStatus          @relation(fields: [statusId], references: [id])
-  tenant         Tenant                 @relation(fields: [tenantId], references: [id])
-  taxDocument    TaxDocument?           @relation(fields: [taxDocumentId], references: [id])
-  paymentAccount PaymentAccount?        @relation(fields: [paymentAccountId], references: [id])
-  staff          Staff?                 @relation(fields: [staffId], references: [id])
-  reimbursement  EmployeeReimbursement? @relation(fields: [reimbursementId], references: [id])
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  paymentType         ExpensePaymentType
+  paymentAccountId    String?
+  staffId             String?
+  reimbursementId     String?
+  isCompanyExpense    Boolean                @default(true)
+  excludeFromReports  Boolean                @default(false)
+  isFromInvoice       Boolean                @default(false)
+  taxDocumentId       String?
+  receiptImageUrl     String?
+  receiptPublicId     String?
+  hasReceipt          Boolean                @default(false)
+  categoryId          String
+  statusId            String
+  tenantId            String
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
+  category            ExpenseCategory        @relation(fields: [categoryId], references: [id])
+  paymentAccount      PaymentAccount?        @relation(fields: [paymentAccountId], references: [id])
+  reimbursement       EmployeeReimbursement? @relation(fields: [reimbursementId], references: [id])
+  staff               Staff?                 @relation(fields: [staffId], references: [id])
+  status              ExpenseStatus          @relation(fields: [statusId], references: [id])
+  taxDocument         TaxDocument?           @relation(fields: [taxDocumentId], references: [id])
+  tenant              Tenant                 @relation(fields: [tenantId], references: [id])
 
   @@map("expenses")
 }
 
-// ==========================================
-// SYSTEM & MULTI-TENANCY
-// ==========================================
-
 model Tenant {
-  id        String   @id @default(cuid())
-  name      String
-  slug      String   @unique
-  rut       String?
-  address   String?
-  phone     String?
-  email     String?
-  domain    String?
-  settings  Json     @default("{}")
-  features  Json     @default("[]")
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  staff          Staff[]
-  products       Product[]
-  categories     Category[]
-  productVariants ProductVariant[]
-  modifierGroups ModifierGroup[]
-  productModifiers ProductModifier[]
-  contacts       Contact[] // Unified contacts (customers + suppliers)
-  transactions   Transaction[]
-  taxDocuments   TaxDocument[]
-  movements      ProductMovement[]
-  tasks          Task[]
-  purchaseOrders PurchaseOrder[]
-  inventory      InventoryRecord[]
-
-  // Recipe & Production Relations
-  recipes                Recipe[]
-  productionBatches      ProductionBatch[]
-  ingredientConsumptions IngredientConsumption[]
-
-  // Expense Management Relations
-  paymentAccounts        PaymentAccount[]
-  expenses               Expense[]
+  id                     String                  @id @default(cuid())
+  name                   String
+  slug                   String                  @unique
+  rut                    String?
+  address                String?
+  phone                  String?
+  email                  String?
+  domain                 String?
+  settings               Json                    @default("{}")
+  features               Json                    @default("[]")
+  isActive               Boolean                 @default(true)
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  apiKeys                ApiKey[]
+  attendances            Attendance[]
+  categories             Category[]
+  contactFieldConfigs    ContactFieldConfig[]
+  contactTypeConfigs     ContactTypeConfig[]
+  contacts               Contact[]
+  employeeReimbursements EmployeeReimbursement[]
   expenseCategories      ExpenseCategory[]
   expenseStatuses        ExpenseStatus[]
-  employeeReimbursements EmployeeReimbursement[]
-
-  // Contact Type Configuration Relations
-  contactTypeConfigs  ContactTypeConfig[]
-  contactFieldConfigs ContactFieldConfig[]
-
-  // Staff Management & Attendance Relations
-  shifts       Shift[]
-  attendances  Attendance[]
-  payrollRuns  PayrollRun[]
-  ptoRequests  PTORequest[]
-
-  // API Keys
-  apiKeys ApiKey[]
+  expenses               Expense[]
+  ingredientConsumptions IngredientConsumption[]
+  inventory              InventoryRecord[]
+  modifierGroups         ModifierGroup[]
+  paymentAccounts        PaymentAccount[]
+  payrollRuns            PayrollRun[]
+  productModifiers       ProductModifier[]
+  movements              ProductMovement[]
+  productVariants        ProductVariant[]
+  productionBatches      ProductionBatch[]
+  products               Product[]
+  ptoRequests            PTORequest[]
+  purchaseOrders         PurchaseOrder[]
+  recipes                Recipe[]
+  shifts                 Shift[]
+  staff                  Staff[]
+  tasks                  Task[]
+  taxDocuments           TaxDocument[]
+  transactions           Transaction[]
 
   @@map("tenants")
 }
@@ -1032,17 +808,196 @@ model AuditLog {
   ipAddress String?
   userAgent String?
   createdAt DateTime @default(now())
-
-  staff Staff? @relation(fields: [staffId], references: [id])
+  staff     Staff?   @relation(fields: [staffId], references: [id])
 
   @@index([entity, entityId])
   @@index([createdAt])
   @@map("audit_logs")
 }
 
-// ==========================================
-// ENUMS
-// ==========================================
+model Shift {
+  id           String       @id @default(cuid())
+  name         String
+  startTime    DateTime
+  endTime      DateTime
+  dayOfWeek    Int?
+  isRecurring  Boolean      @default(false)
+  specificDate DateTime?
+  staffId      String
+  tenantId     String
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  attendances  Attendance[]
+  staff        Staff        @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  tenant       Tenant       @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, staffId])
+  @@index([specificDate])
+  @@map("shifts")
+}
+
+model Attendance {
+  id             String           @id @default(cuid())
+  shiftId        String
+  staffId        String
+  date           DateTime
+  scheduledStart DateTime
+  scheduledEnd   DateTime
+  actualCheckIn  DateTime?
+  actualCheckOut DateTime?
+  status         AttendanceStatus
+  minutesLate    Int?
+  totalHours     Decimal?         @db.Decimal(5, 2)
+  notes          String?
+  tenantId       String
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  shift          Shift            @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+  staff          Staff            @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  tenant         Tenant           @relation(fields: [tenantId], references: [id])
+
+  @@unique([shiftId, date])
+  @@index([tenantId, staffId, date])
+  @@index([date])
+  @@map("attendances")
+}
+
+model PayrollRun {
+  id          String        @id @default(cuid())
+  periodStart DateTime
+  periodEnd   DateTime
+  staffId     String
+  hoursWorked Decimal       @db.Decimal(8, 2)
+  regularPay  Decimal       @db.Decimal(12, 2)
+  overtimePay Decimal?      @db.Decimal(12, 2)
+  deductions  Decimal?      @db.Decimal(12, 2)
+  totalPay    Decimal       @db.Decimal(12, 2)
+  netPay      Decimal       @db.Decimal(12, 2)
+  status      PayrollStatus @default(PENDING)
+  paidAt      DateTime?
+  notes       String?
+  tenantId    String
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  staff       Staff         @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  tenant      Tenant        @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, staffId])
+  @@index([periodStart, periodEnd])
+  @@map("payroll_runs")
+}
+
+model PTORequest {
+  id          String    @id @default(cuid())
+  staffId     String
+  startDate   DateTime
+  endDate     DateTime
+  days        Int
+  reason      String?
+  status      PTOStatus @default(PENDING)
+  requestedAt DateTime  @default(now())
+  reviewedAt  DateTime?
+  reviewedBy  String?
+  tenantId    String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  staff       Staff     @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  tenant      Tenant    @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, staffId])
+  @@index([status])
+  @@map("pto_requests")
+}
+
+model Task {
+  id                  String           @id @default(cuid())
+  title               String
+  description         String?
+  status              TaskStatus       @default(TODO)
+  priority            Priority         @default(MEDIUM)
+  dueDate             DateTime?
+  completedAt         DateTime?
+  googleChatSpaceId   String?
+  googleChatMessageId String?
+  
+  // Google Tasks API Integration
+  googleTaskId        String?          // Google Tasks API identifier
+  googleTasksListId   String?          // Parent task list (usually from Chat space)
+  googleTasksUpdatedAt DateTime?       // Track Google's last modified timestamp
+  syncStatus          SyncStatus       @default(PENDING) // PENDING, SYNCED, CONFLICT, ERROR
+  syncDirection       SyncDirection    @default(BIDIRECTIONAL) // TO_GOOGLE, FROM_GOOGLE, BIDIRECTIONAL
+  lastSyncAt          DateTime?        // When was the last sync performed
+  
+  tenantId            String
+  createdById         String
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+  assignments         TaskAssignment[]
+  comments            TaskComment[]
+  createdBy           Staff            @relation("TaskCreatedBy", fields: [createdById], references: [id])
+  tenant              Tenant           @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@index([status])
+  @@index([dueDate])
+  @@index([createdById])
+  @@index([googleTaskId])
+  @@index([syncStatus])
+  @@map("tasks")
+}
+
+model TaskAssignment {
+  id         String         @id @default(cuid())
+  taskId     String
+  staffId    String
+  role       AssignmentRole @default(ASSIGNEE)
+  assignedAt DateTime       @default(now())
+  assignedBy String
+  staff      Staff          @relation("StaffTaskAssignments", fields: [staffId], references: [id])
+  task       Task           @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, staffId])
+  @@index([staffId])
+  @@map("task_assignments")
+}
+
+model TaskComment {
+  id        String   @id @default(cuid())
+  taskId    String
+  staffId   String
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  staff     Staff    @relation("StaffTaskComments", fields: [staffId], references: [id])
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+  @@index([staffId])
+  @@map("task_comments")
+}
+
+model ApiKey {
+  id          String    @id @default(cuid())
+  name        String
+  key         String    @unique
+  tenantId    String
+  isActive    Boolean   @default(true)
+  expiresAt   DateTime?
+  lastUsedAt  DateTime?
+  createdById String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([key, isActive])
+  @@map("api_keys")
+}
+
+enum ModifierType {
+  ADD
+  REMOVE
+}
 
 enum StaffRole {
   SUPER_ADMIN
@@ -1052,6 +1007,19 @@ enum StaffRole {
   EMPLOYEE
   CONTRACTOR
   INTERN
+}
+
+enum SyncStatus {
+  PENDING
+  SYNCED
+  CONFLICT
+  ERROR
+}
+
+enum SyncDirection {
+  TO_GOOGLE
+  FROM_GOOGLE
+  BIDIRECTIONAL
 }
 
 enum TaskStatus {
@@ -1075,21 +1043,6 @@ enum AssignmentRole {
   OBSERVER
 }
 
-enum SyncStatus {
-  PENDING
-  SYNCED
-  CONFLICT
-  ERROR
-}
-
-enum SyncDirection {
-  TO_GOOGLE
-  FROM_GOOGLE
-  BIDIRECTIONAL
-}
-
-// ContactType enum removed - now using ContactTypeConfig for flexible contact types
-
 enum MovementType {
   PURCHASE
   SALE
@@ -1098,9 +1051,9 @@ enum MovementType {
   RETURN
   DAMAGE
   PRODUCTION
-  PRODUCTION_INPUT // Consume insumos for production
-  PRODUCTION_OUTPUT // Add manufactured product to stock
-  SALE_CONSUMPTION // Auto-deduct for MADE_TO_ORDER
+  PRODUCTION_INPUT
+  PRODUCTION_OUTPUT
+  SALE_CONSUMPTION
 }
 
 enum TransactionType {
@@ -1160,42 +1113,42 @@ enum TaxDocumentStatus {
 }
 
 enum AccountType {
-  BANK_ACCOUNT // Cuenta corriente/ahorro
-  CREDIT_CARD // Tarjeta de crédito
-  DEBIT_CARD // Tarjeta débito
-  CASH // Efectivo/caja chica
-  DIGITAL_WALLET // Mercado Pago, PayPal, etc.
+  BANK_ACCOUNT
+  CREDIT_CARD
+  DEBIT_CARD
+  CASH
+  DIGITAL_WALLET
   OTHER
 }
 
 enum ReimbursementStatus {
-  PENDING // Pending approval/payment
-  APPROVED // Approved but not paid
-  PAID // Fully paid
-  PARTIALLY_PAID // Partially paid
-  REJECTED // Rejected
-  CANCELLED // Cancelled
+  PENDING
+  APPROVED
+  PAID
+  PARTIALLY_PAID
+  REJECTED
+  CANCELLED
 }
 
 enum ExpensePaymentType {
-  COMPANY_ACCOUNT // Paid directly by company account
-  EMPLOYEE_PAID // Employee paid, needs reimbursement
-  PERSONAL // Personal expense, no reimbursement needed
-  MIXED // Split between company and personal
+  COMPANY_ACCOUNT
+  EMPLOYEE_PAID
+  PERSONAL
+  MIXED
 }
 
 enum ProductType {
-  INPUT // Raw materials and ingredients (insumos)
-  READY_PRODUCT // Bought ready to sell (productos comprados listos)
-  MANUFACTURED // Made with recipe, produced in batches
-  MADE_TO_ORDER // Made on-the-spot (elaborados al momento)
-  SERVICE // Non-physical service
+  INPUT
+  READY_PRODUCT
+  MANUFACTURED
+  MADE_TO_ORDER
+  SERVICE
 }
 
 enum ProductFormat {
-  PACKAGED // Envasado - Packaged products
-  FROZEN   // Congelado - Frozen products
-  FRESH    // Fresco - Fresh products
+  PACKAGED
+  FROZEN
+  FRESH
 }
 
 enum ProductionStatus {
@@ -1218,11 +1171,11 @@ enum SalaryType {
 }
 
 enum AttendanceStatus {
-  ON_TIME           // Checked in within 15 min grace period
-  LATE              // Checked in after grace period
-  ABSENT            // No check-in
-  EARLY_DEPARTURE   // Left before shift end
-  APPROVED_PTO      // Scheduled time off
+  ON_TIME
+  LATE
+  ABSENT
+  EARLY_DEPARTURE
+  APPROVED_PTO
 }
 
 enum PayrollStatus {
@@ -1235,206 +1188,4 @@ enum PTOStatus {
   PENDING
   APPROVED
   DENIED
-}
-
-// ==========================================
-// STAFF MANAGEMENT & ATTENDANCE
-// ==========================================
-
-model Shift {
-  id           String   @id @default(cuid())
-  name         String   // e.g., "Morning Shift" or "Dec 25 Extra"
-  startTime    DateTime // Time component used for recurring, full datetime for one-time
-  endTime      DateTime
-  dayOfWeek    Int?     // 0-6 (Sun-Sat) for recurring shifts, null for one-time
-  isRecurring  Boolean  @default(false)
-  specificDate DateTime? // For one-time shifts only
-  staffId      String
-  tenantId     String
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  staff       Staff        @relation(fields: [staffId], references: [id], onDelete: Cascade)
-  tenant      Tenant       @relation(fields: [tenantId], references: [id])
-  attendances Attendance[]
-
-  @@index([tenantId, staffId])
-  @@index([specificDate])
-  @@map("shifts")
-}
-
-model Attendance {
-  id             String           @id @default(cuid())
-  shiftId        String
-  staffId        String
-  date           DateTime         // Which day this attendance is for
-  scheduledStart DateTime         // When shift was supposed to start
-  scheduledEnd   DateTime         // When shift was supposed to end
-  actualCheckIn  DateTime?        // When they actually checked in
-  actualCheckOut DateTime?        // When they actually checked out
-  status         AttendanceStatus // ON_TIME, LATE, ABSENT, etc.
-  minutesLate    Int?             // Minutes late (beyond 15 min grace)
-  totalHours     Decimal?         @db.Decimal(5, 2) // Actual hours worked
-  notes          String?          // Admin notes only
-  tenantId       String
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
-
-  shift  Shift  @relation(fields: [shiftId], references: [id], onDelete: Cascade)
-  staff  Staff  @relation(fields: [staffId], references: [id], onDelete: Cascade)
-  tenant Tenant @relation(fields: [tenantId], references: [id])
-
-  @@unique([shiftId, date])
-  @@index([tenantId, staffId, date])
-  @@index([date])
-  @@map("attendances")
-}
-
-model PayrollRun {
-  id          String        @id @default(cuid())
-  periodStart DateTime      // Start of pay period
-  periodEnd   DateTime      // End of pay period
-  staffId     String
-  hoursWorked Decimal       @db.Decimal(8, 2) // Total hours in period
-  regularPay  Decimal       @db.Decimal(12, 2) // Base pay
-  overtimePay Decimal?      @db.Decimal(12, 2) // Overtime if applicable
-  deductions  Decimal?      @db.Decimal(12, 2) // Optional deductions
-  totalPay    Decimal       @db.Decimal(12, 2) // Gross pay
-  netPay      Decimal       @db.Decimal(12, 2) // After deductions
-  status      PayrollStatus @default(PENDING)
-  paidAt      DateTime?     // When payment was made
-  notes       String?
-  tenantId    String
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-
-  staff  Staff  @relation(fields: [staffId], references: [id], onDelete: Cascade)
-  tenant Tenant @relation(fields: [tenantId], references: [id])
-
-  @@index([tenantId, staffId])
-  @@index([periodStart, periodEnd])
-  @@map("payroll_runs")
-}
-
-model PTORequest {
-  id          String    @id @default(cuid())
-  staffId     String
-  startDate   DateTime  // First day of PTO
-  endDate     DateTime  // Last day of PTO
-  days        Int       // Number of days requested
-  reason      String?   // Optional reason
-  status      PTOStatus @default(PENDING)
-  requestedAt DateTime  @default(now())
-  reviewedAt  DateTime? // When approved/denied
-  reviewedBy  String?   // Staff ID of reviewer (admin)
-  tenantId    String
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  staff  Staff  @relation(fields: [staffId], references: [id], onDelete: Cascade)
-  tenant Tenant @relation(fields: [tenantId], references: [id])
-
-  @@index([tenantId, staffId])
-  @@index([status])
-  @@map("pto_requests")
-}
-
-// ==========================================
-// PLANNING & TASK MANAGEMENT
-// ==========================================
-
-model Task {
-  id          String     @id @default(cuid())
-  title       String
-  description String?
-  status      TaskStatus @default(TODO)
-  priority    Priority   @default(MEDIUM)
-  dueDate     DateTime?
-  completedAt DateTime?
-  googleChatSpaceId String? // Google Chat space ID for this task
-  googleChatMessageId String? // Google Chat message ID for this task
-  
-  // Google Tasks API Integration
-  googleTaskId      String?   // Google Tasks API identifier
-  googleTasksListId String?   // Parent task list (usually from Chat space)
-  googleTasksUpdatedAt DateTime? // Track Google's last modified timestamp
-  syncStatus        SyncStatus @default(PENDING) // PENDING, SYNCED, CONFLICT, ERROR
-  syncDirection     SyncDirection @default(BIDIRECTIONAL) // TO_GOOGLE, FROM_GOOGLE, BIDIRECTIONAL
-  lastSyncAt        DateTime? // When was the last sync performed
-  
-  tenantId    String
-  createdById String
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-
-  // Relations
-  tenant      Tenant @relation(fields: [tenantId], references: [id])
-  createdBy   Staff  @relation("TaskCreatedBy", fields: [createdById], references: [id])
-  assignments TaskAssignment[]
-  comments    TaskComment[]
-
-  @@index([tenantId])
-  @@index([status])
-  @@index([dueDate])
-  @@index([createdById])
-  @@index([googleTaskId])
-  @@index([syncStatus])
-  @@map("tasks")
-}
-
-model TaskAssignment {
-  id     String @id @default(cuid())
-  taskId String
-  staffId String
-  role   AssignmentRole @default(ASSIGNEE)
-  assignedAt DateTime @default(now())
-  assignedBy String // Staff ID who made the assignment
-
-  // Relations
-  task   Task  @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  staff  Staff @relation("StaffTaskAssignments", fields: [staffId], references: [id])
-
-  @@unique([taskId, staffId])
-  @@index([staffId])
-  @@map("task_assignments")
-}
-
-model TaskComment {
-  id        String   @id @default(cuid())
-  taskId    String
-  staffId   String
-  content   String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  task  Task  @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  staff Staff @relation("StaffTaskComments", fields: [staffId], references: [id])
-
-  @@index([taskId])
-  @@index([staffId])
-  @@map("task_comments")
-}
-
-// ==========================================
-// API AUTHENTICATION
-// ==========================================
-
-model ApiKey {
-  id          String   @id @default(cuid())
-  name        String   // Friendly name like "Mobile App", "Website", "External Integration"
-  key         String   @unique // The actual API key (hashed)
-  tenantId    String
-  isActive    Boolean  @default(true)
-  expiresAt   DateTime? // Optional expiration
-  lastUsedAt  DateTime?
-  createdById String?  // Staff who created it
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  @@index([tenantId])
-  @@index([key, isActive])
-  @@map("api_keys")
 }

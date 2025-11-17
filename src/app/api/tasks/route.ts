@@ -163,10 +163,10 @@ export async function POST(request: NextRequest) {
         const taskNotificationData = {
           taskId: 'temp', // Will be updated after task creation
           title: title.trim(),
-          description: description?.trim() || null,
+          description: description?.trim() || undefined,
           status: 'TODO',
           priority,
-          dueDate: dueDate ? new Date(dueDate).toISOString() : null,
+          dueDate: dueDate ? new Date(dueDate).toISOString() : undefined,
           createdBy: auth.userId, // Will be updated with actual name after creation
         };
 
@@ -231,7 +231,7 @@ export async function POST(request: NextRequest) {
         const taskNotificationData = {
           taskId: task.id,
           title: task.title,
-          description: task.description,
+          description: task.description || undefined,
           status: task.status,
           priority: task.priority,
           dueDate: task.dueDate?.toISOString(),

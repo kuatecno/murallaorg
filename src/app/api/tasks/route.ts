@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import prisma from '@/lib/prisma';
 import { getGoogleChatService } from '@/lib/googleChatService';
+import { getGoogleTasksSyncService } from '@/lib/googleTasksSyncService';
 import { authOptions } from '@/lib/auth';
 
 // GET /api/tasks - List tasks for current tenant
@@ -289,6 +290,17 @@ export async function POST(request: NextRequest) {
         }
       } catch (chatError) {
         console.error('Failed to update Google Chat message:', chatError);
+      }
+    }
+
+    // Create Google Task if enabled
+    if (process.env.GOOGLE_TASKS_ENABLED === 'true') {
+      try {
+        const googleTasksSync = getGoogleTasksSyncService();
+        await googleTasksSync.createGoogleTask(task.id);
+      } catch (tasksError) {
+        console.error('Failed to create Google Task:', tasksError);
+        // Continue even if Google Tasks creation fails
       }
     }
 

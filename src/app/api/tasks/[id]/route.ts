@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import prisma from '@/lib/prisma';
 import { getGoogleChatService } from '@/lib/googleChatService';
+import { getGoogleTasksSyncService } from '@/lib/googleTasksSyncService';
 import { authOptions } from '@/lib/auth';
 
 // GET /api/tasks/[id] - Get specific task
@@ -240,6 +241,17 @@ export async function PUT(
       }
     }
 
+    // Update Google Task if enabled
+    if (process.env.GOOGLE_TASKS_ENABLED === 'true') {
+      try {
+        const googleTasksSync = getGoogleTasksSyncService();
+        await googleTasksSync.updateGoogleTask(task.id);
+      } catch (tasksError) {
+        console.error('Failed to update Google Task:', tasksError);
+        // Continue even if Google Tasks update fails
+      }
+    }
+
     return NextResponse.json({ task });
   } catch (error) {
     console.error('Error updating task:', error);
@@ -285,6 +297,17 @@ export async function DELETE(
       } catch (chatError) {
         console.error('Failed to delete Google Chat space:', chatError);
         // Continue even if chat deletion fails
+      }
+    }
+
+    // Delete Google Task if it exists
+    if (process.env.GOOGLE_TASKS_ENABLED === 'true') {
+      try {
+        const googleTasksSync = getGoogleTasksSyncService();
+        await googleTasksSync.deleteGoogleTask(existingTask.id);
+      } catch (tasksError) {
+        console.error('Failed to delete Google Task:', tasksError);
+        // Continue even if Google Tasks deletion fails
       }
     }
 

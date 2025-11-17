@@ -119,7 +119,7 @@ export default function ImageUploader({
           ref={fileInputRef}
           type="file"
           multiple
-          accept="image/*"
+          accept="image/*,.svg"
           className="hidden"
           onChange={(e) => handleUpload(e.target.files)}
           disabled={uploading}
@@ -146,7 +146,7 @@ export default function ImageUploader({
                 Drag & drop images here, or click to select
               </p>
               <p className="text-xs text-gray-500">
-                PNG, JPG, GIF up to 10MB
+                PNG, JPG, GIF, SVG up to 10MB
               </p>
             </>
           )}
@@ -156,24 +156,26 @@ export default function ImageUploader({
       {/* Image Preview Grid */}
       {images.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-          {images.map((imageUrl, index) => (
-            <div
-              key={index}
-              className="relative aspect-square rounded-lg overflow-hidden border-2 border-gray-200 group"
-            >
-              <img
-                src={imageUrl}
-                alt={`Uploaded ${index + 1}`}
-                className="w-full h-full object-cover"
-                onError={(e) => {
-                  const fallback =
-                    'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><rect width="200" height="200" fill="%23f3f4f6"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="Arial" font-size="14" fill="%236b7280">Sin imagen</text></svg>';
-                  const img = e.target as HTMLImageElement;
-                  if (img.src !== fallback) {
-                    img.src = fallback;
-                  }
-                }}
-              />
+          {images.map((imageUrl, index) => {
+            const isSvg = imageUrl.toLowerCase().endsWith('.svg') || imageUrl.includes('.svg?');
+            return (
+              <div
+                key={index}
+                className={`relative aspect-square rounded-lg overflow-hidden border-2 border-gray-200 group ${isSvg ? 'bg-white p-2' : ''}`}
+              >
+                <img
+                  src={imageUrl}
+                  alt={`Uploaded ${index + 1}`}
+                  className={`w-full h-full ${isSvg ? 'object-contain' : 'object-cover'}`}
+                  onError={(e) => {
+                    const fallback =
+                      'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><rect width="200" height="200" fill="%23f3f4f6"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="Arial" font-size="14" fill="%236b7280">Sin imagen</text></svg>';
+                    const img = e.target as HTMLImageElement;
+                    if (img.src !== fallback) {
+                      img.src = fallback;
+                    }
+                  }}
+                />
               <button
                 type="button"
                 onClick={(e) => {
@@ -197,7 +199,8 @@ export default function ImageUploader({
                 </svg>
               </button>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

@@ -97,6 +97,7 @@ model Product {
   ean          String? // Barcode
   name         String
   description  String?
+  shortDescription String? // Short description for menus and quick displays
   type         ProductType @default(INPUT)
   category     String?
   brand        String?
@@ -1074,6 +1075,19 @@ enum AssignmentRole {
   OBSERVER
 }
 
+enum SyncStatus {
+  PENDING
+  SYNCED
+  CONFLICT
+  ERROR
+}
+
+enum SyncDirection {
+  TO_GOOGLE
+  FROM_GOOGLE
+  BIDIRECTIONAL
+}
+
 // ContactType enum removed - now using ContactTypeConfig for flexible contact types
 
 enum MovementType {
@@ -1339,6 +1353,15 @@ model Task {
   completedAt DateTime?
   googleChatSpaceId String? // Google Chat space ID for this task
   googleChatMessageId String? // Google Chat message ID for this task
+  
+  // Google Tasks API Integration
+  googleTaskId      String?   // Google Tasks API identifier
+  googleTasksListId String?   // Parent task list (usually from Chat space)
+  googleTasksUpdatedAt DateTime? // Track Google's last modified timestamp
+  syncStatus        SyncStatus @default(PENDING) // PENDING, SYNCED, CONFLICT, ERROR
+  syncDirection     SyncDirection @default(BIDIRECTIONAL) // TO_GOOGLE, FROM_GOOGLE, BIDIRECTIONAL
+  lastSyncAt        DateTime? // When was the last sync performed
+  
   tenantId    String
   createdById String
   createdAt   DateTime   @default(now())
@@ -1354,6 +1377,8 @@ model Task {
   @@index([status])
   @@index([dueDate])
   @@index([createdById])
+  @@index([googleTaskId])
+  @@index([syncStatus])
   @@map("tasks")
 }
 

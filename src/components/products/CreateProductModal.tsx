@@ -12,6 +12,7 @@ interface Product {
   sku: string;
   name: string;
   description?: string;
+  shortDescription?: string;
   type: ProductType;
   category?: string;
   brand?: string;
@@ -52,6 +53,7 @@ export interface ProductFormData {
   sku: string;
   name: string;
   description: string;
+  shortDescription: string;
   type: ProductType;
   category: string;
   brand: string;
@@ -130,6 +132,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
     sku: '',
     name: '',
     description: '',
+    shortDescription: '',
     type: 'INPUT',
     category: '',
     brand: '',
@@ -181,6 +184,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
         sku: product.sku,
         name: product.name,
         description: product.description || '',
+        shortDescription: product.shortDescription || '',
         type: product.type,
         category: product.category || '',
         brand: product.brand || '',
@@ -393,6 +397,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
       ...prev,
       name: enrichedData.name || prev.name,
       description: enrichedData.description || prev.description,
+      shortDescription: enrichedData.shortDescription || prev.shortDescription,
       category: enrichedData.category || prev.category,
       brand: enrichedData.brand || prev.brand,
       ean: enrichedData.ean || prev.ean,
@@ -450,6 +455,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
         sku: willHaveVariants ? `${formData.name.replace(/\s+/g, '-').toUpperCase()}-PARENT` : formData.sku,
         name: formData.name,
         description: formData.description || undefined,
+        shortDescription: formData.shortDescription || undefined,
         type: formData.type,
         category: formData.category || undefined,
         brand: formData.brand || undefined,
@@ -566,6 +572,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
       sku: '',
       name: '',
       description: '',
+      shortDescription: '',
       type: 'INPUT',
       category: '',
       brand: '',
@@ -968,6 +975,24 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder={t('products.description')}
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Short Description <span className="text-gray-500 text-xs">(Optional, for menus)</span>
+            </label>
+            <textarea
+              name="shortDescription"
+              value={formData.shortDescription}
+              onChange={handleChange}
+              rows={2}
+              maxLength={150}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="Brief description for display in menus (max 150 characters)"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              {formData.shortDescription.length}/150 characters
+            </p>
           </div>
 
           {/* Cross-Variant Images */}

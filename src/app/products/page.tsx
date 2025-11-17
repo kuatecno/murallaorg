@@ -19,6 +19,7 @@ interface Product {
   sourceUrl?: string;
   name: string;
   description?: string;
+  shortDescription?: string;
   type: 'INPUT' | 'READY_PRODUCT' | 'MANUFACTURED' | 'MADE_TO_ORDER' | 'SERVICE';
   category?: string;
   brand?: string;
@@ -644,18 +645,31 @@ export default function ProductsPage() {
                   </div>
 
                   {/* Product Image */}
-                  {product.images && Array.isArray(product.images) && product.images.length > 0 && (
-                    <div className="mb-4 rounded-lg overflow-hidden bg-gray-100">
-                      <img
-                        src={product.images[0]}
-                        alt={product.name}
-                        className="w-full h-48 object-cover"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).style.display = 'none';
-                        }}
-                      />
-                    </div>
-                  )}
+                  <div className="mb-4 rounded-lg overflow-hidden bg-gray-100">
+                    {product.images && Array.isArray(product.images) && product.images.length > 0 ? (
+                      (() => {
+                        const imageUrl = product.images[0];
+                        const isSvg = imageUrl.toLowerCase().endsWith('.svg') || imageUrl.includes('.svg?');
+                        return (
+                          <div className={`w-full h-48 ${isSvg ? 'p-4 bg-white' : ''}`}>
+                            <img
+                              src={imageUrl}
+                              alt={product.name}
+                              className={`w-full h-full ${isSvg ? 'object-contain' : 'object-cover'}`}
+                              onError={(e) => {
+                                const img = e.target as HTMLImageElement;
+                                img.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300"><rect width="400" height="300" fill="%23f3f4f6"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="Arial" font-size="18" fill="%239ca3af">📦 No image</text></svg>';
+                              }}
+                            />
+                          </div>
+                        );
+                      })()
+                    ) : (
+                      <div className="w-full h-48 flex items-center justify-center bg-gray-100">
+                        <span className="text-4xl">📦</span>
+                      </div>
+                    )}
+                  </div>
 
                   <div className="flex justify-between items-start mb-4">
                     {getProductTypeBadge(product.type)}
@@ -816,19 +830,26 @@ export default function ProductsPage() {
                         <div className="flex items-center space-x-3">
                           {/* Product Image */}
                           {product.images && Array.isArray(product.images) && product.images.length > 0 ? (
-                            <div className="flex-shrink-0 h-12 w-12 rounded-lg overflow-hidden bg-gray-100">
-                              <img
-                                src={product.images[0]}
-                                alt={product.name}
-                                className="h-12 w-12 object-cover"
-                                onError={(e) => {
-                                  (e.target as HTMLImageElement).style.display = 'none';
-                                }}
-                              />
-                            </div>
+                            (() => {
+                              const imageUrl = product.images[0];
+                              const isSvg = imageUrl.toLowerCase().endsWith('.svg') || imageUrl.includes('.svg?');
+                              return (
+                                <div className={`flex-shrink-0 h-12 w-12 rounded-lg overflow-hidden bg-gray-100 ${isSvg ? 'p-1 bg-white' : ''}`}>
+                                  <img
+                                    src={imageUrl}
+                                    alt={product.name}
+                                    className={`h-12 w-12 ${isSvg ? 'object-contain' : 'object-cover'}`}
+                                    onError={(e) => {
+                                      const img = e.target as HTMLImageElement;
+                                      img.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" fill="%23f3f4f6"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="Arial" font-size="24" fill="%239ca3af">📦</text></svg>';
+                                    }}
+                                  />
+                                </div>
+                              );
+                            })()
                           ) : (
-                            <div className="flex-shrink-0 h-12 w-12 rounded-lg bg-gray-200 flex items-center justify-center">
-                              <span className="text-gray-400 text-xs">No img</span>
+                            <div className="flex-shrink-0 h-12 w-12 rounded-lg bg-gray-100 flex items-center justify-center">
+                              <span className="text-xl">📦</span>
                             </div>
                           )}
                           <div>

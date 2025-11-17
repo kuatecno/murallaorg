@@ -116,6 +116,7 @@ export async function GET(
       sku: product.sku,
       name: product.name,
       description: product.description,
+      shortDescription: product.shortDescription,
       category: product.category,
       brand: product.brand,
       unitPrice: Number(product.unitPrice),
@@ -126,6 +127,7 @@ export async function GET(
       unit: product.unit,
       format: product.format,
       tags: product.tags,
+      images: product.images,
       isActive: product.isActive,
       metadata: product.metadata,
       createdAt: product.createdAt,
@@ -301,6 +303,7 @@ export async function PUT(
     if (body.ean !== undefined) updateData.ean = body.ean;
     if (body.name !== undefined) updateData.name = body.name;
     if (body.description !== undefined) updateData.description = body.description;
+    if (body.shortDescription !== undefined) updateData.shortDescription = body.shortDescription;
     if (body.category !== undefined) updateData.category = body.category;
     if (body.brand !== undefined) updateData.brand = body.brand;
     if (body.sourceUrl !== undefined) updateData.sourceUrl = body.sourceUrl;
@@ -357,6 +360,7 @@ export async function PUT(
       sku: updatedProduct.sku,
       name: updatedProduct.name,
       description: updatedProduct.description,
+      shortDescription: updatedProduct.shortDescription,
       category: updatedProduct.category,
       brand: updatedProduct.brand,
       unitPrice: Number(updatedProduct.unitPrice),
@@ -367,6 +371,7 @@ export async function PUT(
       unit: updatedProduct.unit,
       format: updatedProduct.format,
       tags: updatedProduct.tags,
+      images: updatedProduct.images,
       isActive: updatedProduct.isActive,
       metadata: updatedProduct.metadata,
       createdAt: updatedProduct.createdAt,

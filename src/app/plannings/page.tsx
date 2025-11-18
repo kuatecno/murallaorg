@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Plus, Filter, Search, Calendar, User, MessageSquare, Link2, MoreHorizontal } from 'lucide-react';
+import { Plus, Filter, Search, Calendar, User, MessageSquare, Link2, MoreHorizontal, RefreshCw, CheckCircle, AlertCircle, Clock, Activity } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import CreateTaskModal from '@/components/tasks/CreateTaskModal';
 
@@ -15,6 +15,13 @@ interface Task {
   completedAt?: string;
   googleChatSpaceId?: string;
   googleChatMessageId?: string;
+  // Google Tasks sync fields
+  googleTaskId?: string;
+  googleTasksListId?: string;
+  googleTasksUpdatedAt?: string;
+  syncStatus?: 'PENDING' | 'SYNCED' | 'CONFLICT' | 'ERROR';
+  syncDirection?: 'TO_GOOGLE' | 'FROM_GOOGLE' | 'BIDIRECTIONAL';
+  lastSyncAt?: string;
   createdAt: string;
   updatedAt: string;
   createdBy: {
@@ -47,6 +54,85 @@ interface Staff {
   email: string;
 }
 
+// Sync status component
+const SyncStatusIndicator = ({ task, onSync }: { task: Task; onSync: () => void }) => {
+  const getSyncIcon = () => {
+    switch (task.syncStatus) {
+      case 'SYNCED':
+        return <CheckCircle className="w-4 h-4 text-green-500" />;
+      case 'PENDING':
+        return <Clock className="w-4 h-4 text-yellow-500" />;
+      case 'ERROR':
+        return <AlertCircle className="w-4 h-4 text-red-500" />;
+      case 'CONFLICT':
+        return <AlertCircle className="w-4 h-4 text-orange-500" />;
+      default:
+        return <Activity className="w-4 h-4 text-gray-400" />;
+    }
+  };
+
+  const getSyncTooltip = () => {
+    switch (task.syncStatus) {
+      case 'SYNCED':
+        return 'Synced with Google Tasks';
+      case 'PENDING':
+        return 'Sync pending';
+      case 'ERROR':
+        return 'Sync error occurred';
+      case 'CONFLICT':
+        return 'Sync conflict detected';
+      default:
+        return 'Not synced';
+    }
+  };
+
+  const handleManualSync = async () => {
+    try {
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      const response = await fetch('/api/tasks/sync', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ taskId: task.id }),
+      });
+
+      if (response.ok) {
+        toast.success('Task synced successfully');
+        // Refresh tasks list
+        onSync();
+      } else {
+        toast.error('Failed to sync task');
+      }
+    } catch (error) {
+      toast.error('Error syncing task');
+    }
+  };
+
+  return (
+    <div className="flex items-center space-x-2 group relative">
+      <div className="flex items-center space-x-1" title={getSyncTooltip()}>
+        {getSyncIcon()}
+        {task.googleTaskId && (
+          <Link2 className="w-3 h-3 text-blue-500" />
+        )}
+      </div>
+      {task.syncStatus !== 'SYNCED' && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            handleManualSync();
+          }}
+          className="opacity-0 group-hover:opacity-100 transition-opacity"
+          title="Manual sync"
+        >
+          <RefreshCw className="w-3 h-3 text-gray-500 hover:text-blue-500" />
+        </button>
+      )}
+    </div>
+  );
+};
+
 const statusColumns = [
   { id: 'TODO', title: 'To Do', color: 'bg-gray-100' },
   { id: 'IN_PROGRESS', title: 'In Progress', color: 'bg-blue-50' },
@@ -69,21 +155,61 @@ const priorityLabels = {
   URGENT: 'Urgent',
 };
 
-export default function PlanningsPage() {
+export default function PlanningPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [staff, setStaff] = useState<Staff[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedPriority, setSelectedPriority] = useState<string>('');
-  const [selectedAssignee, setSelectedAssignee] = useState<string>('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [showTaskDetail, setShowTaskDetail] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedPriority, setSelectedPriority] = useState('');
+  const [selectedAssignee, setSelectedAssignee] = useState('');
+  const [syncStatus, setSyncStatus] = useState<any>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   useEffect(() => {
     fetchTasks();
     fetchStaff();
+    fetchSyncStatus();
   }, [searchTerm, selectedPriority, selectedAssignee]);
+
+  const fetchSyncStatus = async () => {
+    try {
+      const response = await fetch('/api/tasks/sync/status');
+      if (response.ok) {
+        const data = await response.json();
+        setSyncStatus(data);
+      }
+    } catch (error) {
+      console.error('Error fetching sync status:', error);
+    }
+  };
+
+  const handleGlobalSync = async () => {
+    setIsSyncing(true);
+    try {
+      const response = await fetch('/api/tasks/sync', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ direction: 'bidirectional' }),
+      });
+
+      if (response.ok) {
+        toast.success('Global sync completed successfully');
+        fetchTasks();
+        fetchSyncStatus();
+      } else {
+        toast.error('Failed to complete global sync');
+      }
+    } catch (error) {
+      toast.error('Error during global sync');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   const fetchTasks = async () => {
     try {
@@ -182,6 +308,51 @@ export default function PlanningsPage() {
           </button>
         </div>
 
+        {/* Google Tasks Sync Status */}
+        <div className="bg-white p-4 rounded-lg shadow-sm mb-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Activity className="w-5 h-5 text-blue-600" />
+                <h3 className="text-lg font-medium text-gray-900">Google Tasks Sync</h3>
+              </div>
+              {syncStatus && (
+                <div className="flex items-center gap-4 text-sm">
+                  <div className="flex items-center gap-1">
+                    <CheckCircle className="w-4 h-4 text-green-500" />
+                    <span className="text-gray-600">Synced: {syncStatus.SYNCED || 0}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Clock className="w-4 h-4 text-yellow-500" />
+                    <span className="text-gray-600">Pending: {syncStatus.PENDING || 0}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <AlertCircle className="w-4 h-4 text-red-500" />
+                    <span className="text-gray-600">Errors: {syncStatus.ERROR || 0}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+            <button
+              onClick={handleGlobalSync}
+              disabled={isSyncing}
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isSyncing ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  Syncing...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="w-4 h-4" />
+                  Sync All Tasks
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+
         {/* Filters */}
         <div className="flex items-center gap-4 bg-white p-4 rounded-lg shadow-sm">
           <div className="flex-1 relative">
@@ -244,7 +415,10 @@ export default function PlanningsPage() {
                   }}
                 >
                   <div className="flex items-start justify-between mb-2">
-                    <h4 className="font-medium text-gray-900 text-sm">{task.title}</h4>
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-medium text-gray-900 text-sm">{task.title}</h4>
+                      <SyncStatusIndicator task={task} onSync={() => { fetchTasks(); fetchSyncStatus(); }} />
+                    </div>
                     <span className={`text-xs px-2 py-1 rounded-full ${getPriorityColor(task.priority)}`}>
                       {priorityLabels[task.priority as keyof typeof priorityLabels]}
                     </span>

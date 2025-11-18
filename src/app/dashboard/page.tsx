@@ -77,6 +77,10 @@ export default function DashboardPage() {
                 Dashboard
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <Link href="/plannings" className="bg-emerald-50 p-6 rounded-lg hover:bg-emerald-100 transition-colors cursor-pointer">
+                  <h4 className="text-lg font-semibold text-emerald-900">Tasks & Planning</h4>
+                  <p className="text-emerald-700 mt-2">Manage tasks with Google Tasks sync</p>
+                </Link>
                 <Link href="/invoices" className="bg-indigo-50 p-6 rounded-lg hover:bg-indigo-100 transition-colors cursor-pointer">
                   <h4 className="text-lg font-semibold text-indigo-900">Invoices</h4>
                   <p className="text-indigo-700 mt-2">Create and manage tax documents</p>

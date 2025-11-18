@@ -1,22 +1,23 @@
 /**
  * Google Tasks Sync Service
  * Handles bi-directional synchronization between Muralla tasks and Google Tasks API
+ * Uses OAuth 2.0 user authentication
  */
 
 import { google } from 'googleapis';
-import { JWT } from 'google-auth-library';
+import { OAuth2Client } from 'google-auth-library';
 import prisma from '@/lib/prisma';
 
 interface GoogleTask {
-  id: string;
-  title: string;
-  notes?: string;
-  status: 'needsAction' | 'completed';
-  due?: string;
-  updated: string;
-  selfLink?: string;
-  parent?: string; // Task list ID
-  position?: string;
+  id?: string | null;
+  title?: string | null;
+  notes?: string | null;
+  status?: string | null;
+  due?: string | null;
+  updated?: string | null;
+  selfLink?: string | null;
+  parent?: string | null;
+  position?: string | null;
 }
 
 interface SyncConflict {
@@ -27,22 +28,61 @@ interface SyncConflict {
 }
 
 class GoogleTasksSyncService {
-  private auth: JWT;
-  private tasks: any;
-
   constructor() {
-    // Initialize JWT auth with service account (same as Google Chat)
-    this.auth = new JWT({
-      email: process.env.GOOGLE_CHAT_CLIENT_EMAIL,
-      key: process.env.GOOGLE_CHAT_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-      scopes: [
-        'https://www.googleapis.com/auth/chat.bot',
-        'https://www.googleapis.com/auth/tasks'
-      ],
-      subject: process.env.GOOGLE_CHAT_ADMIN_EMAIL,
+    // OAuth 2.0 - no service account initialization needed
+  }
+
+  /**
+   * Get authenticated Google Tasks client for a user
+   */
+  private async getTasksClient(userId: string) {
+    const user = await prisma.staff.findUnique({
+      where: { id: userId },
+      select: {
+        googleAccessToken: true,
+        googleRefreshToken: true,
+        googleTokenExpiresAt: true,
+        googleEmail: true,
+        googleTasksEnabled: true,
+      },
     });
 
-    this.tasks = google.tasks({ version: 'v1', auth: this.auth });
+    if (!user || !user.googleTasksEnabled || !user.googleAccessToken) {
+      throw new Error('Google Tasks not enabled for this user');
+    }
+
+    const oauth2Client = new google.auth.OAuth2(
+      process.env.GOOGLE_CLIENT_ID,
+      process.env.GOOGLE_CLIENT_SECRET,
+      process.env.GOOGLE_REDIRECT_URI
+    );
+
+    oauth2Client.setCredentials({
+      access_token: user.googleAccessToken,
+      refresh_token: user.googleRefreshToken,
+    });
+
+    // Check if token needs refresh
+    if (user.googleTokenExpiresAt && new Date() >= user.googleTokenExpiresAt) {
+      try {
+        const { credentials } = await oauth2Client.refreshAccessToken();
+        
+        // Update tokens in database
+        await prisma.staff.update({
+          where: { id: userId },
+          data: {
+            googleAccessToken: credentials.access_token,
+            googleTokenExpiresAt: credentials.expiry_date ? new Date(credentials.expiry_date) : null,
+          },
+        });
+
+        oauth2Client.setCredentials(credentials);
+      } catch (error) {
+        throw new Error('Failed to refresh Google access token');
+      }
+    }
+
+    return google.tasks({ version: 'v1', auth: oauth2Client });
   }
 
   /**
@@ -53,42 +93,49 @@ class GoogleTasksSyncService {
       const task = await prisma.task.findUnique({
         where: { id: taskId },
         include: {
-          assignments: {
-            include: {
-              staff: true
-            }
-          }
-        }
+          createdBy: true,
+        },
       });
 
-      if (!task) {
-        throw new Error('Task not found');
+      if (!task || !task.createdById) {
+        throw new Error('Task not found or has no creator');
       }
 
-      // Use default task list or create one for the Chat space
-      const taskListId = await this.getOrCreateTaskList(task);
+      const tasksClient = await this.getTasksClient(task.createdById);
+      
+      // Get or create default task list for the user
+      const taskLists = await tasksClient.tasklists.list();
+      let defaultTaskList = taskLists.data.items?.find(list => list.title === 'Muralla Tasks');
+      
+      if (!defaultTaskList) {
+        const newList = await tasksClient.tasklists.insert({
+          requestBody: {
+            title: 'Muralla Tasks',
+          },
+        });
+        defaultTaskList = newList.data;
+      }
 
-      const googleTaskData = {
+      const googleTask = {
         title: task.title,
         notes: this.formatTaskNotes(task),
-        status: this.mapStatusToGoogle(task.status),
         due: task.dueDate ? task.dueDate.toISOString().split('T')[0] : undefined,
       };
 
-      const response = await this.tasks.tasks.insert({
-        tasklist: taskListId,
-        requestBody: googleTaskData,
+      const response = await tasksClient.tasks.insert({
+        tasklist: defaultTaskList.id!,
+        requestBody: googleTask,
       });
 
-      const googleTaskId = response.data.id;
+      const googleTaskId = response.data.id || null;
 
-      // Update Muralla task with Google Task metadata
+      // Update task with Google Task info
       await prisma.task.update({
         where: { id: taskId },
         data: {
           googleTaskId,
-          googleTasksListId: taskListId,
-          googleTasksUpdatedAt: new Date(response.data.updated),
+          googleTasksListId: defaultTaskList.id,
+          googleTasksUpdatedAt: new Date(),
           syncStatus: 'SYNCED',
           lastSyncAt: new Date(),
         },
@@ -97,8 +144,16 @@ class GoogleTasksSyncService {
       return googleTaskId;
     } catch (error) {
       console.error('Error creating Google Task:', error);
-      await this.markTaskSyncError(taskId, (error as Error).message);
-      return null;
+      
+      // Mark as error
+      if (taskId) {
+        await prisma.task.update({
+          where: { id: taskId },
+          data: { syncStatus: 'ERROR' },
+        }).catch(() => {}); // Ignore if task doesn't exist
+      }
+      
+      throw error;
     }
   }
 
@@ -110,17 +165,19 @@ class GoogleTasksSyncService {
       const task = await prisma.task.findUnique({
         where: { id: taskId },
         include: {
-          assignments: {
-            include: {
-              staff: true
-            }
-          }
-        }
+          createdBy: true,
+        },
       });
 
-      if (!task || !task.googleTaskId || !task.googleTasksListId) {
+      if (!task || !task.createdById) {
+        throw new Error('Task not found or has no creator');
+      }
+
+      if (!task.googleTaskId || !task.googleTasksListId) {
         throw new Error('Task not synced with Google Tasks');
       }
+
+      const tasksClient = await this.getTasksClient(task.createdById);
 
       const googleTaskData = {
         title: task.title,
@@ -129,16 +186,17 @@ class GoogleTasksSyncService {
         due: task.dueDate ? task.dueDate.toISOString().split('T')[0] : undefined,
       };
 
-      const response = await this.tasks.tasks.update({
+      const response = await tasksClient.tasks.update({
         tasklist: task.googleTasksListId,
         task: task.googleTaskId,
         requestBody: googleTaskData,
       });
 
+      // Update sync status
       await prisma.task.update({
         where: { id: taskId },
         data: {
-          googleTasksUpdatedAt: new Date(response.data.updated),
+          googleTasksUpdatedAt: new Date(response.data.updated || new Date()),
           syncStatus: 'SYNCED',
           lastSyncAt: new Date(),
         },
@@ -147,8 +205,16 @@ class GoogleTasksSyncService {
       return true;
     } catch (error) {
       console.error('Error updating Google Task:', error);
-      await this.markTaskSyncError(taskId, (error as Error).message);
-      return false;
+      
+      // Mark as error
+      if (taskId) {
+        await prisma.task.update({
+          where: { id: taskId },
+          data: { syncStatus: 'ERROR' },
+        }).catch(() => {});
+      }
+      
+      throw error;
     }
   }
 
@@ -159,19 +225,33 @@ class GoogleTasksSyncService {
     try {
       const task = await prisma.task.findUnique({
         where: { id: taskId },
+        include: {
+          createdBy: true,
+        },
       });
 
-      if (!task || !task.googleTaskId || !task.googleTasksListId) {
+      if (!task || !task.createdById) {
+        throw new Error('Task not found or has no creator');
+      }
+
+      if (!task.googleTaskId || !task.googleTasksListId) {
         throw new Error('Task not synced with Google Tasks');
       }
 
-      const response = await this.tasks.tasks.get({
+      const tasksClient = await this.getTasksClient(task.createdById);
+
+      const response = await tasksClient.tasks.get({
         tasklist: task.googleTasksListId,
         task: task.googleTaskId,
       });
 
-      const googleTask = response.data as GoogleTask;
-      const googleUpdatedAt = new Date(googleTask.updated);
+      const googleTask = response.data;
+      
+      if (!googleTask.id) {
+        throw new Error('Google Task ID is missing');
+      }
+      
+      const googleUpdatedAt = googleTask.updated ? new Date(googleTask.updated) : new Date();
 
       // Check for conflicts
       if (this.hasConflict(task, googleTask)) {
@@ -180,9 +260,9 @@ class GoogleTasksSyncService {
 
       // Update Muralla task with Google Task data
       const updateData: any = {
-        title: googleTask.title,
-        description: this.parseNotesToDescription(googleTask.notes),
-        status: this.mapStatusFromGoogle(googleTask.status),
+        title: googleTask.title || task.title,
+        description: this.parseNotesToDescription(googleTask.notes ?? undefined),
+        status: this.mapStatusFromGoogle(googleTask.status ?? undefined),
         googleTasksUpdatedAt: googleUpdatedAt,
         syncStatus: 'SYNCED',
         lastSyncAt: new Date(),
@@ -203,9 +283,8 @@ class GoogleTasksSyncService {
 
       return true;
     } catch (error) {
-      console.error('Error syncing from Google Tasks:', error);
-      await this.markTaskSyncError(taskId, (error as Error).message);
-      return false;
+      console.error('Error syncing from Google:', error);
+      throw error;
     }
   }
 
@@ -216,13 +295,22 @@ class GoogleTasksSyncService {
     try {
       const task = await prisma.task.findUnique({
         where: { id: taskId },
+        include: {
+          createdBy: true,
+        },
       });
 
-      if (!task || !task.googleTaskId || !task.googleTasksListId) {
+      if (!task || !task.createdById) {
         return true; // Nothing to delete
       }
 
-      await this.tasks.tasks.delete({
+      if (!task.googleTaskId || !task.googleTasksListId) {
+        return true; // Nothing to delete
+      }
+
+      const tasksClient = await this.getTasksClient(task.createdById);
+
+      await tasksClient.tasks.delete({
         tasklist: task.googleTasksListId,
         task: task.googleTaskId,
       });
@@ -233,14 +321,15 @@ class GoogleTasksSyncService {
           googleTaskId: null,
           googleTasksListId: null,
           googleTasksUpdatedAt: null,
-          syncStatus: 'PENDING',
+          syncStatus: 'SYNCED',
+          lastSyncAt: new Date(),
         },
       });
 
       return true;
     } catch (error) {
       console.error('Error deleting Google Task:', error);
-      return false;
+      throw error;
     }
   }
 

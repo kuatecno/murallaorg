@@ -29,6 +29,13 @@ model Staff {
   salary            Decimal?                @db.Decimal(12, 2)
   salaryType        SalaryType              @default(MONTHLY)
   hourlyRate        Decimal?                @db.Decimal(10, 2)
+  
+  // Google OAuth tokens for Tasks sync
+  googleAccessToken     String?
+  googleRefreshToken    String?
+  googleTokenExpiresAt  DateTime?
+  googleEmail           String?
+  googleTasksEnabled    Boolean          @default(false)
   vacationDaysTotal Int                     @default(15)
   vacationDaysUsed  Int                     @default(0)
   attendances       Attendance[]

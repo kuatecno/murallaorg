@@ -167,11 +167,15 @@ export default function PlanningPage() {
   const [selectedAssignee, setSelectedAssignee] = useState('');
   const [syncStatus, setSyncStatus] = useState<any>(null);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [googleConnected, setGoogleConnected] = useState(false);
+  const [googleEmail, setGoogleEmail] = useState<string | null>(null);
+  const [checkingConnection, setCheckingConnection] = useState(true);
 
   useEffect(() => {
     fetchTasks();
     fetchStaff();
     fetchSyncStatus();
+    checkGoogleConnection();
   }, [searchTerm, selectedPriority, selectedAssignee]);
 
   const fetchSyncStatus = async () => {
@@ -235,11 +239,69 @@ export default function PlanningPage() {
     try {
       const response = await fetch('/api/staff');
       if (!response.ok) throw new Error('Failed to fetch staff');
-      
+
       const data = await response.json();
       setStaff(data.staff);
     } catch (error) {
       console.error('Error fetching staff:', error);
+    }
+  };
+
+  const checkGoogleConnection = async () => {
+    try {
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      const response = await fetch('/api/staff/' + user.id);
+
+      if (response.ok) {
+        const data = await response.json();
+        const staff = data.staff;
+
+        if (staff.googleTasksEnabled && staff.googleEmail) {
+          setGoogleConnected(true);
+          setGoogleEmail(staff.googleEmail);
+        } else {
+          setGoogleConnected(false);
+          setGoogleEmail(null);
+        }
+      }
+    } catch (error) {
+      console.error('Error checking Google connection:', error);
+    } finally {
+      setCheckingConnection(false);
+    }
+  };
+
+  const handleConnectGoogle = () => {
+    // Redirect to Google OAuth
+    window.location.href = '/api/auth/google';
+  };
+
+  const handleDisconnectGoogle = async () => {
+    try {
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      const response = await fetch('/api/staff/' + user.id, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          googleTasksEnabled: false,
+          googleAccessToken: null,
+          googleRefreshToken: null,
+          googleEmail: null,
+        }),
+      });
+
+      if (response.ok) {
+        setGoogleConnected(false);
+        setGoogleEmail(null);
+        toast.success('Google account disconnected successfully');
+      } else {
+        toast.error('Failed to disconnect Google account');
+      }
+    } catch (error) {
+      toast.error('Error disconnecting Google account');
+      console.error('Error:', error);
     }
   };
 
@@ -306,6 +368,48 @@ export default function PlanningPage() {
             <Plus className="w-5 h-5" />
             Create Task
           </button>
+        </div>
+
+        {/* Google Account Connection */}
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-lg shadow-sm mb-4 border border-blue-200">
+          {checkingConnection ? (
+            <div className="flex items-center gap-2 text-gray-600">
+              <RefreshCw className="w-4 h-4 animate-spin" />
+              <span>Checking Google connection...</span>
+            </div>
+          ) : googleConnected ? (
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <CheckCircle className="w-6 h-6 text-green-600" />
+                <div>
+                  <h3 className="text-lg font-medium text-gray-900">Google Account Connected</h3>
+                  <p className="text-sm text-gray-600">{googleEmail}</p>
+                </div>
+              </div>
+              <button
+                onClick={handleDisconnectGoogle}
+                className="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors font-medium"
+              >
+                Disconnect
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <AlertCircle className="w-6 h-6 text-yellow-600" />
+                <div>
+                  <h3 className="text-lg font-medium text-gray-900">Connect Google Account</h3>
+                  <p className="text-sm text-gray-600">Enable automatic sync with Google Tasks</p>
+                </div>
+              </div>
+              <button
+                onClick={handleConnectGoogle}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+              >
+                Connect Google Account
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Google Tasks Sync Status */}

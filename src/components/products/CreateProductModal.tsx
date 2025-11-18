@@ -4,8 +4,10 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from '@/contexts/LanguageContext';
 import ProductEnrichmentModal from './ProductEnrichmentModal';
 import ImageUploader from '../shared/ImageUploader';
+import StructuredImageUploader from '../shared/StructuredImageUploader';
 import ChannelPricingModal from '../shared/ChannelPricingModal';
 import apiClient from '@/lib/api-client';
+import { ProductImages, normalizeProductImages } from '@/types/product-images';
 
 interface Product {
   id: string;
@@ -67,7 +69,7 @@ export interface ProductFormData {
   unit: string;
   format: string;
   tags: string[];
-  images: string[];
+  images: ProductImages; // Structured images with photos and icons
   // Platform pricing
   cafePrice: string;
   rappiPrice: string;
@@ -102,7 +104,7 @@ interface ProductVariant {
   uberPrice: string;
   minStock: string;
   maxStock: string;
-  images: string[];
+  images: ProductImages; // Structured images with photos and icons
   tags: string[];
   isDefault: boolean;
 }
@@ -146,7 +148,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
     unit: 'UNIT',
     format: '',
     tags: [],
-    images: [],
+    images: { photos: [], icons: [] },
     cafePrice: '',
     rappiPrice: '',
     pedidosyaPrice: '',
@@ -162,7 +164,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
   const [showModifiers, setShowModifiers] = useState(false);
   const [willHaveVariants, setWillHaveVariants] = useState(false);
   const [expandedVariants, setExpandedVariants] = useState<Set<number>>(new Set());
-  const [crossVariantImages, setCrossVariantImages] = useState<string[]>([]);
+  const [crossVariantImages, setCrossVariantImages] = useState<ProductImages>({ photos: [], icons: [] });
   const [isEnrichModalOpen, setIsEnrichModalOpen] = useState(false);
   const [channelPricingModalOpen, setChannelPricingModalOpen] = useState(false);
   const [modifierChannelPricingModalOpen, setModifierChannelPricingModalOpen] = useState(false);
@@ -198,15 +200,15 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
         unit: product.unit,
         format: product.format || '',
         tags: product.tags || [],
-        images: [],
+        images: { photos: [], icons: [] },
         cafePrice: product.cafePrice?.toString() || '',
         rappiPrice: product.rappiPrice?.toString() || '',
         pedidosyaPrice: product.pedidosyaPrice?.toString() || '',
         uberPrice: product.uberPrice?.toString() || '',
       });
 
-      // Set cross-variant images from product images
-      setCrossVariantImages(product.images || []);
+      // Set cross-variant images from product images (with backward compatibility)
+      setCrossVariantImages(normalizeProductImages(product.images));
 
       // Load variants if product has them
       if (product.variants && product.variants.length > 0) {
@@ -230,7 +232,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
           uberPrice: v.uberPrice?.toString() || '',
           minStock: v.minStock?.toString() || '',
           maxStock: v.maxStock?.toString() || '',
-          images: v.images || [],
+          images: normalizeProductImages(v.images), // Migrate legacy format
           tags: (v as any).tags || [], // Use product tags as fallback for now
           isDefault: v.isDefault || false,
         }));
@@ -251,14 +253,19 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
   // Apply initial data when creating new products (e.g., from AI enrichment)
   useEffect(() => {
     if (!product && initialData) {
+      const normalizedImages = initialData.images
+        ? normalizeProductImages(initialData.images)
+        : undefined;
+
       setFormData(prev => ({
         ...prev,
         ...initialData,
         tags: initialData.tags ?? prev.tags,
-        images: initialData.images ?? prev.images,
+        images: normalizedImages ?? prev.images,
       }));
-      if (initialData.images && initialData.images.length > 0) {
-        setCrossVariantImages(initialData.images);
+
+      if (normalizedImages && (normalizedImages.photos?.length || normalizedImages.icons?.length)) {
+        setCrossVariantImages(normalizedImages);
       }
     }
   }, [initialData, product]);
@@ -408,7 +415,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
         aiTags.length > 0
           ? Array.from(new Set([...prev.tags, ...aiTags]))
           : prev.tags,
-      images: enrichedData.images || prev.images,
+      images: enrichedData.images ? normalizeProductImages(enrichedData.images) : prev.images,
       sourceUrl: enrichedData.sourceUrl || prev.sourceUrl,
     }));
   };
@@ -469,7 +476,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
         unit: formData.unit || 'UNIT',
         format: formData.format || undefined,
         tags: formData.tags.length > 0 ? formData.tags : [],
-        images: crossVariantImages.length > 0 ? crossVariantImages : undefined,
+        images: (crossVariantImages.photos?.length || crossVariantImages.icons?.length) ? crossVariantImages : undefined,
         cafePrice: formData.cafePrice ? parseFloat(formData.cafePrice) : undefined,
         rappiPrice: formData.rappiPrice ? parseFloat(formData.rappiPrice) : undefined,
         pedidosyaPrice: formData.pedidosyaPrice ? parseFloat(formData.pedidosyaPrice) : undefined,
@@ -586,7 +593,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
       unit: 'UNIT',
       format: '',
       tags: [],
-      images: [],
+      images: { photos: [], icons: [] },
       cafePrice: '',
       rappiPrice: '',
       pedidosyaPrice: '',
@@ -598,7 +605,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
     setModifierGroups([]);
     setShowVariants(false);
     setShowModifiers(false);
-    setCrossVariantImages([]);
+    setCrossVariantImages({ photos: [], icons: [] });
     setError('');
     onClose();
   };
@@ -623,7 +630,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
       uberPrice: '',
       minStock: '0',
       maxStock: '',
-      images: [],
+      images: { photos: [], icons: [] },
       tags: [], // Initialize with empty tags
       isDefault: variants.length === 0, // First variant is default
     };
@@ -640,7 +647,10 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
       name: `${sourceVariant.name} - Copy`,
       sku: '', // Clear SKU, user will need to set a unique one
       isDefault: false, // Copy is never default
-      images: [...(sourceVariant.images || [])], // Copy array
+      images: {
+        photos: [...(sourceVariant.images.photos || [])],
+        icons: [...(sourceVariant.images.icons || [])],
+      }, // Deep copy structured images
     };
     setVariants([...variants, newVariant]);
     // Auto-expand the duplicated variant
@@ -676,13 +686,16 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
   const applyCrossVariantImages = () => {
     const updatedVariants = variants.map(variant => ({
       ...variant,
-      images: [...(variant.images || []), ...crossVariantImages]
+      images: {
+        photos: [...(variant.images.photos || []), ...(crossVariantImages.photos || [])],
+        icons: [...(variant.images.icons || []), ...(crossVariantImages.icons || [])],
+      }
     }));
     setVariants(updatedVariants);
   };
 
   const clearCrossVariantImages = () => {
-    setCrossVariantImages([]);
+    setCrossVariantImages({ photos: [], icons: [] });
   };
 
   // Modifier group management functions
@@ -1003,7 +1016,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
                   📸 {t('variants.crossVariantImages')}
                 </label>
                 <div className="flex space-x-2">
-                  {crossVariantImages.length > 0 && (
+                  {crossVariantImages && ((crossVariantImages.photos && crossVariantImages.photos.length > 0) || (crossVariantImages.icons && crossVariantImages.icons.length > 0)) && (
                     <>
                       <button
                         type="button"
@@ -1026,11 +1039,13 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
               <p className="text-xs text-blue-700 mb-3">
                 {t('variants.crossVariantImagesDesc')}
               </p>
-              <ImageUploader
+              <StructuredImageUploader
                 images={crossVariantImages}
                 onImagesChange={setCrossVariantImages}
-                maxImages={3}
+                maxPhotos={3}
+                maxIcons={2}
                 label={t('variants.crossVariantImages')}
+                showIcons={true}
               />
             </div>
           )}
@@ -1610,11 +1625,13 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
                               <label className="block text-sm font-medium text-gray-700 mb-2">
                                 {t('variants.variantImages')} ({t('common.optional')})
                               </label>
-                              <ImageUploader
+                              <StructuredImageUploader
                                 images={variant.images}
                                 onImagesChange={(images) => updateVariant(index, 'images', images)}
-                                maxImages={4}
+                                maxPhotos={4}
+                                maxIcons={2}
                                 label={t('variants.variantImages')}
+                                showIcons={true}
                               />
                             </div>
 
@@ -1982,16 +1999,18 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
             </div>
           )}
 
-          {/* Product Images */}
-          {formData.images.length > 0 && (
+          {/* Product Images - Only shown if there are any images */}
+          {((formData.images.photos && formData.images.photos.length > 0) ||
+            (formData.images.icons && formData.images.icons.length > 0)) && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">{t('products.images')}</label>
               <div className="grid grid-cols-4 gap-3">
-                {formData.images.map((imageUrl, index) => (
-                  <div key={index} className="relative aspect-square rounded-lg overflow-hidden border-2 border-gray-200">
+                {/* Render photos */}
+                {formData.images.photos?.map((imageUrl, index) => (
+                  <div key={`photo-${index}`} className="relative aspect-square rounded-lg overflow-hidden border-2 border-gray-200">
                     <img
                       src={imageUrl}
-                      alt={`Product ${index + 1}`}
+                      alt={`Product Photo ${index + 1}`}
                       className="w-full h-full object-cover"
                       onError={(e) => {
                         const fallback =
@@ -2007,7 +2026,45 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess, onDelet
                       onClick={() => {
                         setFormData(prev => ({
                           ...prev,
-                          images: prev.images.filter((_, i) => i !== index)
+                          images: {
+                            ...prev.images,
+                            photos: prev.images.photos?.filter((_, i) => i !== index) || []
+                          }
+                        }));
+                      }}
+                      className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                ))}
+                {/* Render icons */}
+                {formData.images.icons?.map((imageUrl, index) => (
+                  <div key={`icon-${index}`} className="relative aspect-square rounded-lg overflow-hidden border-2 border-blue-200 bg-white p-2">
+                    <img
+                      src={imageUrl}
+                      alt={`Product Icon ${index + 1}`}
+                      className="w-full h-full object-contain"
+                      onError={(e) => {
+                        const fallback =
+                          'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><rect width="200" height="200" fill="%23f3f4f6"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="Arial" font-size="14" fill="%236b7280">Sin icono</text></svg>';
+                        const img = e.target as HTMLImageElement;
+                        if (img.src !== fallback) {
+                          img.src = fallback;
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFormData(prev => ({
+                          ...prev,
+                          images: {
+                            ...prev.images,
+                            icons: prev.images.icons?.filter((_, i) => i !== index) || []
+                          }
                         }));
                       }}
                       className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"

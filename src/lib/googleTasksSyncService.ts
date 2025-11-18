@@ -262,7 +262,7 @@ class GoogleTasksSyncService {
       const updateData: any = {
         title: googleTask.title || task.title,
         description: this.parseNotesToDescription(googleTask.notes ?? undefined),
-        status: this.mapStatusFromGoogle(googleTask.status ?? undefined),
+        status: this.mapStatusFromGoogle(googleTask.status || 'needsAction'),
         googleTasksUpdatedAt: googleUpdatedAt,
         syncStatus: 'SYNCED',
         lastSyncAt: new Date(),
@@ -336,7 +336,9 @@ class GoogleTasksSyncService {
   /**
    * Get or create a task list for a task
    */
-  private async getOrCreateTaskList(task: any): Promise<string> {
+  private async getOrCreateTaskList(userId: string, task: any): Promise<string> {
+    const tasks = await this.getTasksClient(userId);
+
     // If task has a Chat space, try to find associated task list
     if (task.googleChatSpaceId) {
       // For now, use default task list. In the future, this could be enhanced
@@ -344,28 +346,28 @@ class GoogleTasksSyncService {
     }
 
     // Get default task list
-    const taskLists = await this.tasks.tasklists.list();
+    const taskLists = await tasks.tasklists.list();
     const defaultList = taskLists.data.items?.[0];
 
     if (defaultList) {
-      return defaultList.id;
+      return defaultList.id || '@default';
     }
 
     // Create a default task list if none exists
-    const response = await this.tasks.tasklists.insert({
+    const response = await tasks.tasklists.insert({
       requestBody: {
         title: 'Muralla Tasks',
       },
     });
 
-    return response.data.id;
+    return response.data.id || '@default';
   }
 
   /**
    * Check if there's a conflict between Muralla and Google Task
    */
   private hasConflict(murallaTask: any, googleTask: GoogleTask): boolean {
-    if (!murallaTask.googleTasksUpdatedAt) {
+    if (!murallaTask.googleTasksUpdatedAt || !googleTask.updated) {
       return false;
     }
 
@@ -384,6 +386,11 @@ class GoogleTasksSyncService {
 
     if (conflictResolution === 'auto') {
       // Last-modified-wins strategy
+      if (!googleTask.updated) {
+        // If no Google update timestamp, Muralla wins
+        return await this.updateGoogleTask(murallaTask.id);
+      }
+
       const googleUpdatedAt = new Date(googleTask.updated);
       const murallaUpdatedAt = murallaTask.updatedAt;
 

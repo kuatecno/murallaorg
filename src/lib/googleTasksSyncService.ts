@@ -116,10 +116,14 @@ class GoogleTasksSyncService {
         defaultTaskList = newList.data;
       }
 
+      // Validate and prepare task data
+      const taskTitle = task.title?.trim() || 'Untitled Task';
+      const taskNotes = this.formatTaskNotes(task);
+
       const googleTask = {
-        title: task.title,
-        notes: this.formatTaskNotes(task),
-        due: task.dueDate ? task.dueDate.toISOString().split('T')[0] : undefined,
+        title: taskTitle.substring(0, 1024), // Google Tasks max title length
+        notes: taskNotes.substring(0, 8192), // Google Tasks max notes length
+        due: task.dueDate ? new Date(task.dueDate).toISOString() : undefined,
       };
 
       const response = await tasksClient.tasks.insert({
@@ -179,11 +183,15 @@ class GoogleTasksSyncService {
 
       const tasksClient = await this.getTasksClient(task.createdById);
 
+      // Validate and prepare task data
+      const taskTitle = task.title?.trim() || 'Untitled Task';
+      const taskNotes = this.formatTaskNotes(task);
+
       const googleTaskData = {
-        title: task.title,
-        notes: this.formatTaskNotes(task),
+        title: taskTitle.substring(0, 1024), // Google Tasks max title length
+        notes: taskNotes.substring(0, 8192), // Google Tasks max notes length
         status: this.mapStatusToGoogle(task.status),
-        due: task.dueDate ? task.dueDate.toISOString().split('T')[0] : undefined,
+        due: task.dueDate ? new Date(task.dueDate).toISOString() : undefined,
       };
 
       const response = await tasksClient.tasks.update({

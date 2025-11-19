@@ -22,7 +22,9 @@ export async function GET(request: NextRequest) {
     const scopes = [
       'https://www.googleapis.com/auth/tasks',
       'https://www.googleapis.com/auth/userinfo.email',
-      'https://www.googleapis.com/auth/userinfo.profile'
+      'https://www.googleapis.com/auth/userinfo.profile',
+      'https://www.googleapis.com/auth/chat.spaces',
+      'https://www.googleapis.com/auth/chat.memberships.readonly'
     ];
 
     const authUrl = oauth2Client.generateAuthUrl({

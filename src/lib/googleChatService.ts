@@ -5,6 +5,7 @@
 
 import { google } from 'googleapis';
 import { JWT } from 'google-auth-library';
+import prisma from '@/lib/prisma';
 
 interface GoogleChatMessage {
   text: string;
@@ -36,6 +37,73 @@ class GoogleChatService {
     });
 
     this.chat = google.chat({ version: 'v1', auth: this.auth });
+  }
+
+  /**
+   * Get authenticated Google Chat client for a user
+   */
+  private async getChatClientForUser(userId: string) {
+    const user = await prisma.staff.findUnique({
+      where: { id: userId },
+      select: {
+        googleAccessToken: true,
+        googleRefreshToken: true,
+        googleTokenExpiresAt: true,
+        googleEmail: true,
+        googleTasksEnabled: true,
+      },
+    });
+
+    if (!user || !user.googleTasksEnabled || !user.googleAccessToken) {
+      throw new Error('Google account not connected for this user');
+    }
+
+    const oauth2Client = new google.auth.OAuth2(
+      process.env.GOOGLE_CLIENT_ID,
+      process.env.GOOGLE_CLIENT_SECRET,
+      process.env.GOOGLE_REDIRECT_URI
+    );
+
+    oauth2Client.setCredentials({
+      access_token: user.googleAccessToken,
+      refresh_token: user.googleRefreshToken,
+    });
+
+    // Check if token needs refresh
+    if (user.googleTokenExpiresAt && new Date() >= user.googleTokenExpiresAt) {
+      try {
+        const { credentials } = await oauth2Client.refreshAccessToken();
+        
+        // Update tokens in database
+        await prisma.staff.update({
+          where: { id: userId },
+          data: {
+            googleAccessToken: credentials.access_token,
+            googleTokenExpiresAt: credentials.expiry_date ? new Date(credentials.expiry_date) : null,
+          },
+        });
+
+        oauth2Client.setCredentials(credentials);
+      } catch (error) {
+        throw new Error('Failed to refresh Google access token');
+      }
+    }
+
+    return google.chat({ version: 'v1', auth: oauth2Client });
+  }
+
+  /**
+   * List spaces for a user
+   */
+  async listSpacesForUser(userId: string): Promise<any[]> {
+    try {
+      const chat = await this.getChatClientForUser(userId);
+      const response = await chat.spaces.list();
+      return response.data.spaces || [];
+    } catch (error) {
+      console.error('Error listing Google Chat spaces:', error);
+      throw new Error('Failed to list Google Chat spaces');
+    }
   }
 
   /**

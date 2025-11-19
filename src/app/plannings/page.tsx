@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Plus, Filter, Search, Calendar, User, MessageSquare, Link2, MoreHorizontal, RefreshCw, CheckCircle, AlertCircle, Clock, Activity } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import CreateTaskModal from '@/components/tasks/CreateTaskModal';
@@ -88,7 +89,6 @@ const SyncStatusIndicator = ({ task, onSync }: { task: Task; onSync: () => void 
 
   const handleManualSync = async () => {
     try {
-      const user = JSON.parse(localStorage.getItem('user') || '{}');
       const response = await fetch('/api/tasks/sync', {
         method: 'POST',
         headers: {
@@ -97,14 +97,17 @@ const SyncStatusIndicator = ({ task, onSync }: { task: Task; onSync: () => void 
         body: JSON.stringify({ taskId: task.id }),
       });
 
-      if (response.ok) {
+      const data = await response.json();
+
+      if (response.ok && data.success) {
         toast.success('Task synced successfully');
-        // Refresh tasks list
         onSync();
       } else {
-        toast.error('Failed to sync task');
+        const errorMsg = data.message || data.error || 'Failed to sync task';
+        toast.error(errorMsg);
       }
     } catch (error) {
+      console.error('Manual sync error:', error);
       toast.error('Error syncing task');
     }
   };
@@ -156,6 +159,7 @@ const priorityLabels = {
 };
 
 export default function PlanningPage() {
+  const router = useRouter();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [staff, setStaff] = useState<Staff[]>([]);
   const [loading, setLoading] = useState(true);
@@ -172,11 +176,17 @@ export default function PlanningPage() {
   const [checkingConnection, setCheckingConnection] = useState(true);
 
   useEffect(() => {
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    if (!user.tenantId) {
+      router.push('/login');
+      return;
+    }
+
     fetchTasks();
     fetchStaff();
     fetchSyncStatus();
     checkGoogleConnection();
-  }, [searchTerm, selectedPriority, selectedAssignee]);
+  }, [searchTerm, selectedPriority, selectedAssignee, router]);
 
   const fetchSyncStatus = async () => {
     try {
@@ -191,6 +201,11 @@ export default function PlanningPage() {
   };
 
   const handleGlobalSync = async () => {
+    if (!googleConnected) {
+      toast.error('Please connect your Google account first');
+      return;
+    }
+
     setIsSyncing(true);
     try {
       const response = await fetch('/api/tasks/sync', {
@@ -201,14 +216,24 @@ export default function PlanningPage() {
         body: JSON.stringify({ direction: 'bidirectional' }),
       });
 
-      if (response.ok) {
+      const data = await response.json();
+
+      if (response.ok && data.success) {
         toast.success('Global sync completed successfully');
         fetchTasks();
         fetchSyncStatus();
       } else {
-        toast.error('Failed to complete global sync');
+        const errorMsg = data.message || data.error || 'Failed to complete global sync';
+        toast.error(errorMsg);
+
+        // If authentication expired, prompt to reconnect
+        if (response.status === 401 || data.error?.includes('Authentication')) {
+          setGoogleConnected(false);
+          setGoogleEmail(null);
+        }
       }
     } catch (error) {
+      console.error('Sync error:', error);
       toast.error('Error during global sync');
     } finally {
       setIsSyncing(false);
@@ -238,12 +263,7 @@ export default function PlanningPage() {
 
   const fetchStaff = async () => {
     try {
-      const user = JSON.parse(localStorage.getItem('user') || '{}');
-      const response = await fetch('/api/staff', {
-        headers: {
-          'x-tenant-id': user.tenantId,
-        },
-      });
+      const response = await fetch('/api/staff');
       if (!response.ok) throw new Error('Failed to fetch staff');
 
       const data = await response.json();
@@ -446,8 +466,9 @@ export default function PlanningPage() {
             </div>
             <button
               onClick={handleGlobalSync}
-              disabled={isSyncing}
+              disabled={isSyncing || !googleConnected}
               className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              title={!googleConnected ? 'Connect Google account to enable sync' : 'Sync all tasks with Google Tasks'}
             >
               {isSyncing ? (
                 <>

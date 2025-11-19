@@ -12,15 +12,35 @@ import { getGoogleTasksSyncService } from '@/lib/googleTasksSyncService';
 export async function POST(request: NextRequest) {
   try {
     const auth = await authenticate(request);
-    if (!auth.success || !auth.tenantId) {
+    if (!auth.success || !auth.tenantId || !auth.userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     if (process.env.GOOGLE_TASKS_ENABLED !== 'true') {
-      return NextResponse.json({ error: 'Google Tasks integration is disabled' }, { status: 400 });
+      return NextResponse.json({
+        success: false,
+        message: 'Google Tasks integration is disabled'
+      }, { status: 200 });
     }
 
-    const body = await request.json();
+    // Check if user has Google Tasks enabled
+    const user = await prisma.staff.findUnique({
+      where: { id: auth.userId },
+      select: {
+        googleTasksEnabled: true,
+        googleAccessToken: true,
+      },
+    });
+
+    if (!user?.googleTasksEnabled || !user?.googleAccessToken) {
+      return NextResponse.json({
+        success: false,
+        error: 'Google Tasks not connected',
+        message: 'Please connect your Google account first'
+      }, { status: 400 });
+    }
+
+    const body = await request.json().catch(() => ({}));
     const { taskId, direction = 'bidirectional' } = body;
 
     const googleTasksSync = getGoogleTasksSyncService();
@@ -54,10 +74,40 @@ export async function POST(request: NextRequest) {
         message: 'Pending tasks sync initiated'
       });
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error in tasks sync:', error);
+
+    const errorMessage = error?.message || 'Internal server error';
+
+    // Handle specific error cases
+    if (errorMessage.includes('Google Tasks not enabled')) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Google Tasks not connected',
+          message: 'Please connect your Google account first'
+        },
+        { status: 400 }
+      );
+    }
+
+    if (errorMessage.includes('refresh') || errorMessage.includes('token')) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Authentication expired',
+          message: 'Please reconnect your Google account'
+        },
+        { status: 401 }
+      );
+    }
+
     return NextResponse.json(
-      { error: 'Internal server error' },
+      {
+        success: false,
+        error: 'Sync failed',
+        message: errorMessage
+      },
       { status: 500 }
     );
   }

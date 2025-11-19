@@ -24,6 +24,8 @@ export default function CreateTaskModal({ isOpen, onClose, onTaskCreated }: Crea
   const [dueDate, setDueDate] = useState('');
   const [selectedStaff, setSelectedStaff] = useState<string[]>([]);
   const [createChatSpace, setCreateChatSpace] = useState(true);
+  const [useExistingSpace, setUseExistingSpace] = useState(false);
+  const [existingSpaceId, setExistingSpaceId] = useState('');
   const [loading, setLoading] = useState(false);
   const [staff, setStaff] = useState<Staff[]>([]);
 
@@ -53,6 +55,8 @@ export default function CreateTaskModal({ isOpen, onClose, onTaskCreated }: Crea
     setDueDate('');
     setSelectedStaff([]);
     setCreateChatSpace(true);
+    setUseExistingSpace(false);
+    setExistingSpaceId('');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -75,7 +79,8 @@ export default function CreateTaskModal({ isOpen, onClose, onTaskCreated }: Crea
           priority,
           dueDate: dueDate || undefined,
           assignedStaff: selectedStaff,
-          createChatSpace,
+          createGoogleChatSpace: createChatSpace && !useExistingSpace,
+          existingGoogleChatSpaceId: useExistingSpace ? existingSpaceId : undefined,
         }),
       });
 
@@ -234,24 +239,76 @@ export default function CreateTaskModal({ isOpen, onClose, onTaskCreated }: Crea
             </div>
 
             {/* Google Chat Integration */}
-            <div>
-              <label className="flex items-center gap-3 p-4 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors">
+            <div className="space-y-3">
+              <label className="block text-sm font-medium text-gray-700">
+                Google Chat Integration
+              </label>
+
+              <label className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors">
                 <input
                   type="checkbox"
                   checked={createChatSpace}
-                  onChange={(e) => setCreateChatSpace(e.target.checked)}
+                  onChange={(e) => {
+                    setCreateChatSpace(e.target.checked);
+                    if (!e.target.checked) {
+                      setUseExistingSpace(false);
+                      setExistingSpaceId('');
+                    }
+                  }}
                   className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                 />
                 <div className="flex-1">
                   <div className="flex items-center gap-2 font-medium text-gray-900">
                     <Link2 className="w-4 h-4" />
-                    Create Google Chat Space
+                    Post to Google Chat
                   </div>
                   <div className="text-sm text-gray-600 mt-1">
-                    Automatically creates a Google Chat space for task collaboration and notifications
+                    Share this task in Google Chat for collaboration
                   </div>
                 </div>
               </label>
+
+              {createChatSpace && (
+                <div className="ml-7 space-y-3">
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      checked={!useExistingSpace}
+                      onChange={() => {
+                        setUseExistingSpace(false);
+                        setExistingSpaceId('');
+                      }}
+                      className="w-4 h-4 text-blue-600"
+                    />
+                    <span className="text-sm text-gray-700">Create new Chat space</span>
+                  </label>
+
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      checked={useExistingSpace}
+                      onChange={() => setUseExistingSpace(true)}
+                      className="w-4 h-4 text-blue-600"
+                    />
+                    <span className="text-sm text-gray-700">Use existing Chat space</span>
+                  </label>
+
+                  {useExistingSpace && (
+                    <div className="ml-6">
+                      <input
+                        type="text"
+                        value={existingSpaceId}
+                        onChange={(e) => setExistingSpaceId(e.target.value)}
+                        placeholder="Enter space ID (e.g., AAQA_in1rlk)"
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                      <p className="mt-1 text-xs text-gray-500">
+                        Find the space ID in the Chat URL: chat/space/<strong>SPACE_ID</strong>
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Actions */}

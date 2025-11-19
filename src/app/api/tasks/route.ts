@@ -122,7 +122,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { title, description, priority, dueDate, assignedStaff, createGoogleChatSpace } = body;
+    const { title, description, priority, dueDate, assignedStaff, createGoogleChatSpace, existingGoogleChatSpaceId } = body;
 
     // Validate required fields
     if (!title) {
@@ -155,11 +155,15 @@ export async function POST(request: NextRequest) {
     let googleChatSpaceId = null;
     let googleChatMessageId = null;
 
-    // Create Google Chat space if requested
-    if (createGoogleChatSpace) {
+    // Use existing Google Chat space if provided
+    if (existingGoogleChatSpaceId) {
+      googleChatSpaceId = existingGoogleChatSpaceId.trim();
+    }
+    // Create new Google Chat space if requested
+    else if (createGoogleChatSpace) {
       try {
         const googleChatService = getGoogleChatService();
-        
+
         const taskNotificationData = {
           taskId: 'temp', // Will be updated after task creation
           title: title.trim(),
@@ -216,16 +220,16 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Update Google Chat message with actual task ID
+    // Send task message to Google Chat space
     if (googleChatSpaceId) {
       try {
         const googleChatService = getGoogleChatService();
         const assignedStaffData = await prisma.staff.findMany({
           where: {
-            id: { in: assignedStaff },
+            id: { in: assignedStaff || [] },
             tenantId: auth.tenantId,
           },
-          select: { email: true },
+          select: { email: true, firstName: true, lastName: true },
         });
 
         const taskNotificationData = {
@@ -236,13 +240,14 @@ export async function POST(request: NextRequest) {
           priority: task.priority,
           dueDate: task.dueDate?.toISOString(),
           createdBy: `${task.createdBy.firstName} ${task.createdBy.lastName}`,
-          assignedTo: assignedStaffData.map(s => s.email),
+          assignedTo: assignedStaffData.map(s => `${s.firstName} ${s.lastName}`),
         };
 
+        // Send message to the space (works for both new and existing spaces)
         googleChatMessageId = await googleChatService.sendTaskMessage(
           googleChatSpaceId,
           taskNotificationData,
-          false
+          !existingGoogleChatSpaceId // isInitialMessage = true only for newly created spaces
         );
 
         // Update task with message ID
@@ -251,15 +256,15 @@ export async function POST(request: NextRequest) {
           data: { googleChatMessageId },
         });
 
-        // Add members to the chat space
-        if (assignedStaffData.length > 0) {
+        // Add members to the chat space (only if it's a newly created space and has assigned staff)
+        if (!existingGoogleChatSpaceId && assignedStaffData.length > 0) {
           await googleChatService.addMembersToSpace(
             googleChatSpaceId,
             assignedStaffData.map(s => s.email)
           );
         }
       } catch (chatError) {
-        console.error('Failed to update Google Chat message:', chatError);
+        console.error('Failed to send Google Chat message:', chatError);
       }
     }
 

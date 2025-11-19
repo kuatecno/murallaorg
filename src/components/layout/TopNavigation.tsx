@@ -56,6 +56,7 @@ export default function TopNavigation({
     { href: '/dashboard', icon: Home, label: 'Dashboard' },
     { href: '/invoices', icon: FileText, label: 'Invoices' },
     { href: '/contacts', icon: Users, label: 'Contacts' },
+    { href: '/staff', icon: Users, label: 'Staff' },
     { href: '/settings', icon: Settings, label: 'Settings' },
   ]
 

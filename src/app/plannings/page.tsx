@@ -237,7 +237,12 @@ export default function PlanningPage() {
 
   const fetchStaff = async () => {
     try {
-      const response = await fetch('/api/staff');
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      const response = await fetch('/api/staff', {
+        headers: {
+          'x-tenant-id': user.tenantId,
+        },
+      });
       if (!response.ok) throw new Error('Failed to fetch staff');
 
       const data = await response.json();

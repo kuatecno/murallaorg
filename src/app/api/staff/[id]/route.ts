@@ -2,6 +2,58 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
 /**
+ * GET /api/staff/[id]
+ * Get a staff member by ID
+ */
+export async function GET(
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
+  const params = await context.params;
+  try {
+    const { id } = params;
+
+    const staff = await prisma.staff.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        phone: true,
+        role: true,
+        isActive: true,
+        salary: true,
+        salaryType: true,
+        hourlyRate: true,
+        vacationDaysTotal: true,
+        googleTasksEnabled: true,
+        googleEmail: true,
+        tenantId: true,
+      }
+    });
+
+    if (!staff) {
+      return NextResponse.json(
+        { success: false, error: 'Staff member not found' },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      staff
+    });
+  } catch (error) {
+    console.error('Error fetching staff:', error);
+    return NextResponse.json(
+      { success: false, error: 'Failed to fetch staff member' },
+      { status: 500 }
+    );
+  }
+}
+
+/**
  * PUT /api/staff/[id]
  * Update a staff member
  */
@@ -116,6 +168,55 @@ export async function DELETE(
     console.error('Error deleting staff:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to delete staff member' },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * PATCH /api/staff/[id]
+ * Partially update a staff member (e.g., Google connection settings)
+ */
+export async function PATCH(
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
+  const params = await context.params;
+  try {
+    const { id } = params;
+    const body = await request.json();
+
+    // Build update data - only include fields that were provided
+    const updateData: any = {};
+
+    // Google OAuth fields
+    if (body.googleTasksEnabled !== undefined) updateData.googleTasksEnabled = body.googleTasksEnabled;
+    if (body.googleEmail !== undefined) updateData.googleEmail = body.googleEmail;
+    if (body.googleAccessToken !== undefined) updateData.googleAccessToken = body.googleAccessToken;
+    if (body.googleRefreshToken !== undefined) updateData.googleRefreshToken = body.googleRefreshToken;
+    if (body.googleTokenExpiresAt !== undefined) updateData.googleTokenExpiresAt = body.googleTokenExpiresAt;
+
+    // Regular staff fields
+    if (body.firstName !== undefined) updateData.firstName = body.firstName;
+    if (body.lastName !== undefined) updateData.lastName = body.lastName;
+    if (body.email !== undefined) updateData.email = body.email;
+    if (body.phone !== undefined) updateData.phone = body.phone;
+    if (body.role !== undefined) updateData.role = body.role;
+    if (body.isActive !== undefined) updateData.isActive = body.isActive;
+
+    const staff = await prisma.staff.update({
+      where: { id },
+      data: updateData
+    });
+
+    return NextResponse.json({
+      success: true,
+      staff
+    });
+  } catch (error) {
+    console.error('Error patching staff:', error);
+    return NextResponse.json(
+      { success: false, error: 'Failed to update staff member' },
       { status: 500 }
     );
   }

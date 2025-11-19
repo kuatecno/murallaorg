@@ -30,6 +30,9 @@ export async function GET(request: NextRequest) {
     // Exchange code for tokens
     const { tokens } = await oauth2Client.getToken(code);
     
+    // Log granted scopes for debugging
+    console.log('Granted scopes:', tokens.scope);
+
     // Get user info
     const oauth2 = google.oauth2({ version: 'v2', auth: oauth2Client });
     oauth2Client.setCredentials(tokens);
@@ -44,15 +47,21 @@ export async function GET(request: NextRequest) {
     }
 
     // Update user's Google tokens in database
+    const updateData: any = {
+      googleAccessToken: tokens.access_token,
+      googleTokenExpiresAt: tokens.expiry_date ? new Date(tokens.expiry_date) : null,
+      googleEmail: userInfo.email,
+      googleTasksEnabled: true,
+    };
+
+    // Only update refresh token if one was provided
+    if (tokens.refresh_token) {
+      updateData.googleRefreshToken = tokens.refresh_token;
+    }
+
     await prisma.staff.update({
       where: { id: auth.userId },
-      data: {
-        googleAccessToken: tokens.access_token,
-        googleRefreshToken: tokens.refresh_token,
-        googleTokenExpiresAt: tokens.expiry_date ? new Date(tokens.expiry_date) : null,
-        googleEmail: userInfo.email,
-        googleTasksEnabled: true,
-      },
+      data: updateData,
     });
 
     return NextResponse.redirect(

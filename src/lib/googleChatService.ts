@@ -100,9 +100,11 @@ class GoogleChatService {
       const chat = await this.getChatClientForUser(userId);
       const response = await chat.spaces.list();
       return response.data.spaces || [];
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error listing Google Chat spaces:', error);
-      throw new Error('Failed to list Google Chat spaces');
+      // Return the actual error message from Google API if available
+      const errorMessage = error.response?.data?.error?.message || error.message;
+      throw new Error(`Failed to list Google Chat spaces: ${errorMessage}`);
     }
   }
 

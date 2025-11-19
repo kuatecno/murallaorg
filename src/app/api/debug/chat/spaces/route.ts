@@ -33,14 +33,30 @@ export async function GET(request: NextRequest) {
       hasRefreshToken: !!user?.googleRefreshToken,
     };
 
+    // 2. Test Basic Connectivity (Get User Profile)
+    let userProfile = null;
+    try {
+      // We need to cast to any because the type definition might be missing 'users'
+      const chat: any = await chatService['getChatClientForUser'](auth.userId); 
+      // Try to get own profile first - simplest possible call
+      // Note: The 'users' resource might not be exposed in all googleapis versions, 
+      // but we can try to list spaces directly if this fails.
+    } catch (e) {
+      console.log('Skipping user profile check or it failed', e);
+    }
+
     const chatService = getGoogleChatService();
     let spaces: any[] = [];
+    let apiStage = 'init';
     
     try {
+      apiStage = 'listSpaces';
+      console.log('Attempting to list spaces for user:', auth.userId);
       spaces = await chatService.listSpacesForUser(auth.userId);
     } catch (innerError: any) {
       // Capture specific Google API error details
       throw {
+        stage: apiStage,
         message: innerError.message,
         code: innerError.code || innerError.status,
         details: innerError.response?.data || 'No response data',

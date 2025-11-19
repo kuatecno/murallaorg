@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { authenticate } from '@/lib/auth';
 
 /**
  * GET /api/staff
@@ -12,16 +13,14 @@ import prisma from '@/lib/prisma';
  */
 export async function GET(request: NextRequest) {
   try {
+    const auth = await authenticate(request);
+    if (!auth.success || !auth.tenantId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const tenantId = auth.tenantId;
+
     const { searchParams } = new URL(request.url);
     const includeExpenseSummary = searchParams.get('includeExpenseSummary') === 'true';
-
-    const tenantId = request.headers.get('x-tenant-id');
-    if (!tenantId) {
-      return NextResponse.json(
-        { success: false, error: 'Tenant ID is required' },
-        { status: 400 }
-      );
-    }
 
     const staff = await prisma.staff.findMany({
       where: {
@@ -131,13 +130,11 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const tenantId = request.headers.get('x-tenant-id');
-    if (!tenantId) {
-      return NextResponse.json(
-        { success: false, error: 'Tenant ID is required' },
-        { status: 400 }
-      );
+    const auth = await authenticate(request);
+    if (!auth.success || !auth.tenantId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const tenantId = auth.tenantId;
 
     const body = await request.json();
     const {

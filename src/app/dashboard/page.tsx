@@ -105,6 +105,10 @@ export default function DashboardPage() {
                   <h4 className="text-lg font-semibold text-purple-900">Reports</h4>
                   <p className="text-purple-700 mt-2">Analytics & insights</p>
                 </Link>
+                <Link href="/staff" className="bg-pink-50 p-6 rounded-lg hover:bg-pink-100 transition-colors cursor-pointer">
+                  <h4 className="text-lg font-semibold text-pink-900">Staff</h4>
+                  <p className="text-pink-700 mt-2">Manage team, shifts & payroll</p>
+                </Link>
               </div>
             </div>
           </div>

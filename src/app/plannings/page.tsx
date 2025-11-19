@@ -263,11 +263,14 @@ export default function PlanningPage() {
 
   const fetchStaff = async () => {
     try {
-      const response = await fetch('/api/staff');
+      const response = await fetch('/api/staff', {
+        credentials: 'include',
+      });
       if (!response.ok) throw new Error('Failed to fetch staff');
 
       const data = await response.json();
-      setStaff(data.staff || []);
+      // API returns { success: true, data: [...] }
+      setStaff(data.data || data.staff || []);
     } catch (error) {
       console.error('Error fetching staff:', error);
       setStaff([]); // Reset to empty array on error

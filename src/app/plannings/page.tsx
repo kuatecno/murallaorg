@@ -224,12 +224,13 @@ export default function PlanningPage() {
 
       const response = await fetch(`/api/tasks?${params}`);
       if (!response.ok) throw new Error('Failed to fetch tasks');
-      
+
       const data = await response.json();
-      setTasks(data.tasks);
+      setTasks(data.tasks || []);
     } catch (error) {
       toast.error('Failed to load tasks');
       console.error('Error fetching tasks:', error);
+      setTasks([]); // Reset to empty array on error
     } finally {
       setLoading(false);
     }
@@ -246,9 +247,10 @@ export default function PlanningPage() {
       if (!response.ok) throw new Error('Failed to fetch staff');
 
       const data = await response.json();
-      setStaff(data.staff);
+      setStaff(data.staff || []);
     } catch (error) {
       console.error('Error fetching staff:', error);
+      setStaff([]); // Reset to empty array on error
     }
   };
 
@@ -550,13 +552,13 @@ export default function PlanningPage() {
                     </div>
 
                     <div className="flex items-center gap-3">
-                      {task._count.assignments > 0 && (
+                      {task._count?.assignments > 0 && (
                         <div className="flex items-center gap-1">
                           <User className="w-3 h-3" />
                           {task._count.assignments}
                         </div>
                       )}
-                      {task._count.comments > 0 && (
+                      {task._count?.comments > 0 && (
                         <div className="flex items-center gap-1">
                           <MessageSquare className="w-3 h-3" />
                           {task._count.comments}
@@ -568,7 +570,7 @@ export default function PlanningPage() {
                     </div>
                   </div>
 
-                  {task.assignments.length > 0 && (
+                  {task.assignments?.length > 0 && (
                     <div className="mt-3 flex -space-x-2">
                       {task.assignments.slice(0, 3).map((assignment) => (
                         <div
@@ -640,7 +642,7 @@ export default function PlanningPage() {
                   </div>
                 )}
 
-                {selectedTask.assignments.length > 0 && (
+                {selectedTask.assignments?.length > 0 && (
                   <div>
                     <h3 className="font-semibold text-gray-900 mb-2">Assigned To</h3>
                     <div className="space-y-2">

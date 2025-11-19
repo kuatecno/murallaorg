@@ -10,6 +10,7 @@ import { getGoogleTasksSyncService } from '@/lib/googleTasksSyncService';
 
 // POST /api/tasks/sync - Manual sync for all pending tasks
 export async function POST(request: NextRequest) {
+  console.log('POST /api/tasks/sync called');
   try {
     const auth = await authenticate(request);
     if (!auth.success || !auth.tenantId || !auth.userId) {
@@ -33,15 +34,31 @@ export async function POST(request: NextRequest) {
     });
 
     if (!user?.googleTasksEnabled || !user?.googleAccessToken) {
+      // Return 200 with success: false instead of 400 to avoid console errors
+      // when user hasn't connected Google Tasks yet
       return NextResponse.json({
         success: false,
         error: 'Google Tasks not connected',
         message: 'Please connect your Google account first'
-      }, { status: 400 });
+      }, { status: 200 });
     }
 
-    const body = await request.json().catch(() => ({}));
-    const { taskId, direction = 'bidirectional' } = body;
+    const text = await request.text();
+    let body = {};
+    try {
+      if (text) {
+        body = JSON.parse(text);
+      }
+    } catch (e) {
+      console.warn('Failed to parse JSON body in tasks/sync:', e);
+    }
+    
+    const { taskId, direction = 'bidirectional' } = body as any;
+
+    if (taskId && typeof taskId !== 'string') {
+      console.warn('Invalid taskId received:', taskId);
+      return NextResponse.json({ error: 'Invalid taskId format' }, { status: 400 });
+    }
 
     const googleTasksSync = getGoogleTasksSyncService();
 
@@ -87,7 +104,7 @@ export async function POST(request: NextRequest) {
           error: 'Google Tasks not connected',
           message: 'Please connect your Google account first'
         },
-        { status: 400 }
+        { status: 200 }
       );
     }
 

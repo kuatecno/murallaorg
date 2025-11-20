@@ -21,9 +21,68 @@ export default function SpacesPage() {
   const [spaceName, setSpaceName] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const [showMembersModal, setShowMembersModal] = useState(false);
+  const [selectedSpaceMembers, setSelectedSpaceMembers] = useState<ChatSpace | null>(null);
+  const [members, setMembers] = useState<any[]>([]);
+  const [newMemberEmail, setNewMemberEmail] = useState('');
+  const [isInviting, setIsInviting] = useState(false);
+  const [loadingMembers, setLoadingMembers] = useState(false);
+
   useEffect(() => {
     fetchSpaces();
   }, []);
+
+  const fetchMembers = async (spaceId: string) => {
+    setLoadingMembers(true);
+    try {
+      const response = await fetch(`/api/chat/spaces/${spaceId}/members`);
+      const data = await response.json();
+      if (response.ok) {
+        setMembers(data.members || []);
+      } else {
+        toast.error('Failed to load members');
+      }
+    } catch (error) {
+      toast.error('Error loading members');
+    } finally {
+      setLoadingMembers(false);
+    }
+  };
+
+  const handleInviteMember = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newMemberEmail.trim() || !selectedSpaceMembers) return;
+
+    setIsInviting(true);
+    try {
+      const response = await fetch(`/api/chat/spaces/${selectedSpaceMembers.id}/members`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: newMemberEmail.trim() }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        toast.success('Invitation sent successfully');
+        setNewMemberEmail('');
+        fetchMembers(selectedSpaceMembers.id);
+      } else {
+        toast.error(data.error || 'Failed to send invitation');
+      }
+    } catch (error) {
+      toast.error('Error sending invitation');
+    } finally {
+      setIsInviting(false);
+    }
+  };
+
+  const openMembersModal = (space: ChatSpace) => {
+    setSelectedSpaceMembers(space);
+    setMembers([]);
+    setShowMembersModal(true);
+    fetchMembers(space.id);
+  };
 
   const fetchSpaces = async () => {
     try {
@@ -185,6 +244,13 @@ export default function SpacesPage() {
                   </div>
                   <div className="flex gap-2">
                     <button
+                      onClick={() => openMembersModal(space)}
+                      className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-full transition-colors"
+                      title="Manage Members"
+                    >
+                      <Users className="w-4 h-4" />
+                    </button>
+                    <button
                       onClick={() => openEditModal(space)}
                       className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors"
                     >
@@ -218,6 +284,79 @@ export default function SpacesPage() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Members Modal */}
+        {showMembersModal && selectedSpaceMembers && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-lg w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-bold text-gray-900">
+                  Members: {selectedSpaceMembers.displayName}
+                </h2>
+                <button
+                  onClick={() => setShowMembersModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <span className="text-2xl">&times;</span>
+                </button>
+              </div>
+              
+              <form onSubmit={handleInviteMember} className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Invite Member
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="email"
+                    value={newMemberEmail}
+                    onChange={(e) => setNewMemberEmail(e.target.value)}
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="email@example.com"
+                    required
+                  />
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+                    disabled={isInviting}
+                  >
+                    {isInviting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                    Invite
+                  </button>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  External users (e.g., @gmail.com) can be invited if the space allows it.
+                </p>
+              </form>
+
+              <div className="border-t pt-4">
+                <h3 className="font-medium text-gray-900 mb-3">Current Members</h3>
+                {loadingMembers ? (
+                  <div className="flex justify-center py-4">
+                    <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+                  </div>
+                ) : members.length === 0 ? (
+                  <p className="text-gray-500 text-center py-4">No members found (or failed to load).</p>
+                ) : (
+                  <ul className="space-y-3">
+                    {members.map((m, idx) => (
+                      <li key={idx} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-medium">
+                            {m.member.displayName?.[0] || '?'}
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">{m.member.displayName || 'Unknown User'}</p>
+                            <p className="text-xs text-gray-500">{m.member.type} • {m.state}</p>
+                          </div>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
           </div>
         )}
 

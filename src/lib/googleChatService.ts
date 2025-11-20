@@ -118,8 +118,7 @@ class GoogleChatService {
         requestBody: {
           displayName: displayName,
           spaceType: 'SPACE',
-          // Removing spaceSettings as it causes type errors in some googleapis versions
-          // Default behavior is usually sufficient (History ON for threaded spaces)
+          externalUserAllowed: true, // Allow external members
         },
       });
       return response.data;
@@ -127,6 +126,46 @@ class GoogleChatService {
       console.error('Error creating Google Chat space:', error);
       const errorMessage = error.response?.data?.error?.message || error.message;
       throw new Error(`Failed to create Google Chat space: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * List members of a space
+   */
+  async listMembers(spaceId: string, userId: string): Promise<any[]> {
+    try {
+      const chat = await this.getChatClientForUser(userId);
+      const response = await chat.spaces.members.list({
+        parent: `spaces/${spaceId}`,
+      });
+      return response.data.memberships || [];
+    } catch (error: any) {
+      console.error('Error listing members:', error);
+      // Ignore errors if we can't list members (e.g. DM or permission)
+      return [];
+    }
+  }
+
+  /**
+   * Add a member to a space
+   */
+  async addMember(spaceId: string, email: string, userId: string): Promise<any> {
+    try {
+      const chat = await this.getChatClientForUser(userId);
+      const response = await chat.spaces.members.create({
+        parent: `spaces/${spaceId}`,
+        requestBody: {
+          member: {
+            name: `users/${email}`,
+            type: 'HUMAN',
+          },
+        },
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error('Error adding member to space:', error);
+      const errorMessage = error.response?.data?.error?.message || error.message;
+      throw new Error(`Failed to add member: ${errorMessage}`);
     }
   }
 

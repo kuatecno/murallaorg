@@ -1,13 +1,11 @@
 /**
  * Tasks API Routes
- * CRUD operations for tasks with Google Chat integration
+ * CRUD operations for tasks
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticate } from '@/lib/auth';
 import prisma from '@/lib/prisma';
-import { getGoogleChatService } from '@/lib/googleChatService';
-import { getGoogleTasksSyncService } from '@/lib/googleTasksSyncService';
 
 // GET /api/tasks - List tasks for current tenant
 export async function GET(request: NextRequest) {
@@ -122,7 +120,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { title, description, priority, dueDate, assignedStaff, createGoogleChatSpace, existingGoogleChatSpaceId } = body;
+    const { title, description, priority, dueDate, assignedStaff } = body;
 
     // Validate required fields
     if (!title) {
@@ -152,41 +150,10 @@ export async function POST(request: NextRequest) {
       createdById: auth.userId,
     };
 
-    let googleChatSpaceId = null;
-    let googleChatMessageId = null;
-
-    // Use existing Google Chat space if provided
-    if (existingGoogleChatSpaceId) {
-      googleChatSpaceId = existingGoogleChatSpaceId.trim();
-    }
-    // Create new Google Chat space if requested
-    else if (createGoogleChatSpace) {
-      try {
-        const googleChatService = getGoogleChatService();
-
-        const taskNotificationData = {
-          taskId: 'temp', // Will be updated after task creation
-          title: title.trim(),
-          description: description?.trim() || undefined,
-          status: 'TODO',
-          priority,
-          dueDate: dueDate ? new Date(dueDate).toISOString() : undefined,
-          createdBy: auth.userId, // Will be updated with actual name after creation
-        };
-
-        googleChatSpaceId = await googleChatService.createTaskSpace(taskNotificationData);
-      } catch (chatError) {
-        console.error('Failed to create Google Chat space:', chatError);
-        // Continue even if Chat creation fails
-      }
-    }
-
     // Create the task
     const task = await prisma.task.create({
       data: {
         ...taskData,
-        googleChatSpaceId,
-        googleChatMessageId,
         assignments: assignedStaff && assignedStaff.length > 0
           ? {
               create: assignedStaff.map((staffId: string) => ({
@@ -219,65 +186,6 @@ export async function POST(request: NextRequest) {
         },
       },
     });
-
-    // Send task message to Google Chat space
-    if (googleChatSpaceId) {
-      try {
-        const googleChatService = getGoogleChatService();
-        const assignedStaffData = await prisma.staff.findMany({
-          where: {
-            id: { in: assignedStaff || [] },
-            tenantId: auth.tenantId,
-          },
-          select: { email: true, firstName: true, lastName: true },
-        });
-
-        const taskNotificationData = {
-          taskId: task.id,
-          title: task.title,
-          description: task.description || undefined,
-          status: task.status,
-          priority: task.priority,
-          dueDate: task.dueDate?.toISOString(),
-          createdBy: `${task.createdBy.firstName} ${task.createdBy.lastName}`,
-          assignedTo: assignedStaffData.map(s => `${s.firstName} ${s.lastName}`),
-        };
-
-        // Send message to the space (works for both new and existing spaces)
-        googleChatMessageId = await googleChatService.sendTaskMessage(
-          googleChatSpaceId,
-          taskNotificationData,
-          !existingGoogleChatSpaceId // isInitialMessage = true only for newly created spaces
-        );
-
-        // Update task with message ID
-        await prisma.task.update({
-          where: { id: task.id },
-          data: { googleChatMessageId },
-        });
-
-        // Add members to the chat space (only if it's a newly created space and has assigned staff)
-        if (!existingGoogleChatSpaceId && assignedStaffData.length > 0) {
-          await googleChatService.addMembersToSpace(
-            googleChatSpaceId,
-            assignedStaffData.map(s => s.email)
-          );
-        }
-      } catch (chatError) {
-        console.error('Failed to send Google Chat message:', chatError);
-      }
-    }
-
-    // Create Google Task if enabled
-    if (process.env.GOOGLE_TASKS_ENABLED === 'true') {
-      try {
-        const googleTasksSync = getGoogleTasksSyncService();
-        await googleTasksSync.createGoogleTask(task.id);
-      } catch (tasksError) {
-        console.error('Failed to create Google Task:', tasksError);
-        // Continue even if Google Tasks creation fails
-      }
-    }
 
     return NextResponse.json({ task }, { status: 201 });
   } catch (error) {

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Filter, Search, Calendar, User, MessageSquare, Link2, MoreHorizontal, RefreshCw, CheckCircle, AlertCircle, Clock, Activity } from 'lucide-react';
+import { Plus, Search, Calendar, User, MessageSquare, Link2, MoreHorizontal } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import CreateTaskModal from '@/components/tasks/CreateTaskModal';
 
@@ -14,15 +14,6 @@ interface Task {
   priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
   dueDate?: string;
   completedAt?: string;
-  googleChatSpaceId?: string;
-  googleChatMessageId?: string;
-  // Google Tasks sync fields
-  googleTaskId?: string;
-  googleTasksListId?: string;
-  googleTasksUpdatedAt?: string;
-  syncStatus?: 'PENDING' | 'SYNCED' | 'CONFLICT' | 'ERROR';
-  syncDirection?: 'TO_GOOGLE' | 'FROM_GOOGLE' | 'BIDIRECTIONAL';
-  lastSyncAt?: string;
   createdAt: string;
   updatedAt: string;
   createdBy: {
@@ -54,87 +45,6 @@ interface Staff {
   lastName: string;
   email: string;
 }
-
-// Sync status component
-const SyncStatusIndicator = ({ task, onSync }: { task: Task; onSync: () => void }) => {
-  const getSyncIcon = () => {
-    switch (task.syncStatus) {
-      case 'SYNCED':
-        return <CheckCircle className="w-4 h-4 text-green-500" />;
-      case 'PENDING':
-        return <Clock className="w-4 h-4 text-yellow-500" />;
-      case 'ERROR':
-        return <AlertCircle className="w-4 h-4 text-red-500" />;
-      case 'CONFLICT':
-        return <AlertCircle className="w-4 h-4 text-orange-500" />;
-      default:
-        return <Activity className="w-4 h-4 text-gray-400" />;
-    }
-  };
-
-  const getSyncTooltip = () => {
-    switch (task.syncStatus) {
-      case 'SYNCED':
-        return 'Synced with Google Tasks';
-      case 'PENDING':
-        return 'Sync pending';
-      case 'ERROR':
-        return 'Sync error occurred';
-      case 'CONFLICT':
-        return 'Sync conflict detected';
-      default:
-        return 'Not synced';
-    }
-  };
-
-  const handleManualSync = async () => {
-    try {
-      const response = await fetch('/api/tasks/sync', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ taskId: task.id }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok && data.success) {
-        toast.success('Task synced successfully');
-        onSync();
-      } else {
-        const errorMsg = data.message || data.error || 'Failed to sync task';
-        toast.error(errorMsg);
-      }
-    } catch (error) {
-      console.error('Manual sync error:', error);
-      toast.error('Error syncing task');
-    }
-  };
-
-  return (
-    <div className="flex items-center space-x-2 group relative">
-      <div className="flex items-center space-x-1" title={getSyncTooltip()}>
-        {getSyncIcon()}
-        {task.googleTaskId && (
-          <Link2 className="w-3 h-3 text-blue-500" />
-        )}
-      </div>
-      {task.syncStatus !== 'SYNCED' && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            handleManualSync();
-          }}
-          className="opacity-0 group-hover:opacity-100 transition-opacity"
-          title="Manual sync"
-        >
-          <RefreshCw className="w-3 h-3 text-gray-500 hover:text-blue-500" />
-        </button>
-      )}
-    </div>
-  );
-};
 
 const statusColumns = [
   { id: 'TODO', title: 'To Do', color: 'bg-gray-100' },
@@ -169,11 +79,6 @@ export default function PlanningPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPriority, setSelectedPriority] = useState('');
   const [selectedAssignee, setSelectedAssignee] = useState('');
-  const [syncStatus, setSyncStatus] = useState<any>(null);
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [googleConnected, setGoogleConnected] = useState(false);
-  const [googleEmail, setGoogleEmail] = useState<string | null>(null);
-  const [checkingConnection, setCheckingConnection] = useState(true);
 
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem('user') || '{}');
@@ -184,61 +89,7 @@ export default function PlanningPage() {
 
     fetchTasks();
     fetchStaff();
-    fetchSyncStatus();
-    checkGoogleConnection();
   }, [searchTerm, selectedPriority, selectedAssignee, router]);
-
-  const fetchSyncStatus = async () => {
-    try {
-      const response = await fetch('/api/tasks/sync/status');
-      if (response.ok) {
-        const data = await response.json();
-        setSyncStatus(data);
-      }
-    } catch (error) {
-      console.error('Error fetching sync status:', error);
-    }
-  };
-
-  const handleGlobalSync = async () => {
-    if (!googleConnected) {
-      toast.error('Please connect your Google account first');
-      return;
-    }
-
-    setIsSyncing(true);
-    try {
-      const response = await fetch('/api/tasks/sync', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ direction: 'bidirectional' }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok && data.success) {
-        toast.success('Global sync completed successfully');
-        fetchTasks();
-        fetchSyncStatus();
-      } else {
-        const errorMsg = data.message || data.error || 'Failed to complete global sync';
-        toast.error(errorMsg);
-
-        // If authentication expired, prompt to reconnect
-        if (response.status === 401 || data.error?.includes('Authentication')) {
-          setGoogleConnected(false);
-          setGoogleEmail(null);
-        }
-      }
-    } catch (error) {
-      console.error('Sync error:', error);
-      toast.error('Error during global sync');
-    } finally {
-      setIsSyncing(false);
-    }
-  };
 
   const fetchTasks = async () => {
     try {
@@ -274,64 +125,6 @@ export default function PlanningPage() {
     } catch (error) {
       console.error('Error fetching staff:', error);
       setStaff([]); // Reset to empty array on error
-    }
-  };
-
-  const checkGoogleConnection = async () => {
-    try {
-      const user = JSON.parse(localStorage.getItem('user') || '{}');
-      const response = await fetch('/api/staff/' + user.id);
-
-      if (response.ok) {
-        const data = await response.json();
-        const staff = data.staff;
-
-        if (staff.googleTasksEnabled && staff.googleEmail) {
-          setGoogleConnected(true);
-          setGoogleEmail(staff.googleEmail);
-        } else {
-          setGoogleConnected(false);
-          setGoogleEmail(null);
-        }
-      }
-    } catch (error) {
-      console.error('Error checking Google connection:', error);
-    } finally {
-      setCheckingConnection(false);
-    }
-  };
-
-  const handleConnectGoogle = () => {
-    // Redirect to Google OAuth
-    window.location.href = '/api/auth/google';
-  };
-
-  const handleDisconnectGoogle = async () => {
-    try {
-      const user = JSON.parse(localStorage.getItem('user') || '{}');
-      const response = await fetch('/api/staff/' + user.id, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          googleTasksEnabled: false,
-          googleAccessToken: null,
-          googleRefreshToken: null,
-          googleEmail: null,
-        }),
-      });
-
-      if (response.ok) {
-        setGoogleConnected(false);
-        setGoogleEmail(null);
-        toast.success('Google account disconnected successfully');
-      } else {
-        toast.error('Failed to disconnect Google account');
-      }
-    } catch (error) {
-      toast.error('Error disconnecting Google account');
-      console.error('Error:', error);
     }
   };
 
@@ -391,110 +184,13 @@ export default function PlanningPage() {
       <div className="mb-6">
         <div className="flex items-center justify-between mb-4">
           <h1 className="text-3xl font-bold text-gray-900">Task Planning</h1>
-          <div className="flex gap-2">
-            <button
-              onClick={() => router.push('/plannings/spaces')}
-              className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              <MessageSquare className="w-5 h-5" />
-              Manage Spaces
-            </button>
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              <Plus className="w-5 h-5" />
-              Create Task
-            </button>
-          </div>
-        </div>
-
-        {/* Google Account Connection */}
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-lg shadow-sm mb-4 border border-blue-200">
-          {checkingConnection ? (
-            <div className="flex items-center gap-2 text-gray-600">
-              <RefreshCw className="w-4 h-4 animate-spin" />
-              <span>Checking Google connection...</span>
-            </div>
-          ) : googleConnected ? (
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <CheckCircle className="w-6 h-6 text-green-600" />
-                <div>
-                  <h3 className="text-lg font-medium text-gray-900">Google Account Connected</h3>
-                  <p className="text-sm text-gray-600">{googleEmail}</p>
-                </div>
-              </div>
-              <button
-                onClick={handleDisconnectGoogle}
-                className="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors font-medium"
-              >
-                Disconnect
-              </button>
-            </div>
-          ) : (
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <AlertCircle className="w-6 h-6 text-yellow-600" />
-                <div>
-                  <h3 className="text-lg font-medium text-gray-900">Connect Google Account</h3>
-                  <p className="text-sm text-gray-600">Enable automatic sync with Google Tasks</p>
-                </div>
-              </div>
-              <button
-                onClick={handleConnectGoogle}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
-              >
-                Connect Google Account
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* Google Tasks Sync Status */}
-        <div className="bg-white p-4 rounded-lg shadow-sm mb-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <Activity className="w-5 h-5 text-blue-600" />
-                <h3 className="text-lg font-medium text-gray-900">Google Tasks Sync</h3>
-              </div>
-              {syncStatus && (
-                <div className="flex items-center gap-4 text-sm">
-                  <div className="flex items-center gap-1">
-                    <CheckCircle className="w-4 h-4 text-green-500" />
-                    <span className="text-gray-600">Synced: {syncStatus.SYNCED || 0}</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Clock className="w-4 h-4 text-yellow-500" />
-                    <span className="text-gray-600">Pending: {syncStatus.PENDING || 0}</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <AlertCircle className="w-4 h-4 text-red-500" />
-                    <span className="text-gray-600">Errors: {syncStatus.ERROR || 0}</span>
-                  </div>
-                </div>
-              )}
-            </div>
-            <button
-              onClick={handleGlobalSync}
-              disabled={isSyncing || !googleConnected}
-              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              title={!googleConnected ? 'Connect Google account to enable sync' : 'Sync all tasks with Google Tasks'}
-            >
-              {isSyncing ? (
-                <>
-                  <RefreshCw className="w-4 h-4 animate-spin" />
-                  Syncing...
-                </>
-              ) : (
-                <>
-                  <RefreshCw className="w-4 h-4" />
-                  Sync All Tasks
-                </>
-              )}
-            </button>
-          </div>
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <Plus className="w-5 h-5" />
+            Create Task
+          </button>
         </div>
 
         {/* Filters */}
@@ -561,7 +257,6 @@ export default function PlanningPage() {
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex items-center gap-2">
                       <h4 className="font-medium text-gray-900 text-sm">{task.title}</h4>
-                      <SyncStatusIndicator task={task} onSync={() => { fetchTasks(); fetchSyncStatus(); }} />
                     </div>
                     <span className={`text-xs px-2 py-1 rounded-full ${getPriorityColor(task.priority)}`}>
                       {priorityLabels[task.priority as keyof typeof priorityLabels]}
@@ -596,9 +291,6 @@ export default function PlanningPage() {
                           <MessageSquare className="w-3 h-3" />
                           {task._count.comments}
                         </div>
-                      )}
-                      {task.googleChatSpaceId && (
-                        <Link2 className="w-3 h-3 text-blue-600" />
                       )}
                     </div>
                   </div>
@@ -690,21 +382,6 @@ export default function PlanningPage() {
                         </div>
                       ))}
                     </div>
-                  </div>
-                )}
-
-                {selectedTask.googleChatSpaceId && (
-                  <div>
-                    <h3 className="font-semibold text-gray-900 mb-2">Google Chat Integration</h3>
-                    <a
-                      href={`https://chat.google.com/room/${selectedTask.googleChatSpaceId}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-600 hover:text-blue-700 flex items-center gap-2"
-                    >
-                      <Link2 className="w-4 h-4" />
-                      Open in Google Chat
-                    </a>
                   </div>
                 )}
               </div>

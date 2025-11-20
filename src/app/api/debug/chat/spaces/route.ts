@@ -33,6 +33,8 @@ export async function GET(request: NextRequest) {
       hasRefreshToken: !!user?.googleRefreshToken,
     };
 
+    const chatService = getGoogleChatService();
+    
     // 2. Test Basic Connectivity (Get User Profile)
     let userProfile = null;
     try {
@@ -45,7 +47,6 @@ export async function GET(request: NextRequest) {
       console.log('Skipping user profile check or it failed', e);
     }
 
-    const chatService = getGoogleChatService();
     let spaces: any[] = [];
     let apiStage = 'init';
     

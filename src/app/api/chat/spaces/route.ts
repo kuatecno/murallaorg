@@ -68,7 +68,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       { 
         success: false, 
-        error: error.message 
+        error: error.message,
+        details: error.response?.data || 'No details', // Expose Google API details
+        stack: error.stack
       },
       { status: 500 }
     );

@@ -111,14 +111,15 @@ class GoogleChatService {
   /**
    * Create a new Google Chat space
    */
-  async createSpace(displayName: string): Promise<any> {
+  async createSpace(displayName: string, userId: string): Promise<any> {
     try {
-      const response = await this.chat.spaces.create({
+      const chat = await this.getChatClientForUser(userId);
+      const response = await chat.spaces.create({
         requestBody: {
           displayName: displayName,
           spaceType: 'SPACE',
           spaceSettings: {
-            allowHistory: true, // Usually better for "Projects" to have history
+            allowHistory: true,
             allowGuests: false,
           },
         },
@@ -134,11 +135,10 @@ class GoogleChatService {
   /**
    * Update a Google Chat space (rename)
    */
-  async updateSpace(spaceId: string, displayName: string): Promise<any> {
+  async updateSpace(spaceId: string, displayName: string, userId: string): Promise<any> {
     try {
-      // Note: Updating space details might require specific scopes or might be limited
-      // depending on the API version and space type.
-      const response = await this.chat.spaces.patch({
+      const chat = await this.getChatClientForUser(userId);
+      const response = await chat.spaces.patch({
         name: `spaces/${spaceId}`,
         updateMask: 'displayName',
         requestBody: {

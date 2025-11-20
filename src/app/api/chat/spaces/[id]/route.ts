@@ -22,7 +22,7 @@ export async function PUT(
     }
 
     const chatService = getGoogleChatService();
-    const space = await chatService.updateSpace(id, displayName);
+    const space = await chatService.updateSpace(id, displayName, auth.userId);
 
     return NextResponse.json({
       success: true,

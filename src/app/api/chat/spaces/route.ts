@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
     }
 
     const chatService = getGoogleChatService();
-    const space = await chatService.createSpace(displayName);
+    const space = await chatService.createSpace(displayName, auth.userId);
 
     return NextResponse.json({
       success: true,

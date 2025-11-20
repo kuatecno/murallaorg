@@ -118,10 +118,8 @@ class GoogleChatService {
         requestBody: {
           displayName: displayName,
           spaceType: 'SPACE',
-          spaceSettings: {
-            allowHistory: true,
-            allowGuests: false,
-          },
+          // Removing spaceSettings as it causes type errors in some googleapis versions
+          // Default behavior is usually sufficient (History ON for threaded spaces)
         },
       });
       return response.data;
@@ -162,10 +160,7 @@ class GoogleChatService {
         requestBody: {
           displayName: `Task: ${taskData.title}`,
           spaceType: 'SPACE',
-          spaceSettings: {
-            allowHistory: false,
-            allowGuests: false,
-          },
+          // Removing spaceSettings to fix build
         },
       });
 

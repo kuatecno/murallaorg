@@ -10,7 +10,7 @@ import prisma from '@/lib/prisma';
 // GET /api/projects/[id]/tasks - Get all tasks for a project
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const auth = await authenticate(request);
@@ -18,10 +18,12 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const { id } = await params;
+
     // Verify project exists and belongs to tenant
     const project = await prisma.project.findFirst({
       where: {
-        id: params.id,
+        id,
         tenantId: auth.tenantId,
       },
     });
@@ -40,7 +42,7 @@ export async function GET(
     const skip = (page - 1) * limit;
 
     const where: any = {
-      projectId: params.id,
+      projectId: id,
       tenantId: auth.tenantId,
       ...(assignedTo && {
         assignments: {

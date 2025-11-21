@@ -5,7 +5,7 @@ generator client {
 datasource db {
   provider  = "postgresql"
   url       = env("POSTGRES_PRISMA_URL")
-  directUrl = env("POSTGRES_URL_NON_POOLING")
+  directUrl = env("DIRECT_DATABASE_URL")
 }
 
 model Staff {
@@ -50,6 +50,7 @@ model Staff {
   tenant            Tenant                  @relation(fields: [tenantId], references: [id])
   contactRelations  StaffContact[]
   productsOwned     StaffProduct[]          @relation("StaffOwnsProduct")
+  projectsCreated   Project[]               @relation("ProjectCreatedBy")
   taskAssignments   TaskAssignment[]        @relation("StaffTaskAssignments")
   taskComments      TaskComment[]           @relation("StaffTaskComments")
   tasksCreated      Task[]                  @relation("TaskCreatedBy")
@@ -792,6 +793,7 @@ model Tenant {
   productVariants        ProductVariant[]
   productionBatches      ProductionBatch[]
   products               Product[]
+  projects               Project[]
   ptoRequests            PTORequest[]
   purchaseOrders         PurchaseOrder[]
   recipes                Recipe[]
@@ -926,7 +928,7 @@ model Task {
   completedAt         DateTime?
   googleChatSpaceId   String?
   googleChatMessageId String?
-  
+
   // Google Tasks API Integration
   googleTaskId        String?          // Google Tasks API identifier
   googleTasksListId   String?          // Parent task list (usually from Chat space)
@@ -934,7 +936,16 @@ model Task {
   syncStatus          SyncStatus       @default(PENDING) // PENDING, SYNCED, CONFLICT, ERROR
   syncDirection       SyncDirection    @default(BIDIRECTIONAL) // TO_GOOGLE, FROM_GOOGLE, BIDIRECTIONAL
   lastSyncAt          DateTime?        // When was the last sync performed
-  
+
+  // Enhanced Task Management
+  projectId           String?          // Link to project
+  parentTaskId        String?          // For subtasks
+  startDate           DateTime?        // Start date (in addition to dueDate)
+  progress            Int              @default(0) // 0-100 percentage
+  estimatedHours      Float?           // Time estimation
+  actualHours         Float?           // Time tracking
+  order               Int              @default(0) // For custom ordering
+
   tenantId            String
   createdById         String
   createdAt           DateTime         @default(now())
@@ -944,12 +955,23 @@ model Task {
   createdBy           Staff            @relation("TaskCreatedBy", fields: [createdById], references: [id])
   tenant              Tenant           @relation(fields: [tenantId], references: [id])
 
+  // Enhanced Relations
+  project             Project?         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  parentTask          Task?            @relation("TaskSubtasks", fields: [parentTaskId], references: [id], onDelete: Cascade)
+  subtasks            Task[]           @relation("TaskSubtasks")
+  dependencies        TaskDependency[] @relation("TaskDependencies")
+  dependentOn         TaskDependency[] @relation("DependentTasks")
+
   @@index([tenantId])
   @@index([status])
   @@index([dueDate])
   @@index([createdById])
   @@index([googleTaskId])
   @@index([syncStatus])
+  @@index([projectId])
+  @@index([parentTaskId])
+  @@index([startDate])
+  @@index([progress])
   @@map("tasks")
 }
 
@@ -981,6 +1003,46 @@ model TaskComment {
   @@index([taskId])
   @@index([staffId])
   @@map("task_comments")
+}
+
+model Project {
+  id          String        @id @default(cuid())
+  name        String
+  description String?
+  color       String        @default("#3B82F6")
+  icon        String?
+  status      ProjectStatus @default(ACTIVE)
+  startDate   DateTime?
+  endDate     DateTime?
+  tenantId    String
+  createdById String
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  tasks       Task[]
+  tenant      Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdBy   Staff         @relation("ProjectCreatedBy", fields: [createdById], references: [id])
+
+  @@index([tenantId])
+  @@index([status])
+  @@index([createdById])
+  @@map("projects")
+}
+
+model TaskDependency {
+  id              String         @id @default(cuid())
+  taskId          String
+  dependsOnTaskId String
+  dependencyType  DependencyType @default(FINISH_TO_START)
+  createdAt       DateTime       @default(now())
+
+  task            Task           @relation("TaskDependencies", fields: [taskId], references: [id], onDelete: Cascade)
+  dependsOnTask   Task           @relation("DependentTasks", fields: [dependsOnTaskId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, dependsOnTaskId])
+  @@index([taskId])
+  @@index([dependsOnTaskId])
+  @@map("task_dependencies")
 }
 
 model ApiKey {
@@ -1048,6 +1110,20 @@ enum AssignmentRole {
   ASSIGNEE
   REVIEWER
   OBSERVER
+}
+
+enum ProjectStatus {
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  ARCHIVED
+}
+
+enum DependencyType {
+  FINISH_TO_START
+  START_TO_START
+  FINISH_TO_FINISH
+  START_TO_FINISH
 }
 
 enum MovementType {

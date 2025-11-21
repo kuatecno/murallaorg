@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, Calendar, Users, MessageSquare, Link2 } from 'lucide-react';
+import { X, Calendar, Users, MessageSquare, Link2, FolderKanban } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 interface Staff {
@@ -11,33 +11,52 @@ interface Staff {
   email: string;
 }
 
+interface Project {
+  id: string;
+  name: string;
+  color: string;
+}
+
 interface CreateTaskModalProps {
   isOpen: boolean;
   onClose: () => void;
   onTaskCreated: () => void;
+  defaultProjectId?: string | null;
 }
 
-export default function CreateTaskModal({ isOpen, onClose, onTaskCreated }: CreateTaskModalProps) {
+export default function CreateTaskModal({ isOpen, onClose, onTaskCreated, defaultProjectId }: CreateTaskModalProps) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT'>('MEDIUM');
+  const [startDate, setStartDate] = useState('');
   const [dueDate, setDueDate] = useState('');
+  const [projectId, setProjectId] = useState<string>('');
+  const [progress, setProgress] = useState(0);
+  const [estimatedHours, setEstimatedHours] = useState('');
   const [selectedStaff, setSelectedStaff] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [staff, setStaff] = useState<Staff[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
 
   useEffect(() => {
     if (isOpen) {
       fetchStaff();
+      fetchProjects();
       resetForm();
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    if (defaultProjectId) {
+      setProjectId(defaultProjectId);
+    }
+  }, [defaultProjectId]);
 
   const fetchStaff = async () => {
     try {
       const response = await fetch('/api/staff');
       if (!response.ok) throw new Error('Failed to fetch staff');
-      
+
       const data = await response.json();
       setStaff(data.staff || []);
     } catch (error) {
@@ -45,19 +64,40 @@ export default function CreateTaskModal({ isOpen, onClose, onTaskCreated }: Crea
     }
   };
 
+  const fetchProjects = async () => {
+    try {
+      const response = await fetch('/api/projects');
+      if (!response.ok) throw new Error('Failed to fetch projects');
+
+      const data = await response.json();
+      setProjects(data.projects || []);
+    } catch (error) {
+      console.error('Error fetching projects:', error);
+    }
+  };
+
   const resetForm = () => {
     setTitle('');
     setDescription('');
     setPriority('MEDIUM');
+    setStartDate('');
     setDueDate('');
+    setProjectId(defaultProjectId || '');
+    setProgress(0);
+    setEstimatedHours('');
     setSelectedStaff([]);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!title.trim()) {
       toast.error('Task title is required');
+      return;
+    }
+
+    if (startDate && dueDate && new Date(startDate) > new Date(dueDate)) {
+      toast.error('Start date must be before due date');
       return;
     }
 
@@ -71,7 +111,11 @@ export default function CreateTaskModal({ isOpen, onClose, onTaskCreated }: Crea
           title: title.trim(),
           description: description.trim() || undefined,
           priority,
+          startDate: startDate || undefined,
           dueDate: dueDate || undefined,
+          projectId: projectId || undefined,
+          progress,
+          estimatedHours: estimatedHours ? parseFloat(estimatedHours) : undefined,
           assignedStaff: selectedStaff,
         }),
       });
@@ -149,22 +193,55 @@ export default function CreateTaskModal({ isOpen, onClose, onTaskCreated }: Crea
               />
             </div>
 
-            {/* Priority and Due Date */}
+            {/* Project */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                <FolderKanban className="w-4 h-4" />
+                Project
+              </label>
+              <select
+                value={projectId}
+                onChange={(e) => setProjectId(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="">No Project</option>
+                {projects.map((project) => (
+                  <option key={project.id} value={project.id}>
+                    {project.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Priority */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Priority
+              </label>
+              <select
+                value={priority}
+                onChange={(e) => setPriority(e.target.value as any)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="LOW">Low</option>
+                <option value="MEDIUM">Medium</option>
+                <option value="HIGH">High</option>
+                <option value="URGENT">Urgent</option>
+              </select>
+            </div>
+
+            {/* Date Range */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Priority
+                  Start Date
                 </label>
-                <select
-                  value={priority}
-                  onChange={(e) => setPriority(e.target.value as any)}
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="LOW">Low</option>
-                  <option value="MEDIUM">Medium</option>
-                  <option value="HIGH">High</option>
-                  <option value="URGENT">Urgent</option>
-                </select>
+                />
               </div>
 
               <div>
@@ -175,6 +252,44 @@ export default function CreateTaskModal({ isOpen, onClose, onTaskCreated }: Crea
                   type="date"
                   value={dueDate}
                   onChange={(e) => setDueDate(e.target.value)}
+                  min={startDate}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+
+            {/* Progress and Estimated Hours */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Progress (%)
+                </label>
+                <div className="space-y-2">
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={progress}
+                    onChange={(e) => setProgress(parseInt(e.target.value))}
+                    className="w-full"
+                  />
+                  <div className="text-center text-sm font-medium text-gray-700">
+                    {progress}%
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Estimated Hours
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.5"
+                  value={estimatedHours}
+                  onChange={(e) => setEstimatedHours(e.target.value)}
+                  placeholder="e.g., 8"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>

@@ -13,6 +13,7 @@ import {
     Clock,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import SubtaskBadge from './SubtaskBadge';
 
 interface Task {
     id: string;
@@ -96,6 +97,14 @@ export default function TaskCard({
     const completedSubtasks = subtasks.filter((t) => t.status === 'COMPLETED').length;
     const project = task.project || projects.find((p) => p.id === task.projectId);
 
+    // Calculate aggregated progress from subtasks
+    const aggregatedProgress = subtasks.length > 0
+        ? Math.round(subtasks.reduce((sum, st) => sum + st.progress, 0) / subtasks.length)
+        : task.progress;
+
+    // Check if parent progress is out of sync with subtasks
+    const isProgressOutOfSync = subtasks.length > 0 && Math.abs(task.progress - aggregatedProgress) > 5;
+
     const formatDate = (date: string) => {
         return new Intl.DateTimeFormat('en-US', {
             month: 'short',
@@ -163,6 +172,28 @@ export default function TaskCard({
                                     <Plus className="w-4 h-4" />
                                     Add Subtask
                                 </button>
+                                {isProgressOutOfSync && (
+                                    <button
+                                        onClick={async () => {
+                                            try {
+                                                await fetch(`/api/tasks/${task.id}/progress`, {
+                                                    method: 'PATCH',
+                                                    headers: { 'Content-Type': 'application/json' },
+                                                    body: JSON.stringify({ progress: aggregatedProgress }),
+                                                });
+                                                toast.success('Progress synced with subtasks');
+                                                onRefresh();
+                                                setShowMenu(false);
+                                            } catch (error) {
+                                                toast.error('Failed to sync progress');
+                                            }
+                                        }}
+                                        className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-blue-600"
+                                    >
+                                        <ArrowRight className="w-4 h-4" />
+                                        Sync Progress ({aggregatedProgress}%)
+                                    </button>
+                                )}
                                 <div className="border-t border-gray-200 my-1" />
                                 {statusOptions
                                     .filter((s) => s.value !== task.status)
@@ -214,12 +245,13 @@ export default function TaskCard({
                     {subtasks.length > 0 && (
                         <button
                             onClick={() => setShowSubtasks(!showSubtasks)}
-                            className="flex items-center gap-1 px-2 py-1 rounded-md bg-gray-100 hover:bg-gray-200 transition-colors"
+                            className="hover:scale-105 transition-transform"
                         >
-                            <CheckSquare className="w-3 h-3" />
-                            <span className="text-xs text-gray-700">
-                                {completedSubtasks}/{subtasks.length}
-                            </span>
+                            <SubtaskBadge
+                                completedCount={completedSubtasks}
+                                totalCount={subtasks.length}
+                                size="sm"
+                            />
                         </button>
                     )}
                 </div>
@@ -235,8 +267,8 @@ export default function TaskCard({
                                 <div className="flex items-center gap-2">
                                     <div
                                         className={`w-2 h-2 rounded-full ${subtask.status === 'COMPLETED'
-                                                ? 'bg-emerald-500'
-                                                : 'bg-gray-300'
+                                            ? 'bg-emerald-500'
+                                            : 'bg-gray-300'
                                             }`}
                                     />
                                     <span
@@ -260,7 +292,17 @@ export default function TaskCard({
                 <div className="space-y-2">
                     <div className="flex items-center justify-between text-xs text-gray-500">
                         <span>Progress</span>
-                        <span className="font-medium">{task.progress}%</span>
+                        <div className="flex items-center gap-2">
+                            <span className="font-medium">{task.progress}%</span>
+                            {isProgressOutOfSync && (
+                                <span
+                                    className="text-xs px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 border border-amber-300"
+                                    title={`Subtasks average: ${aggregatedProgress}%`}
+                                >
+                                    ≈{aggregatedProgress}%
+                                </span>
+                            )}
+                        </div>
                     </div>
                     <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
                         <div
@@ -268,6 +310,12 @@ export default function TaskCard({
                             style={{ width: `${task.progress}%` }}
                         />
                     </div>
+                    {isProgressOutOfSync && (
+                        <div className="text-xs text-amber-600 flex items-center gap-1">
+                            <span className="font-medium">⚠</span>
+                            <span>Progress differs from subtasks average ({aggregatedProgress}%)</span>
+                        </div>
+                    )}
                 </div>
 
                 {(task.startDate || task.dueDate) && (

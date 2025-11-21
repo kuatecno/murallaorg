@@ -10,7 +10,7 @@ import prisma from '@/lib/prisma';
 // GET /api/projects/[id] - Get single project
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const auth = await authenticate(request);
@@ -18,9 +18,11 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const { id } = await params;
+
     const project = await prisma.project.findFirst({
       where: {
-        id: params.id,
+        id: id,
         tenantId: auth.tenantId,
       },
       include: {
@@ -97,7 +99,7 @@ export async function GET(
 // PUT /api/projects/[id] - Update project
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const auth = await authenticate(request);
@@ -105,10 +107,12 @@ export async function PUT(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const { id } = await params;
+
     // Verify project exists and belongs to tenant
     const existingProject = await prisma.project.findFirst({
       where: {
-        id: params.id,
+        id: id,
         tenantId: auth.tenantId,
       },
     });
@@ -135,7 +139,7 @@ export async function PUT(
     if (endDate !== undefined) updateData.endDate = endDate ? new Date(endDate) : null;
 
     const project = await prisma.project.update({
-      where: { id: params.id },
+      where: { id: id },
       data: updateData,
       include: {
         createdBy: {
@@ -167,7 +171,7 @@ export async function PUT(
 // DELETE /api/projects/[id] - Delete project
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const auth = await authenticate(request);
@@ -175,10 +179,12 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const { id } = await params;
+
     // Verify project exists and belongs to tenant
     const existingProject = await prisma.project.findFirst({
       where: {
-        id: params.id,
+        id: id,
         tenantId: auth.tenantId,
       },
       include: {
@@ -205,7 +211,7 @@ export async function DELETE(
 
     // Delete project (tasks will be cascaded based on schema)
     await prisma.project.delete({
-      where: { id: params.id },
+      where: { id: id },
     });
 
     return NextResponse.json({ success: true, message: 'Project deleted successfully' });

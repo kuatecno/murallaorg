@@ -1,10 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { Plus, Search, Calendar, User, MessageSquare, Link2, MoreHorizontal } from 'lucide-react';
+import { Plus, LayoutGrid, List, Calendar, Workflow } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import TaskBoard from '@/components/tasks/TaskBoard';
+import TaskListView from '@/components/tasks/TaskListView';
 import CreateTaskModal from '@/components/tasks/CreateTaskModal';
+import TaskTimeline from '@/components/tasks/TaskTimeline';
+import TaskProcess from '@/components/tasks/TaskProcess';
 
 interface Task {
   id: string;
@@ -12,389 +15,260 @@ interface Task {
   description?: string;
   status: 'TODO' | 'IN_PROGRESS' | 'IN_REVIEW' | 'COMPLETED' | 'CANCELLED';
   priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+  startDate?: string;
   dueDate?: string;
-  completedAt?: string;
-  createdAt: string;
-  updatedAt: string;
-  createdBy: {
-    id: string;
-    firstName: string;
-    lastName: string;
-    email: string;
-  };
-  assignments: Array<{
-    id: string;
-    staffId: string;
-    role: string;
+  progress: number;
+  projectId?: string;
+  parentTaskId?: string;
+  estimatedHours?: number;
+  assignments?: {
     staff: {
       id: string;
       firstName: string;
       lastName: string;
       email: string;
     };
-  }>;
-  _count: {
-    assignments: number;
-    comments: number;
+  }[];
+  subtasks?: Task[];
+  project?: {
+    id: string;
+    name: string;
+    color: string;
   };
 }
 
-interface Staff {
+interface Project {
   id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
+  name: string;
+  color: string;
+  description?: string;
 }
 
-const statusColumns = [
-  { id: 'TODO', title: 'To Do', color: 'bg-gray-100' },
-  { id: 'IN_PROGRESS', title: 'In Progress', color: 'bg-blue-50' },
-  { id: 'IN_REVIEW', title: 'In Review', color: 'bg-yellow-50' },
-  { id: 'COMPLETED', title: 'Completed', color: 'bg-green-50' },
-  { id: 'CANCELLED', title: 'Cancelled', color: 'bg-red-50' },
-];
-
-const priorityColors = {
-  LOW: 'bg-green-100 text-green-800',
-  MEDIUM: 'bg-yellow-100 text-yellow-800',
-  HIGH: 'bg-orange-100 text-orange-800',
-  URGENT: 'bg-red-100 text-red-800',
-};
-
-const priorityLabels = {
-  LOW: 'Low',
-  MEDIUM: 'Medium',
-  HIGH: 'High',
-  URGENT: 'Urgent',
-};
-
 export default function PlanningPage() {
-  const router = useRouter();
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [staff, setStaff] = useState<Staff[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
-  const [showTaskDetail, setShowTaskDetail] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedPriority, setSelectedPriority] = useState('');
-  const [selectedAssignee, setSelectedAssignee] = useState('');
+  const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | 'all'>('all');
+  const [activeView, setActiveView] = useState<'board' | 'list' | 'timeline' | 'process'>('board');
+  const [parentTaskId, setParentTaskId] = useState<string | null>(null);
 
   useEffect(() => {
-    const user = JSON.parse(localStorage.getItem('user') || '{}');
-    if (!user.tenantId) {
-      router.push('/login');
-      return;
-    }
+    fetchData();
+  }, []);
 
-    fetchTasks();
-    fetchStaff();
-  }, [searchTerm, selectedPriority, selectedAssignee, router]);
-
-  const fetchTasks = async () => {
+  const fetchData = async () => {
     try {
-      const params = new URLSearchParams();
-      if (searchTerm) params.append('search', searchTerm);
-      if (selectedPriority) params.append('priority', selectedPriority);
-      if (selectedAssignee) params.append('assignedTo', selectedAssignee);
+      setLoading(true);
+      const [tasksRes, projectsRes] = await Promise.all([
+        fetch('/api/tasks'),
+        fetch('/api/projects'),
+      ]);
 
-      const response = await fetch(`/api/tasks?${params}`);
-      if (!response.ok) throw new Error('Failed to fetch tasks');
+      if (tasksRes.ok) {
+        const tasksData = await tasksRes.json();
+        setTasks(tasksData.tasks || []);
+      }
 
-      const data = await response.json();
-      setTasks(data.tasks || []);
+      if (projectsRes.ok) {
+        const projectsData = await projectsRes.json();
+        setProjects(projectsData.projects || []);
+      }
     } catch (error) {
+      console.error('Error fetching data:', error);
       toast.error('Failed to load tasks');
-      console.error('Error fetching tasks:', error);
-      setTasks([]); // Reset to empty array on error
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchStaff = async () => {
+  const handleUpdateStatus = async (id: string, status: Task['status']) => {
     try {
-      const response = await fetch('/api/staff', {
-        credentials: 'include',
-      });
-      if (!response.ok) throw new Error('Failed to fetch staff');
-
-      const data = await response.json();
-      // API returns { success: true, data: [...] }
-      setStaff(data.data || data.staff || []);
-    } catch (error) {
-      console.error('Error fetching staff:', error);
-      setStaff([]); // Reset to empty array on error
-    }
-  };
-
-  const handleStatusChange = async (taskId: string, newStatus: string) => {
-    try {
-      const response = await fetch(`/api/tasks/${taskId}`, {
+      const response = await fetch(`/api/tasks/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus }),
+        body: JSON.stringify({ status }),
       });
 
       if (!response.ok) throw new Error('Failed to update task');
 
-      const updatedTask = await response.json();
-      setTasks(prev => prev.map(task => 
-        task.id === taskId ? updatedTask.task : task
-      ));
-      
-      toast.success('Task updated successfully');
+      await fetchData();
     } catch (error) {
-      toast.error('Failed to update task');
       console.error('Error updating task:', error);
+      throw error;
     }
   };
 
-  const getTasksByStatus = (status: string) => {
-    return tasks.filter(task => task.status === status);
+  const handleDeleteTask = async (id: string) => {
+    try {
+      const response = await fetch(`/api/tasks/${id}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) throw new Error('Failed to delete task');
+
+      await fetchData();
+    } catch (error) {
+      console.error('Error deleting task:', error);
+      throw error;
+    }
   };
 
-  const getPriorityColor = (priority: string) => {
-    return priorityColors[priority as keyof typeof priorityColors] || priorityColors.MEDIUM;
+  const handleEditTask = (task: Task) => {
+    // TODO: Open edit modal
+    toast('Edit modal coming soon!');
   };
 
-  const formatDueDate = (dateString: string) => {
-    const date = new Date(dateString);
-    const today = new Date();
-    const diffTime = date.getTime() - today.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-    if (diffDays < 0) return 'text-red-600';
-    if (diffDays === 0) return 'text-orange-600';
-    if (diffDays <= 3) return 'text-yellow-600';
-    return 'text-gray-600';
+  const handleAddSubtask = (parentId: string) => {
+    setParentTaskId(parentId);
+    setIsTaskModalOpen(true);
   };
+
+  const filteredTasks = selectedProjectId === 'all'
+    ? tasks
+    : tasks.filter((t) => t.projectId === selectedProjectId);
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-gray-600">Loading tasks...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="p-6 bg-gray-50 min-h-screen">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       {/* Header */}
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="text-3xl font-bold text-gray-900">Task Planning</h1>
+      <div className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-10 shadow-sm">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">Task Management</h1>
+              <p className="text-gray-600 text-sm mt-1">
+                Smart task and process management across all projects
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <select
+                value={selectedProjectId}
+                onChange={(e) => setSelectedProjectId(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+              >
+                <option value="all">All Projects</option>
+                {projects.map((project) => (
+                  <option key={project.id} value={project.id}>
+                    {project.name}
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={() => setIsTaskModalOpen(true)}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm"
+              >
+                <Plus className="w-4 h-4" />
+                New Task
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="container mx-auto px-4 py-6">
+        {/* View Tabs */}
+        <div className="bg-white rounded-lg shadow-sm p-1 mb-6 inline-flex gap-1">
           <button
-            onClick={() => setShowCreateModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            onClick={() => setActiveView('board')}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${activeView === 'board'
+              ? 'bg-blue-600 text-white'
+              : 'text-gray-700 hover:bg-gray-100'
+              }`}
           >
-            <Plus className="w-5 h-5" />
-            Create Task
+            <LayoutGrid className="w-4 h-4" />
+            Board
+          </button>
+          <button
+            onClick={() => setActiveView('list')}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${activeView === 'list'
+              ? 'bg-blue-600 text-white'
+              : 'text-gray-700 hover:bg-gray-100'
+              }`}
+          >
+            <List className="w-4 h-4" />
+            List
+          </button>
+          <button
+            onClick={() => setActiveView('timeline')}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${activeView === 'timeline'
+              ? 'bg-blue-600 text-white'
+              : 'text-gray-700 hover:bg-gray-100'
+              }`}
+          >
+            <Calendar className="w-4 h-4" />
+            Timeline
+          </button>
+          <button
+            onClick={() => setActiveView('process')}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${activeView === 'process'
+              ? 'bg-blue-600 text-white'
+              : 'text-gray-700 hover:bg-gray-100'
+              }`}
+          >
+            <Workflow className="w-4 h-4" />
+            Process
           </button>
         </div>
 
-        {/* Filters */}
-        <div className="flex items-center gap-4 bg-white p-4 rounded-lg shadow-sm">
-          <div className="flex-1 relative">
-            <Search className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search tasks..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
+        {/* Content */}
+        {activeView === 'board' && (
+          <TaskBoard
+            tasks={filteredTasks}
+            projects={projects}
+            selectedProjectId={selectedProjectId}
+            onUpdateStatus={handleUpdateStatus}
+            onEditTask={handleEditTask}
+            onDeleteTask={handleDeleteTask}
+            onAddSubtask={handleAddSubtask}
+            onRefresh={fetchData}
+          />
+        )}
 
-          <select
-            value={selectedPriority}
-            onChange={(e) => setSelectedPriority(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            <option value="">All Priorities</option>
-            <option value="LOW">Low</option>
-            <option value="MEDIUM">Medium</option>
-            <option value="HIGH">High</option>
-            <option value="URGENT">Urgent</option>
-          </select>
+        {activeView === 'list' && (
+          <TaskListView
+            tasks={filteredTasks}
+            onUpdateStatus={handleUpdateStatus}
+            onEditTask={handleEditTask}
+            onDeleteTask={handleDeleteTask}
+            onAddSubtask={handleAddSubtask}
+          />
+        )}
 
-          <select
-            value={selectedAssignee}
-            onChange={(e) => setSelectedAssignee(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            <option value="">All Assignees</option>
-            {staff.map((member) => (
-              <option key={member.id} value={member.id}>
-                {member.firstName} {member.lastName}
-              </option>
-            ))}
-          </select>
-        </div>
+        {activeView === 'timeline' && (
+          <TaskTimeline
+            tasks={filteredTasks}
+            onEditTask={handleEditTask}
+          />
+        )}
+
+        {activeView === 'process' && (
+          <TaskProcess
+            tasks={filteredTasks}
+            onEditTask={handleEditTask}
+          />
+        )}
       </div>
 
-      {/* Kanban Board */}
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
-        {statusColumns.map((column) => (
-          <div key={column.id} className={`${column.color} rounded-lg p-4`}>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-gray-900">{column.title}</h3>
-              <span className="text-sm text-gray-600">
-                {getTasksByStatus(column.id).length}
-              </span>
-            </div>
-
-            <div className="space-y-3">
-              {getTasksByStatus(column.id).map((task) => (
-                <div
-                  key={task.id}
-                  className="bg-white p-4 rounded-lg shadow-sm hover:shadow-md transition-shadow cursor-pointer"
-                  onClick={() => {
-                    setSelectedTask(task);
-                    setShowTaskDetail(true);
-                  }}
-                >
-                  <div className="flex items-start justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <h4 className="font-medium text-gray-900 text-sm">{task.title}</h4>
-                    </div>
-                    <span className={`text-xs px-2 py-1 rounded-full ${getPriorityColor(task.priority)}`}>
-                      {priorityLabels[task.priority as keyof typeof priorityLabels]}
-                    </span>
-                  </div>
-
-                  {task.description && (
-                    <p className="text-gray-600 text-xs mb-3 line-clamp-2">
-                      {task.description}
-                    </p>
-                  )}
-
-                  <div className="flex items-center justify-between text-xs text-gray-500">
-                    <div className="flex items-center gap-2">
-                      {task.dueDate && (
-                        <div className={`flex items-center gap-1 ${formatDueDate(task.dueDate)}`}>
-                          <Calendar className="w-3 h-3" />
-                          {new Date(task.dueDate).toLocaleDateString()}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      {task._count?.assignments > 0 && (
-                        <div className="flex items-center gap-1">
-                          <User className="w-3 h-3" />
-                          {task._count.assignments}
-                        </div>
-                      )}
-                      {task._count?.comments > 0 && (
-                        <div className="flex items-center gap-1">
-                          <MessageSquare className="w-3 h-3" />
-                          {task._count.comments}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {task.assignments?.length > 0 && (
-                    <div className="mt-3 flex -space-x-2">
-                      {task.assignments.slice(0, 3).map((assignment) => (
-                        <div
-                          key={assignment.staffId}
-                          className="w-6 h-6 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center border-2 border-white"
-                          title={`${assignment.staff.firstName} ${assignment.staff.lastName}`}
-                        >
-                          {assignment.staff.firstName.charAt(0)}{assignment.staff.lastName.charAt(0)}
-                        </div>
-                      ))}
-                      {task.assignments.length > 3 && (
-                        <div className="w-6 h-6 rounded-full bg-gray-500 text-white text-xs flex items-center justify-center border-2 border-white">
-                          +{task.assignments.length - 3}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Task Detail Modal */}
-      {showTaskDetail && selectedTask && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-2xl font-bold text-gray-900">{selectedTask.title}</h2>
-                <button
-                  onClick={() => setShowTaskDetail(false)}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <MoreHorizontal className="w-6 h-6" />
-                </button>
-              </div>
-
-              <div className="space-y-4">
-                <div className="flex items-center gap-4">
-                  <span className={`px-3 py-1 rounded-full text-sm ${getPriorityColor(selectedTask.priority)}`}>
-                    {priorityLabels[selectedTask.priority as keyof typeof priorityLabels]}
-                  </span>
-                  <select
-                    value={selectedTask.status}
-                    onChange={(e) => handleStatusChange(selectedTask.id, e.target.value)}
-                    className="px-3 py-1 border border-gray-300 rounded-lg text-sm"
-                  >
-                    {statusColumns.map((col) => (
-                      <option key={col.id} value={col.id}>{col.title}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {selectedTask.description && (
-                  <div>
-                    <h3 className="font-semibold text-gray-900 mb-2">Description</h3>
-                    <p className="text-gray-600">{selectedTask.description}</p>
-                  </div>
-                )}
-
-                {selectedTask.dueDate && (
-                  <div>
-                    <h3 className="font-semibold text-gray-900 mb-2">Due Date</h3>
-                    <p className={`text-gray-600 ${formatDueDate(selectedTask.dueDate)}`}>
-                      {new Date(selectedTask.dueDate).toLocaleDateString()}
-                    </p>
-                  </div>
-                )}
-
-                {selectedTask.assignments?.length > 0 && (
-                  <div>
-                    <h3 className="font-semibold text-gray-900 mb-2">Assigned To</h3>
-                    <div className="space-y-2">
-                      {selectedTask.assignments.map((assignment) => (
-                        <div key={assignment.id} className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-full bg-blue-500 text-white text-sm flex items-center justify-center">
-                            {assignment.staff.firstName.charAt(0)}{assignment.staff.lastName.charAt(0)}
-                          </div>
-                          <span className="text-gray-600">
-                            {assignment.staff.firstName} {assignment.staff.lastName}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Create Task Modal */}
       <CreateTaskModal
-        isOpen={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
-        onTaskCreated={fetchTasks}
+        isOpen={isTaskModalOpen}
+        onClose={() => {
+          setIsTaskModalOpen(false);
+          setParentTaskId(null);
+        }}
+        onTaskCreated={fetchData}
+        defaultProjectId={selectedProjectId === 'all' ? null : selectedProjectId}
+        parentTaskId={parentTaskId}
       />
     </div>
   );

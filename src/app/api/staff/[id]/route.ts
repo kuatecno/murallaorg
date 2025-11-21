@@ -27,8 +27,7 @@ export async function GET(
         salaryType: true,
         hourlyRate: true,
         vacationDaysTotal: true,
-        googleTasksEnabled: true,
-        googleEmail: true,
+
         tenantId: true,
       }
     });
@@ -189,12 +188,7 @@ export async function PATCH(
     // Build update data - only include fields that were provided
     const updateData: any = {};
 
-    // Google OAuth fields
-    if (body.googleTasksEnabled !== undefined) updateData.googleTasksEnabled = body.googleTasksEnabled;
-    if (body.googleEmail !== undefined) updateData.googleEmail = body.googleEmail;
-    if (body.googleAccessToken !== undefined) updateData.googleAccessToken = body.googleAccessToken;
-    if (body.googleRefreshToken !== undefined) updateData.googleRefreshToken = body.googleRefreshToken;
-    if (body.googleTokenExpiresAt !== undefined) updateData.googleTokenExpiresAt = body.googleTokenExpiresAt;
+
 
     // Regular staff fields
     if (body.firstName !== undefined) updateData.firstName = body.firstName;

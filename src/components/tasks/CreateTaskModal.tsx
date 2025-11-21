@@ -22,9 +22,10 @@ interface CreateTaskModalProps {
   onClose: () => void;
   onTaskCreated: () => void;
   defaultProjectId?: string | null;
+  parentTaskId?: string | null;
 }
 
-export default function CreateTaskModal({ isOpen, onClose, onTaskCreated, defaultProjectId }: CreateTaskModalProps) {
+export default function CreateTaskModal({ isOpen, onClose, onTaskCreated, defaultProjectId, parentTaskId }: CreateTaskModalProps) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT'>('MEDIUM');
@@ -114,6 +115,7 @@ export default function CreateTaskModal({ isOpen, onClose, onTaskCreated, defaul
           startDate: startDate || undefined,
           dueDate: dueDate || undefined,
           projectId: projectId || undefined,
+          parentTaskId: parentTaskId || undefined,
           progress,
           estimatedHours: estimatedHours ? parseFloat(estimatedHours) : undefined,
           assignedStaff: selectedStaff,
@@ -126,7 +128,7 @@ export default function CreateTaskModal({ isOpen, onClose, onTaskCreated, defaul
       }
 
       const data = await response.json();
-      
+
       toast.success('Task created successfully!');
 
       onTaskCreated();
@@ -140,7 +142,7 @@ export default function CreateTaskModal({ isOpen, onClose, onTaskCreated, defaul
   };
 
   const toggleStaffSelection = (staffId: string) => {
-    setSelectedStaff(prev => 
+    setSelectedStaff(prev =>
       prev.includes(staffId)
         ? prev.filter(id => id !== staffId)
         : [...prev, staffId]
@@ -154,7 +156,9 @@ export default function CreateTaskModal({ isOpen, onClose, onTaskCreated, defaul
       <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <div className="p-6">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-gray-900">Create New Task</h2>
+            <h2 className="text-2xl font-bold text-gray-900">
+              {parentTaskId ? 'Create Subtask' : 'Create New Task'}
+            </h2>
             <button
               onClick={onClose}
               className="text-gray-400 hover:text-gray-600 transition-colors"
@@ -194,24 +198,26 @@ export default function CreateTaskModal({ isOpen, onClose, onTaskCreated, defaul
             </div>
 
             {/* Project */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
-                <FolderKanban className="w-4 h-4" />
-                Project
-              </label>
-              <select
-                value={projectId}
-                onChange={(e) => setProjectId(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="">No Project</option>
-                {projects.map((project) => (
-                  <option key={project.id} value={project.id}>
-                    {project.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {!parentTaskId && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                  <FolderKanban className="w-4 h-4" />
+                  Project
+                </label>
+                <select
+                  value={projectId}
+                  onChange={(e) => setProjectId(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="">No Project</option>
+                  {projects.map((project) => (
+                    <option key={project.id} value={project.id}>
+                      {project.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             {/* Priority */}
             <div>

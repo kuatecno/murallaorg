@@ -210,15 +210,14 @@ export default function EditProjectModal({
                     type="button"
                     onClick={() => setColor(colorOption.value)}
                     disabled={loading}
-                    className={`relative h-10 rounded-lg transition-all ${
-                      color === colorOption.value
+                    className={`relative h-10 rounded-lg transition-all ${color === colorOption.value
                         ? 'ring-2 ring-offset-2 scale-110'
                         : 'hover:scale-105'
-                    }`}
+                      }`}
                     style={{
                       backgroundColor: colorOption.value,
-                      ringColor: colorOption.value,
-                    }}
+                      '--tw-ring-color': colorOption.value,
+                    } as React.CSSProperties}
                     title={colorOption.name}
                   >
                     {color === colorOption.value && (

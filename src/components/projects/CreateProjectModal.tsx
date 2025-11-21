@@ -169,8 +169,8 @@ export default function CreateProjectModal({
                     }`}
                     style={{
                       backgroundColor: colorOption.value,
-                      ringColor: colorOption.value,
-                    }}
+                      '--tw-ring-color': colorOption.value,
+                    } as React.CSSProperties}
                     title={colorOption.name}
                   >
                     {color === colorOption.value && (

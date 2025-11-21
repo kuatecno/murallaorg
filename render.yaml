@@ -1,0 +1,52 @@
+services:
+  - type: web
+    name: muralla-app
+    env: node
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: GOOGLE_TASKS_ENABLED
+        value: "true"
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_REDIRECT_URI
+        sync: false
+      - key: GOOGLE_CHAT_CLIENT_EMAIL
+        sync: false
+      - key: GOOGLE_CHAT_PRIVATE_KEY
+        sync: false
+      - key: GOOGLE_CHAT_ADMIN_EMAIL
+        sync: false
+      - key: OPENFACTURA_API_KEY
+        sync: false
+      - key: OPENFACTURA_API_KEY_MURALLA
+        sync: false
+      - key: OPENFACTURA_API_KEY_MURALLITA
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: GOOGLE_CUSTOM_SEARCH_API_KEY
+        sync: false
+      - key: GOOGLE_SEARCH_ENGINE_ID
+        sync: false
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: SEED_SECRET
+        sync: false
+      - key: CRON_SECRET
+        sync: false
+

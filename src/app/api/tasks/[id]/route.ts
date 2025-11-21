@@ -6,8 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticate } from '@/lib/auth';
 import prisma from '@/lib/prisma';
-import { getGoogleChatService } from '@/lib/googleChatService';
-import { getGoogleTasksSyncService } from '@/lib/googleTasksSyncService';
+
 
 // GET /api/tasks/[id] - Get specific task
 export async function GET(
@@ -185,73 +184,7 @@ export async function PUT(
       },
     });
 
-    // Update Google Chat if space exists
-    if (task.googleChatSpaceId) {
-      try {
-        const googleChatService = getGoogleChatService();
-        
-        // Get assigned staff emails
-        const assignedStaffData = await prisma.staff.findMany({
-          where: {
-            id: { in: assignedStaff },
-            tenantId: auth.tenantId,
-          },
-          select: { email: true },
-        });
 
-        const taskNotificationData = {
-          taskId: task.id,
-          title: task.title,
-          description: task.description || undefined,
-          status: task.status,
-          priority: task.priority,
-          dueDate: task.dueDate?.toISOString(),
-          createdBy: `${task.createdBy.firstName} ${task.createdBy.lastName}`,
-          assignedTo: assignedStaffData.map(s => s.email),
-        };
-
-        if (task.googleChatMessageId) {
-          await googleChatService.updateTaskMessage(
-            task.googleChatSpaceId,
-            task.googleChatMessageId,
-            taskNotificationData
-          );
-        } else {
-          // Create new message if none exists
-          const messageId = await googleChatService.sendTaskMessage(
-            task.googleChatSpaceId,
-            taskNotificationData,
-            false
-          );
-          await prisma.task.update({
-            where: { id: task.id },
-            data: { googleChatMessageId: messageId },
-          });
-        }
-
-        // Update space members
-        if (assignedStaffData.length > 0) {
-          await googleChatService.addMembersToSpace(
-            task.googleChatSpaceId,
-            assignedStaffData.map(s => s.email)
-          );
-        }
-      } catch (chatError) {
-        console.error('Failed to update Google Chat:', chatError);
-        // Continue even if chat update fails
-      }
-    }
-
-    // Update Google Task if enabled
-    if (process.env.GOOGLE_TASKS_ENABLED === 'true') {
-      try {
-        const googleTasksSync = getGoogleTasksSyncService();
-        await googleTasksSync.updateGoogleTask(task.id);
-      } catch (tasksError) {
-        console.error('Failed to update Google Task:', tasksError);
-        // Continue even if Google Tasks update fails
-      }
-    }
 
     return NextResponse.json({ task });
   } catch (error) {
@@ -283,7 +216,6 @@ export async function DELETE(
       },
       select: {
         id: true,
-        googleChatSpaceId: true,
       },
     });
 
@@ -291,27 +223,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
     }
 
-    // Delete Google Chat space if it exists
-    if (existingTask.googleChatSpaceId) {
-      try {
-        const googleChatService = getGoogleChatService();
-        await googleChatService.deleteSpace(existingTask.googleChatSpaceId);
-      } catch (chatError) {
-        console.error('Failed to delete Google Chat space:', chatError);
-        // Continue even if chat deletion fails
-      }
-    }
 
-    // Delete Google Task if it exists
-    if (process.env.GOOGLE_TASKS_ENABLED === 'true') {
-      try {
-        const googleTasksSync = getGoogleTasksSyncService();
-        await googleTasksSync.deleteGoogleTask(existingTask.id);
-      } catch (tasksError) {
-        console.error('Failed to delete Google Task:', tasksError);
-        // Continue even if Google Tasks deletion fails
-      }
-    }
 
     // Delete task (cascades will delete assignments and comments)
     await prisma.task.delete({

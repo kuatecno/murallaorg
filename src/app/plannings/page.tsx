@@ -1,13 +1,16 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Plus, LayoutGrid, List, Calendar, Workflow } from 'lucide-react';
+import { Plus, Filter, Search, LayoutGrid, List, Calendar, GitGraph } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import TaskBoard from '@/components/tasks/TaskBoard';
 import TaskListView from '@/components/tasks/TaskListView';
-import CreateTaskModal from '@/components/tasks/CreateTaskModal';
+import TaskModal from '@/components/tasks/TaskModal';
 import TaskTimeline from '@/components/tasks/TaskTimeline';
 import TaskProcess from '@/components/tasks/TaskProcess';
+import ProjectSidebar from '@/components/projects/ProjectSidebar';
+import CreateProjectModal from '@/components/projects/CreateProjectModal';
+import EditProjectModal from '@/components/projects/EditProjectModal';
 
 interface Task {
   id: string;
@@ -40,8 +43,14 @@ interface Task {
 interface Project {
   id: string;
   name: string;
-  color: string;
   description?: string;
+  color: string;
+  status: string;
+  startDate?: string;
+  endDate?: string;
+  taskCount?: number;
+  completedTaskCount?: number;
+  progress?: number;
 }
 
 export default function PlanningPage() {
@@ -49,9 +58,14 @@ export default function PlanningPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
+  const [isCreateProjectModalOpen, setIsCreateProjectModalOpen] = useState(false);
+  const [isEditProjectModalOpen, setIsEditProjectModalOpen] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState<string | 'all'>('all');
   const [activeView, setActiveView] = useState<'board' | 'list' | 'timeline' | 'process'>('board');
   const [parentTaskId, setParentTaskId] = useState<string | null>(null);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     fetchData();
@@ -59,64 +73,65 @@ export default function PlanningPage() {
 
   const fetchData = async () => {
     try {
-      setLoading(true);
       const [tasksRes, projectsRes] = await Promise.all([
         fetch('/api/tasks'),
         fetch('/api/projects'),
       ]);
 
-      if (tasksRes.ok) {
-        const tasksData = await tasksRes.json();
-        setTasks(tasksData.tasks || []);
+      if (!tasksRes.ok || !projectsRes.ok) {
+        throw new Error('Failed to fetch data');
       }
 
-      if (projectsRes.ok) {
-        const projectsData = await projectsRes.json();
-        setProjects(projectsData.projects || []);
-      }
+      const tasksData = await tasksRes.json();
+      const projectsData = await projectsRes.json();
+
+      setTasks(tasksData.tasks || []);
+      setProjects(projectsData.projects || []);
     } catch (error) {
       console.error('Error fetching data:', error);
-      toast.error('Failed to load tasks');
+      toast.error('Failed to load data');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleUpdateStatus = async (id: string, status: Task['status']) => {
+  const handleUpdateStatus = async (taskId: string, newStatus: Task['status']) => {
     try {
-      const response = await fetch(`/api/tasks/${id}`, {
+      const response = await fetch(`/api/tasks/${taskId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({ status: newStatus }),
       });
 
-      if (!response.ok) throw new Error('Failed to update task');
+      if (!response.ok) throw new Error('Failed to update status');
 
-      await fetchData();
+      setTasks(tasks.map((t) =>
+        t.id === taskId ? { ...t, status: newStatus } : t
+      ));
+      toast.success('Status updated');
     } catch (error) {
-      console.error('Error updating task:', error);
-      throw error;
+      toast.error('Failed to update status');
     }
   };
 
-  const handleDeleteTask = async (id: string) => {
+  const handleDeleteTask = async (taskId: string) => {
     try {
-      const response = await fetch(`/api/tasks/${id}`, {
+      const response = await fetch(`/api/tasks/${taskId}`, {
         method: 'DELETE',
       });
 
       if (!response.ok) throw new Error('Failed to delete task');
 
-      await fetchData();
+      setTasks(tasks.filter((t) => t.id !== taskId));
+      toast.success('Task deleted');
     } catch (error) {
-      console.error('Error deleting task:', error);
-      throw error;
+      toast.error('Failed to delete task');
     }
   };
 
   const handleEditTask = (task: Task) => {
-    // TODO: Open edit modal
-    toast('Edit modal coming soon!');
+    setEditingTask(task);
+    setIsTaskModalOpen(true);
   };
 
   const handleAddSubtask = (parentId: string) => {
@@ -124,151 +139,202 @@ export default function PlanningPage() {
     setIsTaskModalOpen(true);
   };
 
-  const filteredTasks = selectedProjectId === 'all'
-    ? tasks
-    : tasks.filter((t) => t.projectId === selectedProjectId);
+  // Compute sidebar projects with stats
+  const sidebarProjects = projects.map(p => {
+    const pTasks = tasks.filter(t => t.projectId === p.id);
+    const completed = pTasks.filter(t => t.status === 'COMPLETED').length;
+    return {
+      ...p,
+      taskCount: pTasks.length,
+      completedTaskCount: completed,
+      progress: pTasks.length ? Math.round((completed / pTasks.length) * 100) : 0,
+      status: p.status || 'ACTIVE'
+    };
+  });
+
+  const filteredTasks = tasks.filter((task) => {
+    const matchesProject = selectedProjectId === 'all' || task.projectId === selectedProjectId;
+    const matchesSearch = task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      task.description?.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesProject && matchesSearch;
+  });
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-gray-600">Loading tasks...</p>
-        </div>
+      <div className="flex items-center justify-center h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      {/* Header */}
-      <div className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-10 shadow-sm">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
+    <div className="flex h-screen bg-gray-50">
+      {/* Sidebar */}
+      <ProjectSidebar
+        projects={sidebarProjects}
+        selectedProjectId={selectedProjectId === 'all' ? null : selectedProjectId}
+        onSelectProject={(id) => setSelectedProjectId(id || 'all')}
+        onCreateProject={() => setIsCreateProjectModalOpen(true)}
+        onEditProject={(project) => {
+          setEditingProject(project);
+          setIsEditProjectModalOpen(true);
+        }}
+        onDeleteProject={() => fetchData()}
+      />
+
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <header className="bg-white border-b border-gray-200 px-6 py-4">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Task Management</h1>
-              <p className="text-gray-600 text-sm mt-1">
-                Smart task and process management across all projects
+              <h1 className="text-2xl font-bold text-gray-900">
+                {selectedProjectId === 'all'
+                  ? 'All Tasks'
+                  : projects.find((p) => p.id === selectedProjectId)?.name || 'Tasks'}
+              </h1>
+              <p className="text-sm text-gray-500 mt-1">
+                Manage and track your project tasks
               </p>
             </div>
+
             <div className="flex items-center gap-3">
-              <select
-                value={selectedProjectId}
-                onChange={(e) => setSelectedProjectId(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
-              >
-                <option value="all">All Projects</option>
-                {projects.map((project) => (
-                  <option key={project.id} value={project.id}>
-                    {project.name}
-                  </option>
-                ))}
-              </select>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <input
+                  type="text"
+                  placeholder="Search tasks..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm w-64"
+                />
+              </div>
+
               <button
-                onClick={() => setIsTaskModalOpen(true)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm"
+                onClick={() => {
+                  setEditingTask(null);
+                  setParentTaskId(null);
+                  setIsTaskModalOpen(true);
+                }}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
               >
                 <Plus className="w-4 h-4" />
                 New Task
               </button>
             </div>
           </div>
-        </div>
+
+          {/* View Switcher */}
+          <div className="flex items-center gap-2 mt-6 border-b border-gray-200">
+            <button
+              onClick={() => setActiveView('board')}
+              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeView === 'board'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+            >
+              <LayoutGrid className="w-4 h-4" />
+              Board
+            </button>
+            <button
+              onClick={() => setActiveView('list')}
+              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeView === 'list'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+            >
+              <List className="w-4 h-4" />
+              List
+            </button>
+            <button
+              onClick={() => setActiveView('timeline')}
+              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeView === 'timeline'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+            >
+              <Calendar className="w-4 h-4" />
+              Timeline
+            </button>
+            <button
+              onClick={() => setActiveView('process')}
+              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeView === 'process'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+            >
+              <GitGraph className="w-4 h-4" />
+              Process
+            </button>
+          </div>
+        </header>
+
+        <main className="flex-1 overflow-y-auto p-6">
+          {activeView === 'board' && (
+            <TaskBoard
+              tasks={filteredTasks}
+              projects={projects}
+              selectedProjectId={selectedProjectId}
+              onUpdateStatus={handleUpdateStatus}
+              onEditTask={handleEditTask}
+              onDeleteTask={handleDeleteTask}
+              onAddSubtask={handleAddSubtask}
+              onRefresh={fetchData}
+            />
+          )}
+
+          {activeView === 'list' && (
+            <TaskListView
+              tasks={filteredTasks}
+              onEditTask={handleEditTask}
+              onDeleteTask={handleDeleteTask}
+              onAddSubtask={handleAddSubtask}
+              onUpdateStatus={handleUpdateStatus}
+            />
+          )}
+
+          {activeView === 'timeline' && (
+            <TaskTimeline
+              tasks={filteredTasks}
+              onEditTask={handleEditTask}
+            />
+          )}
+
+          {activeView === 'process' && (
+            <TaskProcess
+              tasks={filteredTasks}
+              onEditTask={handleEditTask}
+            />
+          )}
+        </main>
       </div>
 
-      <div className="container mx-auto px-4 py-6">
-        {/* View Tabs */}
-        <div className="bg-white rounded-lg shadow-sm p-1 mb-6 inline-flex gap-1">
-          <button
-            onClick={() => setActiveView('board')}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${activeView === 'board'
-              ? 'bg-blue-600 text-white'
-              : 'text-gray-700 hover:bg-gray-100'
-              }`}
-          >
-            <LayoutGrid className="w-4 h-4" />
-            Board
-          </button>
-          <button
-            onClick={() => setActiveView('list')}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${activeView === 'list'
-              ? 'bg-blue-600 text-white'
-              : 'text-gray-700 hover:bg-gray-100'
-              }`}
-          >
-            <List className="w-4 h-4" />
-            List
-          </button>
-          <button
-            onClick={() => setActiveView('timeline')}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${activeView === 'timeline'
-              ? 'bg-blue-600 text-white'
-              : 'text-gray-700 hover:bg-gray-100'
-              }`}
-          >
-            <Calendar className="w-4 h-4" />
-            Timeline
-          </button>
-          <button
-            onClick={() => setActiveView('process')}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${activeView === 'process'
-              ? 'bg-blue-600 text-white'
-              : 'text-gray-700 hover:bg-gray-100'
-              }`}
-          >
-            <Workflow className="w-4 h-4" />
-            Process
-          </button>
-        </div>
-
-        {/* Content */}
-        {activeView === 'board' && (
-          <TaskBoard
-            tasks={filteredTasks}
-            projects={projects}
-            selectedProjectId={selectedProjectId}
-            onUpdateStatus={handleUpdateStatus}
-            onEditTask={handleEditTask}
-            onDeleteTask={handleDeleteTask}
-            onAddSubtask={handleAddSubtask}
-            onRefresh={fetchData}
-          />
-        )}
-
-        {activeView === 'list' && (
-          <TaskListView
-            tasks={filteredTasks}
-            onUpdateStatus={handleUpdateStatus}
-            onEditTask={handleEditTask}
-            onDeleteTask={handleDeleteTask}
-            onAddSubtask={handleAddSubtask}
-          />
-        )}
-
-        {activeView === 'timeline' && (
-          <TaskTimeline
-            tasks={filteredTasks}
-            onEditTask={handleEditTask}
-          />
-        )}
-
-        {activeView === 'process' && (
-          <TaskProcess
-            tasks={filteredTasks}
-            onEditTask={handleEditTask}
-          />
-        )}
-      </div>
-
-      <CreateTaskModal
+      <TaskModal
         isOpen={isTaskModalOpen}
         onClose={() => {
           setIsTaskModalOpen(false);
           setParentTaskId(null);
+          setEditingTask(null);
         }}
-        onTaskCreated={fetchData}
+        onTaskSaved={fetchData}
         defaultProjectId={selectedProjectId === 'all' ? null : selectedProjectId}
         parentTaskId={parentTaskId}
+        task={editingTask}
+      />
+
+      <CreateProjectModal
+        isOpen={isCreateProjectModalOpen}
+        onClose={() => setIsCreateProjectModalOpen(false)}
+        onProjectCreated={fetchData}
+      />
+
+      <EditProjectModal
+        isOpen={isEditProjectModalOpen}
+        project={editingProject}
+        onClose={() => {
+          setIsEditProjectModalOpen(false);
+          setEditingProject(null);
+        }}
+        onProjectUpdated={fetchData}
       />
     </div>
   );

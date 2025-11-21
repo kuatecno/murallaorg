@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, Calendar, Users, MessageSquare, Link2, FolderKanban } from 'lucide-react';
+import { X, FolderKanban } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 interface Staff {
@@ -17,18 +17,46 @@ interface Project {
   color: string;
 }
 
-interface CreateTaskModalProps {
+interface Task {
+  id: string;
+  title: string;
+  description?: string;
+  status: 'TODO' | 'IN_PROGRESS' | 'IN_REVIEW' | 'COMPLETED' | 'CANCELLED';
+  priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+  startDate?: string;
+  dueDate?: string;
+  progress: number;
+  projectId?: string;
+  parentTaskId?: string;
+  estimatedHours?: number;
+  assignments?: {
+    staff: {
+      id: string;
+    };
+  }[];
+}
+
+interface TaskModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onTaskCreated: () => void;
+  onTaskSaved: () => void;
+  task?: Task | null;
   defaultProjectId?: string | null;
   parentTaskId?: string | null;
 }
 
-export default function CreateTaskModal({ isOpen, onClose, onTaskCreated, defaultProjectId, parentTaskId }: CreateTaskModalProps) {
+export default function TaskModal({
+  isOpen,
+  onClose,
+  onTaskSaved,
+  task,
+  defaultProjectId,
+  parentTaskId
+}: TaskModalProps) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT'>('MEDIUM');
+  const [status, setStatus] = useState<'TODO' | 'IN_PROGRESS' | 'IN_REVIEW' | 'COMPLETED' | 'CANCELLED'>('TODO');
   const [startDate, setStartDate] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [projectId, setProjectId] = useState<string>('');
@@ -43,15 +71,19 @@ export default function CreateTaskModal({ isOpen, onClose, onTaskCreated, defaul
     if (isOpen) {
       fetchStaff();
       fetchProjects();
-      resetForm();
+      if (task) {
+        populateForm(task);
+      } else {
+        resetForm();
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, task]);
 
   useEffect(() => {
-    if (defaultProjectId) {
+    if (!task && defaultProjectId) {
       setProjectId(defaultProjectId);
     }
-  }, [defaultProjectId]);
+  }, [defaultProjectId, task]);
 
   const fetchStaff = async () => {
     try {
@@ -77,10 +109,24 @@ export default function CreateTaskModal({ isOpen, onClose, onTaskCreated, defaul
     }
   };
 
+  const populateForm = (task: Task) => {
+    setTitle(task.title);
+    setDescription(task.description || '');
+    setPriority(task.priority);
+    setStatus(task.status);
+    setStartDate(task.startDate ? new Date(task.startDate).toISOString().split('T')[0] : '');
+    setDueDate(task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : '');
+    setProjectId(task.projectId || '');
+    setProgress(task.progress);
+    setEstimatedHours(task.estimatedHours ? task.estimatedHours.toString() : '');
+    setSelectedStaff(task.assignments?.map(a => a.staff.id) || []);
+  };
+
   const resetForm = () => {
     setTitle('');
     setDescription('');
     setPriority('MEDIUM');
+    setStatus('TODO');
     setStartDate('');
     setDueDate('');
     setProjectId(defaultProjectId || '');
@@ -105,37 +151,45 @@ export default function CreateTaskModal({ isOpen, onClose, onTaskCreated, defaul
     setLoading(true);
 
     try {
-      const response = await fetch('/api/tasks', {
-        method: 'POST',
+      const url = task ? `/api/tasks/${task.id}` : '/api/tasks';
+      const method = task ? 'PUT' : 'POST';
+
+      const body: any = {
+        title: title.trim(),
+        description: description.trim() || undefined,
+        priority,
+        startDate: startDate || undefined,
+        dueDate: dueDate || undefined,
+        projectId: projectId || undefined,
+        progress,
+        estimatedHours: estimatedHours ? parseFloat(estimatedHours) : undefined,
+        assignedStaff: selectedStaff, // Send IDs to be handled by API
+      };
+
+      if (!task) {
+        body.parentTaskId = parentTaskId || undefined;
+      } else {
+        body.status = status; // Allow updating status when editing
+      }
+
+      const response = await fetch(url, {
+        method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: title.trim(),
-          description: description.trim() || undefined,
-          priority,
-          startDate: startDate || undefined,
-          dueDate: dueDate || undefined,
-          projectId: projectId || undefined,
-          parentTaskId: parentTaskId || undefined,
-          progress,
-          estimatedHours: estimatedHours ? parseFloat(estimatedHours) : undefined,
-          assignedStaff: selectedStaff,
-        }),
+        body: JSON.stringify(body),
       });
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || 'Failed to create task');
+        throw new Error(error.error || `Failed to ${task ? 'update' : 'create'} task`);
       }
 
-      const data = await response.json();
+      toast.success(`Task ${task ? 'updated' : 'created'} successfully!`);
 
-      toast.success('Task created successfully!');
-
-      onTaskCreated();
+      onTaskSaved();
       onClose();
     } catch (error: any) {
-      toast.error(error.message || 'Failed to create task');
-      console.error('Error creating task:', error);
+      toast.error(error.message || `Failed to ${task ? 'update' : 'create'} task`);
+      console.error('Error saving task:', error);
     } finally {
       setLoading(false);
     }
@@ -157,7 +211,7 @@ export default function CreateTaskModal({ isOpen, onClose, onTaskCreated, defaul
         <div className="p-6">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold text-gray-900">
-              {parentTaskId ? 'Create Subtask' : 'Create New Task'}
+              {task ? 'Edit Task' : parentTaskId ? 'Create Subtask' : 'Create New Task'}
             </h2>
             <button
               onClick={onClose}
@@ -219,21 +273,43 @@ export default function CreateTaskModal({ isOpen, onClose, onTaskCreated, defaul
               </div>
             )}
 
-            {/* Priority */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Priority
-              </label>
-              <select
-                value={priority}
-                onChange={(e) => setPriority(e.target.value as any)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="LOW">Low</option>
-                <option value="MEDIUM">Medium</option>
-                <option value="HIGH">High</option>
-                <option value="URGENT">Urgent</option>
-              </select>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Priority */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Priority
+                </label>
+                <select
+                  value={priority}
+                  onChange={(e) => setPriority(e.target.value as any)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="LOW">Low</option>
+                  <option value="MEDIUM">Medium</option>
+                  <option value="HIGH">High</option>
+                  <option value="URGENT">Urgent</option>
+                </select>
+              </div>
+
+              {/* Status (Only for Edit) */}
+              {task && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Status
+                  </label>
+                  <select
+                    value={status}
+                    onChange={(e) => setStatus(e.target.value as any)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="TODO">To Do</option>
+                    <option value="IN_PROGRESS">In Progress</option>
+                    <option value="IN_REVIEW">In Review</option>
+                    <option value="COMPLETED">Completed</option>
+                    <option value="CANCELLED">Cancelled</option>
+                  </select>
+                </div>
+              )}
             </div>
 
             {/* Date Range */}
@@ -359,7 +435,7 @@ export default function CreateTaskModal({ isOpen, onClose, onTaskCreated, defaul
                 disabled={loading}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {loading ? 'Creating...' : 'Create Task'}
+                {loading ? 'Saving...' : task ? 'Update Task' : 'Create Task'}
               </button>
             </div>
           </form>

@@ -17,6 +17,7 @@ interface Project {
 }
 
 interface ProjectSidebarProps {
+  projects: Project[];
   selectedProjectId: string | null;
   onSelectProject: (projectId: string | null) => void;
   onCreateProject: () => void;
@@ -25,34 +26,14 @@ interface ProjectSidebarProps {
 }
 
 export default function ProjectSidebar({
+  projects,
   selectedProjectId,
   onSelectProject,
   onCreateProject,
   onEditProject,
   onDeleteProject,
 }: ProjectSidebarProps) {
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [loading, setLoading] = useState(true);
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
-
-  useEffect(() => {
-    fetchProjects();
-  }, []);
-
-  const fetchProjects = async () => {
-    try {
-      const response = await fetch('/api/projects');
-      if (!response.ok) throw new Error('Failed to fetch projects');
-
-      const data = await response.json();
-      setProjects(data.projects || []);
-    } catch (error) {
-      console.error('Error fetching projects:', error);
-      toast.error('Failed to load projects');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleDeleteProject = async (projectId: string, projectName: string) => {
     if (!confirm(`Are you sure you want to delete "${projectName}"? All tasks in this project will also be deleted.`)) {
@@ -67,7 +48,6 @@ export default function ProjectSidebar({
       if (!response.ok) throw new Error('Failed to delete project');
 
       toast.success('Project deleted successfully');
-      setProjects(projects.filter(p => p.id !== projectId));
 
       if (selectedProjectId === projectId) {
         onSelectProject(null);
@@ -83,20 +63,7 @@ export default function ProjectSidebar({
   const activeProjects = projects.filter(p => p.status === 'ACTIVE');
   const archivedProjects = projects.filter(p => p.status === 'ARCHIVED');
 
-  if (loading) {
-    return (
-      <div className="w-64 bg-white border-r border-gray-200 p-4">
-        <div className="animate-pulse space-y-4">
-          <div className="h-10 bg-gray-200 rounded"></div>
-          <div className="space-y-2">
-            {[1, 2, 3].map(i => (
-              <div key={i} className="h-12 bg-gray-200 rounded"></div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
+
 
   return (
     <div className="w-64 bg-white border-r border-gray-200 flex flex-col h-screen">
@@ -116,11 +83,10 @@ export default function ProjectSidebar({
         {/* All Projects */}
         <button
           onClick={() => onSelectProject(null)}
-          className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
-            selectedProjectId === null
-              ? 'bg-blue-50 text-blue-700'
-              : 'hover:bg-gray-50 text-gray-700'
-          }`}
+          className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${selectedProjectId === null
+            ? 'bg-blue-50 text-blue-700'
+            : 'hover:bg-gray-50 text-gray-700'
+            }`}
         >
           <FolderKanban className="w-5 h-5" />
           <span className="font-medium">All Projects</span>
@@ -156,11 +122,10 @@ export default function ProjectSidebar({
                     >
                       <button
                         onClick={() => onSelectProject(project.id)}
-                        className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
-                          selectedProjectId === project.id
-                            ? 'bg-blue-50 text-blue-700'
-                            : 'hover:bg-gray-50 text-gray-700'
-                        }`}
+                        className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${selectedProjectId === project.id
+                          ? 'bg-blue-50 text-blue-700'
+                          : 'hover:bg-gray-50 text-gray-700'
+                          }`}
                       >
                         <div
                           className="w-3 h-3 rounded-full flex-shrink-0"
@@ -253,11 +218,10 @@ export default function ProjectSidebar({
                     <button
                       key={project.id}
                       onClick={() => onSelectProject(project.id)}
-                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors opacity-60 ${
-                        selectedProjectId === project.id
-                          ? 'bg-gray-100 text-gray-700'
-                          : 'hover:bg-gray-50 text-gray-600'
-                      }`}
+                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors opacity-60 ${selectedProjectId === project.id
+                        ? 'bg-gray-100 text-gray-700'
+                        : 'hover:bg-gray-50 text-gray-600'
+                        }`}
                     >
                       <div
                         className="w-3 h-3 rounded-full flex-shrink-0"

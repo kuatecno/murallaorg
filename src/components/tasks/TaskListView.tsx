@@ -77,6 +77,29 @@ export default function TaskListView({
     const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
     const [sortBy, setSortBy] = useState<'none' | 'priority' | 'dueDate' | 'status'>('none');
     const [activeMenu, setActiveMenu] = useState<string | null>(null);
+    const [updatingProgress, setUpdatingProgress] = useState<string | null>(null);
+
+    const handleProgressUpdate = async (taskId: string, newProgress: number) => {
+        setUpdatingProgress(taskId);
+        try {
+            const response = await fetch(`/api/tasks/${taskId}/progress`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ progress: newProgress }),
+            });
+
+            if (!response.ok) throw new Error('Failed to update progress');
+
+            toast.success('Progress updated');
+            // Trigger parent refresh
+            window.location.reload(); // Temporary - ideally use state management
+        } catch (error) {
+            toast.error('Failed to update progress');
+            console.error('Error updating progress:', error);
+        } finally {
+            setUpdatingProgress(null);
+        }
+    };
 
     // Only show top-level tasks
     const topLevelTasks = tasks.filter((t) => !t.parentTaskId);
@@ -228,18 +251,33 @@ export default function TaskListView({
 
                     {/* Progress */}
                     <div className="col-span-1 flex items-center justify-end">
-                        <div className="w-full max-w-[80px]">
+                        <div className="w-full max-w-[120px] group">
                             <div className="flex items-center gap-2 mb-1">
                                 <span className="text-xs text-gray-600 ml-auto">
                                     {task.progress}%
                                 </span>
                             </div>
-                            <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                                <div
-                                    className="h-full bg-blue-600 transition-all"
-                                    style={{ width: `${task.progress}%` }}
-                                />
-                            </div>
+                            <input
+                                type="range"
+                                min="0"
+                                max="100"
+                                value={task.progress}
+                                onChange={(e) => handleProgressUpdate(task.id, parseInt(e.target.value))}
+                                disabled={updatingProgress === task.id}
+                                className="w-full h-1.5 bg-gray-200 rounded-full appearance-none cursor-pointer disabled:opacity-50 
+                                [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 
+                                [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-blue-600 
+                                [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:opacity-0 
+                                [&::-webkit-slider-thumb]:group-hover:opacity-100 [&::-webkit-slider-thumb]:transition-opacity
+                                [&::-moz-range-thumb]:w-3 [&::-moz-range-thumb]:h-3 [&::-moz-range-thumb]:rounded-full 
+                                [&::-moz-range-thumb]:bg-blue-600 [&::-moz-range-thumb]:border-0 
+                                [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:opacity-0 
+                                [&::-moz-range-thumb]:group-hover:opacity-100 [&::-moz-range-thumb]:transition-opacity"
+                                style={{
+                                    background: `linear-gradient(to right, #2563eb 0%, #2563eb ${task.progress}%, #e5e7eb ${task.progress}%, #e5e7eb 100%)`
+                                }}
+                                title={`Drag to update progress (${task.progress}%)`}
+                            />
                         </div>
                     </div>
 

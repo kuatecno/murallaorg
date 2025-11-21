@@ -61,6 +61,49 @@ export async function GET(
             createdAt: 'desc',
           },
         },
+        dependencies: {
+          include: {
+            dependsOnTask: {
+              select: {
+                id: true,
+                title: true,
+                status: true,
+                priority: true,
+                dueDate: true,
+                progress: true,
+              },
+            },
+          },
+        },
+        dependentOn: {
+          include: {
+            task: {
+              select: {
+                id: true,
+                title: true,
+                status: true,
+                priority: true,
+                dueDate: true,
+                progress: true,
+              },
+            },
+          },
+        },
+        project: {
+          select: {
+            id: true,
+            name: true,
+            color: true,
+          },
+        },
+        subtasks: {
+          select: {
+            id: true,
+            title: true,
+            status: true,
+            progress: true,
+          },
+        },
       },
     });
 

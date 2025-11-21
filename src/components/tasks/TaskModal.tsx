@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { X, FolderKanban } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import DependencySelector from './DependencySelector';
 
 interface Staff {
   id: string;
@@ -34,6 +35,26 @@ interface Task {
       id: string;
     };
   }[];
+  dependencies?: {
+    id: string;
+    dependsOnTask: {
+      id: string;
+      title: string;
+      status: string;
+      priority: string;
+      progress: number;
+      project?: {
+        id: string;
+        name: string;
+        color: string;
+      };
+    };
+  }[];
+  project?: {
+    id: string;
+    name: string;
+    color: string;
+  };
 }
 
 interface TaskModalProps {
@@ -63,14 +84,17 @@ export default function TaskModal({
   const [progress, setProgress] = useState(0);
   const [estimatedHours, setEstimatedHours] = useState('');
   const [selectedStaff, setSelectedStaff] = useState<string[]>([]);
+  const [selectedDependencies, setSelectedDependencies] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [staff, setStaff] = useState<Staff[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [allTasks, setAllTasks] = useState<Task[]>([]);
 
   useEffect(() => {
     if (isOpen) {
       fetchStaff();
       fetchProjects();
+      fetchAllTasks();
       if (task) {
         populateForm(task);
       } else {
@@ -109,6 +133,18 @@ export default function TaskModal({
     }
   };
 
+  const fetchAllTasks = async () => {
+    try {
+      const response = await fetch('/api/tasks');
+      if (!response.ok) throw new Error('Failed to fetch tasks');
+
+      const data = await response.json();
+      setAllTasks(data.tasks || []);
+    } catch (error) {
+      console.error('Error fetching tasks:', error);
+    }
+  };
+
   const populateForm = (task: Task) => {
     setTitle(task.title);
     setDescription(task.description || '');
@@ -120,6 +156,7 @@ export default function TaskModal({
     setProgress(task.progress);
     setEstimatedHours(task.estimatedHours ? task.estimatedHours.toString() : '');
     setSelectedStaff(task.assignments?.map(a => a.staff.id) || []);
+    setSelectedDependencies(task.dependencies?.map(d => d.dependsOnTask.id) || []);
   };
 
   const resetForm = () => {
@@ -133,6 +170,7 @@ export default function TaskModal({
     setProgress(0);
     setEstimatedHours('');
     setSelectedStaff([]);
+    setSelectedDependencies([]);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -183,6 +221,14 @@ export default function TaskModal({
         throw new Error(error.error || `Failed to ${task ? 'update' : 'create'} task`);
       }
 
+      const result = await response.json();
+      const savedTaskId = task?.id || result.task?.id;
+
+      // Handle dependencies for existing tasks
+      if (task && savedTaskId) {
+        await updateDependencies(savedTaskId);
+      }
+
       toast.success(`Task ${task ? 'updated' : 'created'} successfully!`);
 
       onTaskSaved();
@@ -192,6 +238,41 @@ export default function TaskModal({
       console.error('Error saving task:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const updateDependencies = async (taskId: string) => {
+    try {
+      // Get current dependencies
+      const currentDeps = task?.dependencies?.map(d => d.dependsOnTask.id) || [];
+
+      // Find dependencies to add
+      const depsToAdd = selectedDependencies.filter(id => !currentDeps.includes(id));
+
+      // Find dependencies to remove
+      const depsToRemove = currentDeps.filter(id => !selectedDependencies.includes(id));
+
+      // Add new dependencies
+      for (const depId of depsToAdd) {
+        await fetch(`/api/tasks/${taskId}/dependencies`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ dependsOnTaskId: depId }),
+        });
+      }
+
+      // Remove old dependencies
+      for (const depId of depsToRemove) {
+        const depRecord = task?.dependencies?.find(d => d.dependsOnTask.id === depId);
+        if (depRecord) {
+          await fetch(`/api/tasks/${taskId}/dependencies/${depRecord.id}`, {
+            method: 'DELETE',
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error updating dependencies:', error);
+      // Don't throw - dependencies are not critical
     }
   };
 
@@ -420,6 +501,16 @@ export default function TaskModal({
                 </p>
               )}
             </div>
+
+            {/* Dependencies */}
+            {!parentTaskId && (
+              <DependencySelector
+                taskId={task?.id}
+                selectedDependencies={selectedDependencies}
+                onDependenciesChange={setSelectedDependencies}
+                availableTasks={allTasks}
+              />
+            )}
 
             {/* Actions */}
             <div className="flex items-center justify-end gap-3 pt-4 border-t">

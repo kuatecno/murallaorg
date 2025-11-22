@@ -115,7 +115,11 @@ export default function TaskModal({
       if (!response.ok) throw new Error('Failed to fetch staff');
 
       const data = await response.json();
-      setStaff(data.staff || []);
+      setStaff(
+        (Array.isArray(data)
+          ? data
+          : data.data || data.staff || [])
+      );
     } catch (error) {
       console.error('Error fetching staff:', error);
     }

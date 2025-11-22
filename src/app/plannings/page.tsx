@@ -70,7 +70,11 @@ export default function PlanningPage() {
     ...p,
     status: p.status || 'ACTIVE'
   })) || []) as Project[], [projectsData]);
-  const staff = useMemo(() => (staffData?.staff || []) as { id: string; firstName: string; lastName: string }[], [staffData]);
+  const staff = useMemo(() => (
+    (Array.isArray(staffData)
+      ? staffData
+      : staffData?.data || staffData?.staff || []) as { id: string; firstName: string; lastName: string }[]
+  ), [staffData]);
 
   const loading = tasksLoading || projectsLoading;
 

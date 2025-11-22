@@ -533,42 +533,59 @@ export default function TaskListView({
                     </div>
 
                     {/* Assignee */}
-                    <div className="col-span-2 flex items-center gap-1.5 text-sm text-gray-700">
+                    <div className="col-span-2 flex items-center gap-1.5 text-sm text-gray-700 relative">
                         <User className="w-3.5 h-3.5 text-gray-500" />
                         {isEditingField('assignedStaff') ? (
-                            <div className="flex-1">
-                                <select
-                                    multiple
-                                    value={getEditValue('assignedStaff') || []}
-                                    onChange={(e) => {
-                                        const selected = Array.from(e.target.selectedOptions, option => option.value);
-                                        setEditValues({ ...editValues, [`${task.id}-assignedStaff`]: selected });
-                                    }}
-                                    disabled={isSavingField('assignedStaff')}
-                                    className={`w-full text-xs px-2 py-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                                        isSavingField('assignedStaff')
-                                            ? 'border-gray-300 bg-gray-50 cursor-not-allowed'
-                                            : 'border-blue-300'
-                                    }`}
-                                    size={3}
-                                >
-                                    {staff.map((member) => (
-                                        <option key={member.id} value={member.id}>
-                                            {member.firstName} {member.lastName}
-                                        </option>
-                                    ))}
-                                </select>
-                                <button
-                                    onClick={() => updateTaskAssignment(task.id, getEditValue('assignedStaff') || [])}
-                                    disabled={isSavingField('assignedStaff')}
-                                    className={`mt-1 text-xs ${
-                                        isSavingField('assignedStaff')
-                                            ? 'text-gray-400 cursor-not-allowed'
-                                            : 'text-green-600 hover:text-green-700'
-                                    }`}
-                                >
-                                    {isSavingField('assignedStaff') ? 'Saving...' : 'Save assignments'}
-                                </button>
+                            <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-3 min-w-[280px]">
+                                <div className="mb-2">
+                                    <label className="text-xs font-medium text-gray-700 mb-1 block">Assign Staff:</label>
+                                    <select
+                                        multiple
+                                        value={getEditValue('assignedStaff') || []}
+                                        onChange={(e) => {
+                                            const selected = Array.from(e.target.selectedOptions, option => option.value);
+                                            setEditValues({ ...editValues, [`${task.id}-assignedStaff`]: selected });
+                                        }}
+                                        disabled={isSavingField('assignedStaff')}
+                                        className={`w-full text-xs px-2 py-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                                            isSavingField('assignedStaff')
+                                                ? 'border-gray-300 bg-gray-50 cursor-not-allowed'
+                                                : 'border-blue-300'
+                                        }`}
+                                        size={Math.min(6, Math.max(3, staff.length))}
+                                    >
+                                        {staff.map((member) => (
+                                            <option key={member.id} value={member.id}>
+                                                {member.firstName} {member.lastName}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <p className="text-xs text-gray-500 mt-1">Hold Ctrl/Cmd to select multiple</p>
+                                </div>
+                                <div className="flex gap-2 justify-end">
+                                    <button
+                                        onClick={cancelEditing}
+                                        disabled={isSavingField('assignedStaff')}
+                                        className={`px-2 py-1 text-xs rounded ${
+                                            isSavingField('assignedStaff')
+                                                ? 'text-gray-400 cursor-not-allowed'
+                                                : 'text-gray-600 hover:bg-gray-50'
+                                        }`}
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={() => updateTaskAssignment(task.id, getEditValue('assignedStaff') || [])}
+                                        disabled={isSavingField('assignedStaff')}
+                                        className={`px-2 py-1 text-xs rounded ${
+                                            isSavingField('assignedStaff')
+                                                ? 'text-gray-400 cursor-not-allowed'
+                                                : 'bg-blue-600 text-white hover:bg-blue-700'
+                                        }`}
+                                    >
+                                        {isSavingField('assignedStaff') ? 'Saving...' : 'Save'}
+                                    </button>
+                                </div>
                             </div>
                         ) : (
                             <div 
@@ -799,7 +816,7 @@ export default function TaskListView({
                     </div>
 
                     {/* Assignee */}
-                    <div className="col-span-2">
+                    <div className="col-span-2 relative">
                         <select
                             multiple
                             value={quickAddTask.assignedStaff}
@@ -808,7 +825,7 @@ export default function TaskListView({
                                 setQuickAddTask({ ...quickAddTask, assignedStaff: selected });
                             }}
                             className="w-full text-xs px-2 py-1 border border-blue-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            size={2}
+                            size={Math.min(4, Math.max(2, staff.length))}
                         >
                             {staff.map((member) => (
                                 <option key={member.id} value={member.id}>
@@ -816,6 +833,7 @@ export default function TaskListView({
                                 </option>
                             ))}
                         </select>
+                        <p className="text-xs text-gray-500 mt-1">Hold Ctrl/Cmd to select multiple</p>
                     </div>
 
                     {/* Due Date */}

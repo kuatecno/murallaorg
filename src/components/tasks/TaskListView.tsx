@@ -14,9 +14,12 @@ import {
     X,
     Check,
     Users,
+    ChevronLeft,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import useSWR from 'swr';
+import { motion, AnimatePresence } from 'framer-motion';
+import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isToday, isSameMonth } from 'date-fns';
 
 interface Task {
     id: string;
@@ -83,6 +86,310 @@ const priorityOptions: { value: Task['priority']; label: string }[] = [
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
+// Calendar Picker Component
+interface CalendarPickerProps {
+    selectedDate: Date | null;
+    onSelect: (date: Date) => void;
+    onClose: () => void;
+}
+
+const CalendarPicker: React.FC<CalendarPickerProps> = ({ selectedDate, onSelect, onClose }) => {
+    const [currentMonth, setCurrentMonth] = useState(selectedDate || new Date());
+    
+    const monthStart = startOfMonth(currentMonth);
+    const monthEnd = endOfMonth(currentMonth);
+    const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
+    
+    const handlePrevMonth = () => setCurrentMonth(subMonths(currentMonth, 1));
+    const handleNextMonth = () => setCurrentMonth(addMonths(currentMonth, 1));
+    
+    const handleDateSelect = (date: Date) => {
+        onSelect(date);
+        onClose();
+    };
+    
+    return (
+        <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: -10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: -10 }}
+            transition={{ duration: 0.15, ease: 'easeOut' }}
+            className="absolute z-50 mt-2 bg-white rounded-xl shadow-2xl border border-gray-200 p-4 min-w-[280px]"
+        >
+            <div className="flex items-center justify-between mb-3">
+                <button
+                    onClick={handlePrevMonth}
+                    className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                    <ChevronLeft className="w-4 h-4 text-gray-600" />
+                </button>
+                <div className="text-sm font-semibold text-gray-900">
+                    {format(currentMonth, 'MMMM yyyy')}
+                </div>
+                <button
+                    onClick={handleNextMonth}
+                    className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                    <ChevronRight className="w-4 h-4 text-gray-600" />
+                </button>
+            </div>
+            
+            <div className="grid grid-cols-7 gap-1 mb-2">
+                {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(day => (
+                    <div key={day} className="text-center text-xs font-medium text-gray-500 py-1">
+                        {day}
+                    </div>
+                ))}
+            </div>
+            
+            <div className="grid grid-cols-7 gap-1">
+                {days.map((day, idx) => {
+                    const isSelected = selectedDate && isSameDay(day, selectedDate);
+                    const isCurrentDay = isToday(day);
+                    const isCurrentMonth = isSameMonth(day, currentMonth);
+                    
+                    return (
+                        <button
+                            key={idx}
+                            onClick={() => handleDateSelect(day)}
+                            className={`
+                                p-2 text-sm rounded-lg transition-all hover:bg-blue-50
+                                ${isSelected ? 'bg-blue-600 text-white hover:bg-blue-700' : ''}
+                                ${isCurrentDay && !isSelected ? 'bg-blue-100 text-blue-600 font-semibold' : ''}
+                                ${!isCurrentMonth ? 'text-gray-300' : 'text-gray-700'}
+                            `}
+                        >
+                            {format(day, 'd')}
+                        </button>
+                    );
+                })}
+            </div>
+            
+            <div className="mt-3 pt-3 border-t border-gray-100 flex gap-2">
+                <button
+                    onClick={onClose}
+                    className="flex-1 px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                    Cancel
+                </button>
+                <button
+                    onClick={() => handleDateSelect(new Date())}
+                    className="flex-1 px-3 py-1.5 text-xs bg-blue-600 text-white hover:bg-blue-700 rounded-lg transition-colors font-medium"
+                >
+                    Today
+                </button>
+            </div>
+        </motion.div>
+    );
+};
+
+// Edit Popover Component
+interface EditPopoverProps {
+    title: string;
+    value: string;
+    onSave: (value: string) => void;
+    onClose: () => void;
+    isLoading?: boolean;
+    multiline?: boolean;
+    position?: 'left' | 'right' | 'center';
+}
+
+const EditPopover: React.FC<EditPopoverProps> = ({ 
+    title, 
+    value, 
+    onSave, 
+    onClose, 
+    isLoading = false,
+    multiline = false,
+    position = 'left'
+}) => {
+    const [editValue, setEditValue] = useState(value);
+    const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
+    
+    useEffect(() => {
+        inputRef.current?.focus();
+        inputRef.current?.select();
+    }, []);
+    
+    const handleSave = () => {
+        if (editValue.trim()) {
+            onSave(editValue);
+        }
+    };
+    
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter' && !multiline) {
+            e.preventDefault();
+            handleSave();
+        }
+        if (e.key === 'Escape') {
+            onClose();
+        }
+    };
+    
+    const positionClasses = {
+        left: 'left-0',
+        right: 'right-0',
+        center: 'left-1/2 -translate-x-1/2'
+    };
+    
+    return (
+        <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: -10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: -10 }}
+            transition={{ duration: 0.15, ease: 'easeOut' }}
+            className={`absolute z-50 mt-2 bg-white rounded-xl shadow-2xl border border-gray-200 p-4 min-w-[320px] ${positionClasses[position]}`}
+        >
+            <div className="text-xs font-semibold text-gray-700 mb-2">{title}</div>
+            {multiline ? (
+                <textarea
+                    ref={inputRef as React.RefObject<HTMLTextAreaElement>}
+                    value={editValue}
+                    onChange={(e) => setEditValue(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    disabled={isLoading}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                    rows={3}
+                />
+            ) : (
+                <input
+                    ref={inputRef as React.RefObject<HTMLInputElement>}
+                    type="text"
+                    value={editValue}
+                    onChange={(e) => setEditValue(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    disabled={isLoading}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+            )}
+            <div className="flex gap-2 mt-3">
+                <button
+                    onClick={onClose}
+                    disabled={isLoading}
+                    className="flex-1 px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
+                >
+                    Cancel
+                </button>
+                <button
+                    onClick={handleSave}
+                    disabled={isLoading || !editValue.trim()}
+                    className="flex-1 px-3 py-2 text-sm bg-blue-600 text-white hover:bg-blue-700 rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                    {isLoading ? (
+                        <>
+                            <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            Saving...
+                        </>
+                    ) : (
+                        'Save'
+                    )}
+                </button>
+            </div>
+        </motion.div>
+    );
+};
+
+// Staff Assignment Popover Component
+interface StaffAssignmentPopoverProps {
+    staff: { id: string; firstName: string; lastName: string }[];
+    selectedIds: string[];
+    onSave: (ids: string[]) => void;
+    onClose: () => void;
+    isLoading?: boolean;
+}
+
+const StaffAssignmentPopover: React.FC<StaffAssignmentPopoverProps> = ({ 
+    staff, 
+    selectedIds, 
+    onSave, 
+    onClose, 
+    isLoading = false 
+}) => {
+    const [selected, setSelected] = useState<Set<string>>(new Set(selectedIds));
+    
+    const toggleStaff = (id: string) => {
+        const newSelected = new Set(selected);
+        if (newSelected.has(id)) {
+            newSelected.delete(id);
+        } else {
+            newSelected.add(id);
+        }
+        setSelected(newSelected);
+    };
+    
+    const handleSave = () => {
+        onSave(Array.from(selected));
+    };
+    
+    return (
+        <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: -10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: -10 }}
+            transition={{ duration: 0.15, ease: 'easeOut' }}
+            className="absolute z-50 mt-2 top-full left-0 bg-white rounded-xl shadow-2xl border border-gray-200 p-4 min-w-[280px] max-h-[400px] overflow-y-auto"
+        >
+            <div className="text-xs font-semibold text-gray-700 mb-3">Assign Staff Members</div>
+            <div className="space-y-1 mb-3">
+                {staff.length > 0 ? (
+                    staff.map((member) => {
+                        const isSelected = selected.has(member.id);
+                        return (
+                            <motion.button
+                                key={member.id}
+                                onClick={() => toggleStaff(member.id)}
+                                whileHover={{ scale: 1.01 }}
+                                whileTap={{ scale: 0.99 }}
+                                disabled={isLoading}
+                                className={`w-full px-3 py-2.5 rounded-lg text-sm font-medium text-left transition-all flex items-center gap-3 ${
+                                    isSelected
+                                        ? 'bg-blue-50 border-2 border-blue-500 text-blue-700'
+                                        : 'bg-gray-50 border-2 border-gray-200 text-gray-700 hover:bg-gray-100'
+                                } disabled:opacity-50 disabled:cursor-not-allowed`}
+                            >
+                                <div className={`w-5 h-5 rounded flex items-center justify-center border-2 ${
+                                    isSelected ? 'bg-blue-600 border-blue-600' : 'bg-white border-gray-300'
+                                }`}>
+                                    {isSelected && <Check className="w-3 h-3 text-white" />}
+                                </div>
+                                <div className="flex-1">
+                                    {member.firstName} {member.lastName}
+                                </div>
+                            </motion.button>
+                        );
+                    })
+                ) : (
+                    <p className="text-xs text-gray-500 text-center py-4">No staff members available</p>
+                )}
+            </div>
+            <div className="flex gap-2 pt-3 border-t border-gray-100">
+                <button
+                    onClick={onClose}
+                    disabled={isLoading}
+                    className="flex-1 px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
+                >
+                    Cancel
+                </button>
+                <button
+                    onClick={handleSave}
+                    disabled={isLoading}
+                    className="flex-1 px-3 py-2 text-sm bg-blue-600 text-white hover:bg-blue-700 rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                    {isLoading ? (
+                        <>
+                            <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            Saving...
+                        </>
+                    ) : (
+                        `Assign${selected.size > 0 ? ` (${selected.size})` : ''}`
+                    )}
+                </button>
+            </div>
+        </motion.div>
+    );
+};
+
 export default function TaskListView({
     tasks,
     onEditTask,
@@ -97,13 +404,9 @@ export default function TaskListView({
     const [activeMenu, setActiveMenu] = useState<string | null>(null);
     const [updatingProgress, setUpdatingProgress] = useState<string | null>(null);
     
-    // Inline editing states
-    const [editingField, setEditingField] = useState<{ taskId: string; field: string } | null>(null);
-    const [editValues, setEditValues] = useState<Record<string, any>>({});
+    // Popover states
+    const [activePopover, setActivePopover] = useState<{ taskId: string; field: string } | null>(null);
     const [savingFields, setSavingFields] = useState<Set<string>>(new Set());
-    
-    // Debounced save for auto-save fields
-    const debouncedSave = useRef<Record<string, NodeJS.Timeout>>({});
     
     // Quick add states
     const [showQuickAdd, setShowQuickAdd] = useState(false);
@@ -122,10 +425,6 @@ export default function TaskListView({
             ? staffData
             : staffData?.data || staffData?.staff || []) as { id: string; firstName: string; lastName: string }[]
     ), [staffData]);
-    
-    // Refs for inline editing
-    const titleInputRef = useRef<HTMLInputElement>(null);
-    const descriptionInputRef = useRef<HTMLTextAreaElement>(null);
 
     const handleProgressUpdate = async (taskId: string, newProgress: number) => {
         setUpdatingProgress(taskId);
@@ -148,82 +447,30 @@ export default function TaskListView({
         }
     };
     
-    const startEditing = (taskId: string, field: string, currentValue: any) => {
-        setEditingField({ taskId, field });
-        setEditValues({ ...editValues, [`${taskId}-${field}`]: currentValue });
-        
-        // Focus the appropriate input
-        setTimeout(() => {
-            if (field === 'title' && titleInputRef.current) {
-                titleInputRef.current.focus();
-                titleInputRef.current.select();
-            } else if (field === 'description' && descriptionInputRef.current) {
-                descriptionInputRef.current.focus();
-                descriptionInputRef.current.select();
-            }
-        }, 0);
+    const openPopover = (taskId: string, field: string) => {
+        setActivePopover({ taskId, field });
     };
     
-    const cancelEditing = () => {
-        setEditingField(null);
-        setEditValues({});
+    const closePopover = () => {
+        setActivePopover(null);
     };
     
-    const saveField = async (taskId: string, field: string, value?: any) => {
-        const fieldValue = value !== undefined ? value : editValues[`${taskId}-${field}`];
+    const saveField = async (taskId: string, field: string, value: any) => {
         const fieldKey = `${taskId}-${field}`;
-        
-        // Clear any existing debounce timer
-        if (debouncedSave.current[fieldKey]) {
-            clearTimeout(debouncedSave.current[fieldKey]);
-        }
-        
-        // For auto-save fields (priority, dueDate), use debouncing
-        const autoSaveFields = ['priority', 'dueDate'];
-        if (autoSaveFields.includes(field) && value !== undefined) {
-            debouncedSave.current[fieldKey] = setTimeout(async () => {
-                setSavingFields(prev => new Set(prev).add(fieldKey));
-                
-                try {
-                    const response = await fetch(`/api/tasks/${taskId}`, {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ [field]: fieldValue }),
-                    });
-
-                    if (!response.ok) throw new Error(`Failed to update ${field}`);
-
-                    toast.success(`${field.charAt(0).toUpperCase() + field.slice(1)} updated`);
-                    onRefresh();
-                } catch (error) {
-                    toast.error(`Failed to update ${field}`);
-                    console.error(`Error updating ${field}:`, error);
-                } finally {
-                    setSavingFields(prev => {
-                        const newSet = new Set(prev);
-                        newSet.delete(fieldKey);
-                        return newSet;
-                    });
-                }
-            }, 500);
-            return;
-        }
-        
-        // For manual save fields (title, description, assignedStaff)
         setSavingFields(prev => new Set(prev).add(fieldKey));
         
         try {
             const response = await fetch(`/api/tasks/${taskId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ [field]: fieldValue }),
+                body: JSON.stringify({ [field]: value }),
             });
 
             if (!response.ok) throw new Error(`Failed to update ${field}`);
 
             toast.success(`${field.charAt(0).toUpperCase() + field.slice(1)} updated`);
             onRefresh();
-            cancelEditing();
+            closePopover();
         } catch (error) {
             toast.error(`Failed to update ${field}`);
             console.error(`Error updating ${field}:`, error);
@@ -271,34 +518,6 @@ export default function TaskListView({
         } catch (error) {
             toast.error('Failed to create task');
             console.error('Error creating task:', error);
-        }
-    };
-    
-    const updateTaskAssignment = async (taskId: string, staffIds: string[]) => {
-        const fieldKey = `${taskId}-assignedStaff`;
-        setSavingFields(prev => new Set(prev).add(fieldKey));
-        
-        try {
-            const response = await fetch(`/api/tasks/${taskId}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ assignedStaff: staffIds }),
-            });
-
-            if (!response.ok) throw new Error('Failed to update assignments');
-
-            toast.success('Assignments updated');
-            onRefresh();
-            cancelEditing();
-        } catch (error) {
-            toast.error('Failed to update assignments');
-            console.error('Error updating assignments:', error);
-        } finally {
-            setSavingFields(prev => {
-                const newSet = new Set(prev);
-                newSet.delete(fieldKey);
-                return newSet;
-            });
         }
     };
 
@@ -353,8 +572,7 @@ export default function TaskListView({
         const isExpanded = expandedTasks.has(task.id);
         const completedSubtasks = subtasks.filter((t) => t.status === 'COMPLETED').length;
         const assignees = task.assignments?.map((a) => a.staff) || [];
-        const isEditingField = (field: string) => editingField?.taskId === task.id && editingField?.field === field;
-        const getEditValue = (field: string) => editValues[`${task.id}-${field}`] || task[field as keyof Task];
+        const isPopoverOpen = (field: string) => activePopover?.taskId === task.id && activePopover?.field === field;
         const isSavingField = (field: string) => savingFields.has(`${task.id}-${field}`);
 
         return (
@@ -382,105 +600,56 @@ export default function TaskListView({
                         ) : (
                             <div className="w-6 h-6" />
                         )}
-                        <div className="flex-1 min-w-0">
-                            {isEditingField('title') ? (
-                                <div className="flex items-center gap-2">
-                                    <input
-                                        ref={titleInputRef}
-                                        type="text"
-                                        value={getEditValue('title')}
-                                        onChange={(e) => setEditValues({ ...editValues, [`${task.id}-title`]: e.target.value })}
-                                        onBlur={() => saveField(task.id, 'title')}
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Enter') saveField(task.id, 'title');
-                                            if (e.key === 'Escape') cancelEditing();
-                                        }}
-                                        disabled={isSavingField('title')}
-                                        className={`flex-1 px-2 py-1 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                                            isSavingField('title') 
-                                                ? 'border-gray-300 bg-gray-50 cursor-not-allowed' 
-                                                : 'border-blue-300'
-                                        }`}
-                                    />
-                                    <button
-                                        onClick={() => saveField(task.id, 'title')}
-                                        disabled={isSavingField('title')}
-                                        className={`p-1 rounded ${
-                                            isSavingField('title')
-                                                ? 'text-gray-400 cursor-not-allowed'
-                                                : 'text-green-600 hover:text-green-700'
-                                        }`}
-                                    >
-                                        {isSavingField('title') ? (
-                                            <div className="w-4 h-4 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin" />
-                                        ) : (
-                                            <Check className="w-4 h-4" />
-                                        )}
-                                    </button>
-                                    <button
-                                        onClick={cancelEditing}
-                                        disabled={isSavingField('title')}
-                                        className={`p-1 rounded ${
-                                            isSavingField('title')
-                                                ? 'text-gray-400 cursor-not-allowed'
-                                                : 'text-red-600 hover:text-red-700'
-                                        }`}
-                                    >
-                                        <X className="w-4 h-4" />
-                                    </button>
-                                </div>
-                            ) : (
+                        <div className="flex-1 min-w-0 relative">
                                 <div className="flex items-center gap-2 mb-1">
-                                    <span 
-                                        onClick={() => startEditing(task.id, 'title', task.title)}
-                                        className="text-gray-900 truncate font-medium cursor-pointer hover:text-blue-600 hover:bg-blue-50 px-1 py-0.5 rounded transition-colors"
+                                    <motion.span 
+                                        onClick={() => openPopover(task.id, 'title')}
+                                        whileHover={{ scale: 1.01 }}
+                                        className="text-gray-900 truncate font-medium cursor-pointer hover:text-blue-600 hover:bg-blue-50/80 px-2 py-1 rounded-lg transition-all duration-200"
                                     >
                                         {task.title}
-                                    </span>
+                                    </motion.span>
                                     {hasSubtasks && (
-                                        <span className="text-xs px-1.5 py-0.5 rounded border border-gray-300 text-gray-600">
+                                        <span className="text-xs px-1.5 py-0.5 rounded-md border border-gray-300 text-gray-600 bg-gray-50 font-medium">
                                             {completedSubtasks}/{subtasks.length}
                                         </span>
                                     )}
                                 </div>
-                            )}
-                            {isEditingField('description') ? (
-                                <div className="flex items-start gap-2 mt-1">
-                                    <textarea
-                                        ref={descriptionInputRef}
-                                        value={getEditValue('description') || ''}
-                                        onChange={(e) => setEditValues({ ...editValues, [`${task.id}-description`]: e.target.value })}
-                                        onBlur={() => saveField(task.id, 'description')}
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Escape') cancelEditing();
-                                        }}
-                                        className="flex-1 px-2 py-1 text-xs border border-blue-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                                        rows={2}
-                                    />
-                                    <div className="flex gap-1">
-                                        <button
-                                            onClick={() => saveField(task.id, 'description')}
-                                            className="p-1 text-green-600 hover:bg-green-50 rounded"
-                                        >
-                                            <Check className="w-3 h-3" />
-                                        </button>
-                                        <button
-                                            onClick={cancelEditing}
-                                            className="p-1 text-red-600 hover:bg-red-50 rounded"
-                                        >
-                                            <X className="w-3 h-3" />
-                                        </button>
-                                    </div>
-                                </div>
-                            ) : (
-                                task.description && (
-                                    <p 
-                                        onClick={() => startEditing(task.id, 'description', task.description)}
-                                        className="text-xs text-gray-600 truncate cursor-pointer hover:text-blue-600 hover:bg-blue-50 px-1 py-0.5 rounded transition-colors"
+                                <AnimatePresence>
+                                    {isPopoverOpen('title') && (
+                                        <EditPopover
+                                            title="Edit Task Title"
+                                            value={task.title}
+                                            onSave={(value) => saveField(task.id, 'title', value)}
+                                            onClose={closePopover}
+                                            isLoading={isSavingField('title')}
+                                            position="left"
+                                        />
+                                    )}
+                                </AnimatePresence>
+                            {task.description && (
+                                <>
+                                    <motion.p 
+                                        onClick={() => openPopover(task.id, 'description')}
+                                        whileHover={{ scale: 1.01 }}
+                                        className="text-xs text-gray-600 truncate cursor-pointer hover:text-blue-600 hover:bg-blue-50/80 px-2 py-1 rounded-lg transition-all duration-200 mt-0.5"
                                     >
                                         {task.description}
-                                    </p>
-                                )
+                                    </motion.p>
+                                    <AnimatePresence>
+                                        {isPopoverOpen('description') && (
+                                            <EditPopover
+                                                title="Edit Description"
+                                                value={task.description}
+                                                onSave={(value) => saveField(task.id, 'description', value)}
+                                                onClose={closePopover}
+                                                isLoading={isSavingField('description')}
+                                                multiline
+                                                position="left"
+                                            />
+                                        )}
+                                    </AnimatePresence>
+                                </>
                             )}
                         </div>
                     </div>
@@ -501,148 +670,114 @@ export default function TaskListView({
                     </div>
 
                     {/* Priority */}
-                    <div className="col-span-1 flex items-center">
-                        {isEditingField('priority') ? (
-                            <select
-                                value={getEditValue('priority')}
-                                onChange={(e) => {
-                                    setEditValues({ ...editValues, [`${task.id}-priority`]: e.target.value });
-                                    saveField(task.id, 'priority', e.target.value);
-                                }}
-                                disabled={isSavingField('priority')}
-                                className={`text-xs px-2 py-1 rounded-md border font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                                    isSavingField('priority')
-                                        ? 'border-gray-300 bg-gray-50 cursor-not-allowed'
-                                        : 'border-blue-300'
-                                }`}
-                            >
-                                {priorityOptions.map((option) => (
-                                    <option key={option.value} value={option.value}>
-                                        {option.label}
-                                    </option>
-                                ))}
-                            </select>
-                        ) : (
-                            <span 
-                                onClick={() => startEditing(task.id, 'priority', task.priority)}
-                                className={`text-xs px-2 py-1 rounded-md border font-medium cursor-pointer hover:opacity-80 transition-opacity ${priorityColors[task.priority]}`}
-                            >
-                                {task.priority}
-                            </span>
-                        )}
+                    <div className="col-span-1 flex items-center relative">
+                        <motion.span 
+                            onClick={() => openPopover(task.id, 'priority')}
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            className={`text-xs px-3 py-1.5 rounded-lg border-2 font-semibold cursor-pointer hover:shadow-md transition-all duration-200 ${priorityColors[task.priority]}`}
+                        >
+                            {task.priority}
+                        </motion.span>
+                        <AnimatePresence>
+                            {isPopoverOpen('priority') && (
+                                <motion.div
+                                    initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                                    exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                                    transition={{ duration: 0.15, ease: 'easeOut' }}
+                                    className="absolute z-50 mt-2 top-full left-0 bg-white rounded-xl shadow-2xl border border-gray-200 p-3 min-w-[180px]"
+                                >
+                                    <div className="text-xs font-semibold text-gray-700 mb-2">Set Priority</div>
+                                    <div className="flex flex-col gap-1">
+                                        {priorityOptions.map((option) => (
+                                            <motion.button
+                                                key={option.value}
+                                                onClick={() => {
+                                                    saveField(task.id, 'priority', option.value);
+                                                }}
+                                                whileHover={{ scale: 1.02 }}
+                                                whileTap={{ scale: 0.98 }}
+                                                disabled={isSavingField('priority')}
+                                                className={`text-xs px-3 py-2 rounded-lg border-2 font-semibold text-left transition-all ${
+                                                    task.priority === option.value
+                                                        ? priorityColors[option.value as Task['priority']] + ' ring-2 ring-blue-400'
+                                                        : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
+                                                } disabled:opacity-50 disabled:cursor-not-allowed`}
+                                            >
+                                                {option.label}
+                                            </motion.button>
+                                        ))}
+                                    </div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
                     </div>
 
                     {/* Assignee */}
                     <div className="col-span-2 flex items-center gap-1.5 text-sm text-gray-700 relative">
                         <User className="w-3.5 h-3.5 text-gray-500" />
-                        {isEditingField('assignedStaff') ? (
-                            <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-3 min-w-[280px]">
-                                <div className="mb-2">
-                                    <label className="text-xs font-medium text-gray-700 mb-1 block">Assign Staff:</label>
-                                    <select
-                                        multiple
-                                        value={getEditValue('assignedStaff') || []}
-                                        onChange={(e) => {
-                                            const selected = Array.from(e.target.selectedOptions, option => option.value);
-                                            setEditValues({ ...editValues, [`${task.id}-assignedStaff`]: selected });
-                                        }}
-                                        disabled={isSavingField('assignedStaff')}
-                                        className={`w-full text-xs px-2 py-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                                            isSavingField('assignedStaff')
-                                                ? 'border-gray-300 bg-gray-50 cursor-not-allowed'
-                                                : 'border-blue-300'
-                                        }`}
-                                        size={Math.min(6, Math.max(3, staff.length))}
-                                    >
-                                        {staff.map((member) => (
-                                            <option key={member.id} value={member.id}>
-                                                {member.firstName} {member.lastName}
-                                            </option>
-                                        ))}
-                                    </select>
-                                    <p className="text-xs text-gray-500 mt-1">Hold Ctrl/Cmd to select multiple</p>
-                                </div>
-                                <div className="flex gap-2 justify-end">
-                                    <button
-                                        onClick={cancelEditing}
-                                        disabled={isSavingField('assignedStaff')}
-                                        className={`px-2 py-1 text-xs rounded ${
-                                            isSavingField('assignedStaff')
-                                                ? 'text-gray-400 cursor-not-allowed'
-                                                : 'text-gray-600 hover:bg-gray-50'
-                                        }`}
-                                    >
-                                        Cancel
-                                    </button>
-                                    <button
-                                        onClick={() => updateTaskAssignment(task.id, getEditValue('assignedStaff') || [])}
-                                        disabled={isSavingField('assignedStaff')}
-                                        className={`px-2 py-1 text-xs rounded ${
-                                            isSavingField('assignedStaff')
-                                                ? 'text-gray-400 cursor-not-allowed'
-                                                : 'bg-blue-600 text-white hover:bg-blue-700'
-                                        }`}
-                                    >
-                                        {isSavingField('assignedStaff') ? 'Saving...' : 'Save'}
-                                    </button>
-                                </div>
-                            </div>
-                        ) : (
-                            <div 
-                                onClick={() => startEditing(task.id, 'assignedStaff', assignees.map(a => a.id))}
-                                className="flex -space-x-2 cursor-pointer hover:opacity-80 transition-opacity"
-                            >
-                                {assignees.length > 0 ? (
-                                    <>
-                                        {assignees.slice(0, 2).map((assignee) => (
-                                            <div
-                                                key={assignee.id}
-                                                className="w-6 h-6 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center border-2 border-white font-medium"
-                                                title={`${assignee.firstName} ${assignee.lastName}`}
-                                            >
-                                                {assignee.firstName.charAt(0)}
-                                                {assignee.lastName.charAt(0)}
-                                            </div>
-                                        ))}
-                                        {assignees.length > 2 && (
-                                            <div className="w-6 h-6 rounded-full bg-gray-300 text-gray-700 text-xs flex items-center justify-center border-2 border-white font-medium">
-                                                +{assignees.length - 2}
-                                            </div>
-                                        )}
-                                    </>
-                                ) : (
-                                    <span className="text-xs text-gray-400 hover:text-blue-600">Click to assign</span>
-                                )}
-                            </div>
-                        )}
+                        <motion.div 
+                            onClick={() => openPopover(task.id, 'assignedStaff')}
+                            whileHover={{ scale: 1.02 }}
+                            className="flex -space-x-2 cursor-pointer"
+                        >
+                            {assignees.length > 0 ? (
+                                <>
+                                    {assignees.slice(0, 2).map((assignee) => (
+                                        <motion.div
+                                            key={assignee.id}
+                                            whileHover={{ scale: 1.1, zIndex: 10 }}
+                                            className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 text-white text-xs flex items-center justify-center border-2 border-white font-medium shadow-sm"
+                                            title={`${assignee.firstName} ${assignee.lastName}`}
+                                        >
+                                            {assignee.firstName.charAt(0)}
+                                            {assignee.lastName.charAt(0)}
+                                        </motion.div>
+                                    ))}
+                                    {assignees.length > 2 && (
+                                        <div className="w-7 h-7 rounded-full bg-gray-200 text-gray-700 text-xs flex items-center justify-center border-2 border-white font-medium shadow-sm">
+                                            +{assignees.length - 2}
+                                        </div>
+                                    )}
+                                </>
+                            ) : (
+                                <span className="text-xs text-gray-400 hover:text-blue-600 px-2 py-1 rounded-lg hover:bg-blue-50 transition-colors">Click to assign</span>
+                            )}
+                        </motion.div>
+                        <AnimatePresence>
+                            {isPopoverOpen('assignedStaff') && (
+                                <StaffAssignmentPopover
+                                    staff={staff}
+                                    selectedIds={assignees.map(a => a.id)}
+                                    onSave={(ids) => saveField(task.id, 'assignedStaff', ids)}
+                                    onClose={closePopover}
+                                    isLoading={isSavingField('assignedStaff')}
+                                />
+                            )}
+                        </AnimatePresence>
                     </div>
 
                     {/* Due Date */}
-                    <div className="col-span-2 flex items-center gap-1.5 text-sm text-gray-700">
+                    <div className="col-span-2 flex items-center gap-1.5 text-sm text-gray-700 relative">
                         <Calendar className="w-3.5 h-3.5 text-gray-500" />
-                        {isEditingField('dueDate') ? (
-                            <input
-                                type="date"
-                                value={getEditValue('dueDate') || ''}
-                                onChange={(e) => {
-                                    setEditValues({ ...editValues, [`${task.id}-dueDate`]: e.target.value });
-                                    saveField(task.id, 'dueDate', e.target.value);
-                                }}
-                                disabled={isSavingField('dueDate')}
-                                className={`text-xs px-2 py-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                                    isSavingField('dueDate')
-                                        ? 'border-gray-300 bg-gray-50 cursor-not-allowed'
-                                        : 'border-blue-300'
-                                }`}
-                            />
-                        ) : (
-                            <span 
-                                onClick={() => startEditing(task.id, 'dueDate', task.dueDate)}
-                                className="truncate text-xs cursor-pointer hover:text-blue-600 hover:bg-blue-50 px-1 py-0.5 rounded transition-colors"
-                            >
-                                {formatDate(task.dueDate)}
-                            </span>
-                        )}
+                        <motion.span 
+                            onClick={() => openPopover(task.id, 'dueDate')}
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                            className="truncate text-xs cursor-pointer hover:text-blue-600 hover:bg-blue-50/80 px-2 py-1 rounded-lg transition-all duration-200 font-medium"
+                        >
+                            {formatDate(task.dueDate)}
+                        </motion.span>
+                        <AnimatePresence>
+                            {isPopoverOpen('dueDate') && (
+                                <CalendarPicker
+                                    selectedDate={task.dueDate ? new Date(task.dueDate) : null}
+                                    onSelect={(date) => saveField(task.id, 'dueDate', date.toISOString().split('T')[0])}
+                                    onClose={closePopover}
+                                />
+                            )}
+                        </AnimatePresence>
                     </div>
 
                     {/* Progress */}
@@ -737,10 +872,24 @@ export default function TaskListView({
                     subtasks.map((subtask) => renderTaskRow(subtask, depth + 1))}
             </div>
         );
-    }, [tasks, editingField, editValues, savingFields, expandedTasks, onUpdateStatus, startEditing, saveField, updateTaskAssignment, cancelEditing]);
+    }, [tasks, activePopover, savingFields, expandedTasks, staff, onUpdateStatus, openPopover, closePopover, saveField, toggleExpand, onAddSubtask, onDeleteTask, onEditTask, setActiveMenu, activeMenu, handleProgressUpdate, updatingProgress]);
 
     return (
-        <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+        <>
+            {/* Backdrop for popovers */}
+            <AnimatePresence>
+                {activePopover && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-40 bg-black/5"
+                        onClick={closePopover}
+                    />
+                )}
+            </AnimatePresence>
+            
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden relative z-0">
             {/* Header */}
             <div className="p-6 border-b border-gray-200">
                 <div className="flex items-center justify-between">
@@ -936,5 +1085,6 @@ export default function TaskListView({
                 </div>
             </div>
         </div>
+        </>
     );
 }

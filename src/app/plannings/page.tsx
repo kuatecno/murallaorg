@@ -1,16 +1,17 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Plus, Filter, Search, LayoutGrid, List, Calendar, GitGraph } from 'lucide-react';
-import { toast } from 'react-hot-toast';
+import { useState, useEffect, useMemo } from 'react';
+import { Plus, LayoutGrid, List, Calendar, Clock, ArrowLeft, Filter } from 'lucide-react';
 import TaskBoard from '@/components/tasks/TaskBoard';
 import TaskListView from '@/components/tasks/TaskListView';
 import TaskModal from '@/components/tasks/TaskModal';
-import TaskTimeline from '@/components/tasks/TaskTimeline';
-import TaskProcess from '@/components/tasks/TaskProcess';
 import ProjectSidebar from '@/components/projects/ProjectSidebar';
 import CreateProjectModal from '@/components/projects/CreateProjectModal';
 import EditProjectModal from '@/components/projects/EditProjectModal';
+import TaskProcess from '@/components/tasks/TaskProcess';
+import FilterBar from '@/components/tasks/FilterBar';
+import { toast } from 'react-hot-toast';
+import TaskTimeline from '@/components/tasks/TaskTimeline';
 
 interface Task {
   id: string;
@@ -23,7 +24,7 @@ interface Task {
   progress: number;
   projectId?: string;
   parentTaskId?: string;
-  estimatedHours?: number;
+  createdAt: string;
   assignments?: {
     staff: {
       id: string;
@@ -43,11 +44,9 @@ interface Task {
 interface Project {
   id: string;
   name: string;
-  description?: string;
   color: string;
+  description?: string;
   status: string;
-  startDate?: string;
-  endDate?: string;
   taskCount?: number;
   completedTaskCount?: number;
   progress?: number;
@@ -56,16 +55,36 @@ interface Project {
 export default function PlanningPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [staff, setStaff] = useState<{ id: string; firstName: string; lastName: string }[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Modals
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [isCreateProjectModalOpen, setIsCreateProjectModalOpen] = useState(false);
   const [isEditProjectModalOpen, setIsEditProjectModalOpen] = useState(false);
+
+  // View State
   const [selectedProjectId, setSelectedProjectId] = useState<string | 'all'>('all');
   const [activeView, setActiveView] = useState<'board' | 'list' | 'timeline' | 'process'>('board');
   const [parentTaskId, setParentTaskId] = useState<string | null>(null);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
+
+  // Filter & Sort State
   const [searchQuery, setSearchQuery] = useState('');
+  const [filters, setFilters] = useState<{
+    assigneeId: string | null;
+    priority: string | null;
+    dateRange: { start: string | null; end: string | null };
+  }>({
+    assigneeId: null,
+    priority: null,
+    dateRange: { start: null, end: null },
+  });
+  const [sort, setSort] = useState<{ field: string; direction: 'asc' | 'desc' }>({
+    field: 'createdAt',
+    direction: 'desc',
+  });
 
   useEffect(() => {
     fetchData();
@@ -73,9 +92,10 @@ export default function PlanningPage() {
 
   const fetchData = async () => {
     try {
-      const [tasksRes, projectsRes] = await Promise.all([
+      const [tasksRes, projectsRes, staffRes] = await Promise.all([
         fetch('/api/tasks'),
         fetch('/api/projects'),
+        fetch('/api/staff'),
       ]);
 
       if (!tasksRes.ok || !projectsRes.ok) {
@@ -86,7 +106,15 @@ export default function PlanningPage() {
       const projectsData = await projectsRes.json();
 
       setTasks(tasksData.tasks || []);
-      setProjects(projectsData.projects || []);
+      setProjects(projectsData.projects?.map((p: any) => ({
+        ...p,
+        status: p.status || 'ACTIVE'
+      })) || []);
+
+      if (staffRes.ok) {
+        const staffData = await staffRes.json();
+        setStaff(staffData.staff || []);
+      }
     } catch (error) {
       console.error('Error fetching data:', error);
       toast.error('Failed to load data');
@@ -111,6 +139,24 @@ export default function PlanningPage() {
       toast.success('Status updated');
     } catch (error) {
       toast.error('Failed to update status');
+    }
+  };
+
+  const handleUpdateTask = async (id: string, updates: any) => {
+    try {
+      const response = await fetch(`/api/tasks/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      });
+
+      if (!response.ok) throw new Error('Failed to update task');
+
+      await fetchData();
+    } catch (error) {
+      console.error('Error updating task:', error);
+      toast.error('Failed to update task');
+      throw error;
     }
   };
 
@@ -152,12 +198,71 @@ export default function PlanningPage() {
     };
   });
 
-  const filteredTasks = tasks.filter((task) => {
-    const matchesProject = selectedProjectId === 'all' || task.projectId === selectedProjectId;
-    const matchesSearch = task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      task.description?.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesProject && matchesSearch;
-  });
+  const filteredTasks = useMemo(() => {
+    let result = tasks.filter((task) => {
+      // Project filter
+      if (selectedProjectId !== 'all' && task.projectId !== selectedProjectId) return false;
+
+      // Search
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        const matchesTitle = task.title.toLowerCase().includes(query);
+        const matchesDesc = task.description?.toLowerCase().includes(query);
+        if (!matchesTitle && !matchesDesc) return false;
+      }
+
+      // Assignee
+      if (filters.assigneeId) {
+        const hasAssignee = task.assignments?.some(a => a.staff.id === filters.assigneeId);
+        if (!hasAssignee) return false;
+      }
+
+      // Priority
+      if (filters.priority && task.priority !== filters.priority) return false;
+
+      // Date Range
+      if (filters.dateRange.start && task.dueDate) {
+        if (new Date(task.dueDate) < new Date(filters.dateRange.start)) return false;
+      }
+      if (filters.dateRange.end && task.dueDate) {
+        if (new Date(task.dueDate) > new Date(filters.dateRange.end)) return false;
+      }
+
+      return true;
+    });
+
+    // Sorting
+    result.sort((a, b) => {
+      let valA: any = a[sort.field as keyof Task];
+      let valB: any = b[sort.field as keyof Task];
+
+      // Handle dates
+      if (sort.field === 'dueDate' || sort.field === 'createdAt') {
+        valA = valA ? new Date(valA).getTime() : 0;
+        valB = valB ? new Date(valB).getTime() : 0;
+      }
+
+      // Handle priority (custom order)
+      if (sort.field === 'priority') {
+        const priorityOrder: Record<string, number> = { LOW: 0, MEDIUM: 1, HIGH: 2, URGENT: 3 };
+        valA = priorityOrder[valA as string] || 0;
+        valB = priorityOrder[valB as string] || 0;
+      }
+
+      // Handle string comparison
+      if (typeof valA === 'string' && typeof valB === 'string') {
+        return sort.direction === 'asc'
+          ? valA.localeCompare(valB)
+          : valB.localeCompare(valA);
+      }
+
+      if (valA < valB) return sort.direction === 'asc' ? -1 : 1;
+      if (valA > valB) return sort.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    return result;
+  }, [tasks, selectedProjectId, searchQuery, filters, sort]);
 
   if (loading) {
     return (
@@ -185,7 +290,7 @@ export default function PlanningPage() {
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         <header className="bg-white border-b border-gray-200 px-6 py-4">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">
                 {selectedProjectId === 'all'
@@ -198,74 +303,68 @@ export default function PlanningPage() {
             </div>
 
             <div className="flex items-center gap-3">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                <input
-                  type="text"
-                  placeholder="Search tasks..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm w-64"
-                />
+              <div className="flex bg-gray-100 p-1 rounded-lg">
+                <button
+                  onClick={() => setActiveView('board')}
+                  className={`p-2 rounded-md transition-all ${activeView === 'board'
+                    ? 'bg-white text-blue-600 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                  title="Board View"
+                >
+                  <LayoutGrid className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={() => setActiveView('list')}
+                  className={`p-2 rounded-md transition-all ${activeView === 'list'
+                    ? 'bg-white text-blue-600 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                  title="List View"
+                >
+                  <List className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={() => setActiveView('timeline')}
+                  className={`p-2 rounded-md transition-all ${activeView === 'timeline'
+                    ? 'bg-white text-blue-600 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                  title="Timeline View"
+                >
+                  <Calendar className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={() => setActiveView('process')}
+                  className={`p-2 rounded-md transition-all ${activeView === 'process'
+                    ? 'bg-white text-blue-600 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                  title="Process View"
+                >
+                  <Clock className="w-5 h-5" />
+                </button>
               </div>
 
               <button
-                onClick={() => {
-                  setEditingTask(null);
-                  setParentTaskId(null);
-                  setIsTaskModalOpen(true);
-                }}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                onClick={() => setIsTaskModalOpen(true)}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
               >
-                <Plus className="w-4 h-4" />
-                New Task
+                <Plus className="w-5 h-5" />
+                <span className="font-medium">New Task</span>
               </button>
             </div>
           </div>
 
-          {/* View Switcher */}
-          <div className="flex items-center gap-2 mt-6 border-b border-gray-200">
-            <button
-              onClick={() => setActiveView('board')}
-              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeView === 'board'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-                }`}
-            >
-              <LayoutGrid className="w-4 h-4" />
-              Board
-            </button>
-            <button
-              onClick={() => setActiveView('list')}
-              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeView === 'list'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-                }`}
-            >
-              <List className="w-4 h-4" />
-              List
-            </button>
-            <button
-              onClick={() => setActiveView('timeline')}
-              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeView === 'timeline'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-                }`}
-            >
-              <Calendar className="w-4 h-4" />
-              Timeline
-            </button>
-            <button
-              onClick={() => setActiveView('process')}
-              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeView === 'process'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-                }`}
-            >
-              <GitGraph className="w-4 h-4" />
-              Process
-            </button>
-          </div>
+          <FilterBar
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            filters={filters}
+            onFilterChange={setFilters}
+            sort={sort}
+            onSortChange={setSort}
+            staff={staff}
+          />
         </header>
 
         <main className="flex-1 overflow-y-auto p-6">
@@ -275,6 +374,7 @@ export default function PlanningPage() {
               projects={projects}
               selectedProjectId={selectedProjectId}
               onUpdateStatus={handleUpdateStatus}
+              onUpdateTask={handleUpdateTask}
               onEditTask={handleEditTask}
               onDeleteTask={handleDeleteTask}
               onAddSubtask={handleAddSubtask}
@@ -289,6 +389,7 @@ export default function PlanningPage() {
               onDeleteTask={handleDeleteTask}
               onAddSubtask={handleAddSubtask}
               onUpdateStatus={handleUpdateStatus}
+              onRefresh={fetchData}
             />
           )}
 

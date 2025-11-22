@@ -25,6 +25,7 @@ interface Task {
     progress: number;
     projectId?: string;
     parentTaskId?: string;
+    createdAt: string;
     assignments?: {
         staff: {
             id: string;
@@ -42,6 +43,7 @@ interface TaskListViewProps {
     onDeleteTask: (id: string) => void;
     onAddSubtask: (parentId: string) => void;
     onUpdateStatus: (id: string, status: Task['status']) => void;
+    onRefresh: () => void;
 }
 
 const priorityColors = {

@@ -26,6 +26,7 @@ interface Task {
     progress: number;
     projectId?: string;
     parentTaskId?: string;
+    createdAt: string;
     estimatedHours?: number;
     assignments?: {
         staff: {

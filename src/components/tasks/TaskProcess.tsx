@@ -13,6 +13,7 @@ interface Task {
     progress: number;
     projectId?: string;
     parentTaskId?: string;
+    createdAt: string;
     assignments?: {
         staff: {
             id: string;
@@ -180,10 +181,10 @@ export default function TaskProcess({ tasks, onEditTask }: TaskProcessProps) {
                                                     </div>
                                                     <span
                                                         className={`text-xs px-2 py-0.5 rounded border font-medium whitespace-nowrap ${task.priority === 'HIGH' || task.priority === 'URGENT'
-                                                                ? 'border-red-200 text-red-700 bg-red-50'
-                                                                : task.priority === 'MEDIUM'
-                                                                    ? 'border-blue-200 text-blue-700 bg-blue-50'
-                                                                    : 'border-gray-200 text-gray-700 bg-gray-50'
+                                                            ? 'border-red-200 text-red-700 bg-red-50'
+                                                            : task.priority === 'MEDIUM'
+                                                                ? 'border-blue-200 text-blue-700 bg-blue-50'
+                                                                : 'border-gray-200 text-gray-700 bg-gray-50'
                                                             }`}
                                                     >
                                                         {task.priority}

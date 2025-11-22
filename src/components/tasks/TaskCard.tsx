@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, memo } from 'react';
 import {
     MoreVertical,
     Edit,
@@ -80,7 +80,7 @@ const statusOptions: {
         { value: 'COMPLETED', label: 'Completed' },
     ];
 
-export default function TaskCard({
+function TaskCard({
     task,
     allTasks,
     projects,
@@ -369,3 +369,5 @@ export default function TaskCard({
         </div>
     );
 }
+
+export default memo(TaskCard);

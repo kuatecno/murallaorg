@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
-import { Plus, LayoutGrid, List, Calendar, Clock, ArrowLeft, Filter } from 'lucide-react';
+import { useState, useMemo, useCallback } from 'react';
+import useSWR, { mutate } from 'swr';
+import { Plus, LayoutGrid, List, Calendar, Clock, ArrowLeft, Filter, ClipboardList } from 'lucide-react';
 import TaskBoard from '@/components/tasks/TaskBoard';
 import TaskListView from '@/components/tasks/TaskListView';
 import TaskModal from '@/components/tasks/TaskModal';
@@ -12,6 +13,9 @@ import TaskProcess from '@/components/tasks/TaskProcess';
 import FilterBar from '@/components/tasks/FilterBar';
 import { toast } from 'react-hot-toast';
 import TaskTimeline from '@/components/tasks/TaskTimeline';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 
 interface Task {
   id: string;
@@ -52,11 +56,23 @@ interface Project {
   progress?: number;
 }
 
+const fetcher = (url: string) => fetch(url).then((res) => res.json());
+
 export default function PlanningPage() {
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [staff, setStaff] = useState<{ id: string; firstName: string; lastName: string }[]>([]);
-  const [loading, setLoading] = useState(true);
+  // SWR Hooks
+  const { data: tasksData, error: tasksError, isLoading: tasksLoading } = useSWR('/api/tasks', fetcher);
+  const { data: projectsData, error: projectsError, isLoading: projectsLoading } = useSWR('/api/projects', fetcher);
+  const { data: staffData } = useSWR('/api/staff', fetcher);
+
+  // Derived State
+  const tasks = useMemo(() => (tasksData?.tasks || []) as Task[], [tasksData]);
+  const projects = useMemo(() => (projectsData?.projects?.map((p: any) => ({
+    ...p,
+    status: p.status || 'ACTIVE'
+  })) || []) as Project[], [projectsData]);
+  const staff = useMemo(() => (staffData?.staff || []) as { id: string; firstName: string; lastName: string }[], [staffData]);
+
+  const loading = tasksLoading || projectsLoading;
 
   // Modals
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
@@ -86,45 +102,14 @@ export default function PlanningPage() {
     direction: 'desc',
   });
 
-  useEffect(() => {
-    fetchData();
+  const refreshData = useCallback(() => {
+    mutate('/api/tasks');
+    mutate('/api/projects');
   }, []);
 
-  const fetchData = async () => {
+  const handleUpdateStatus = useCallback(async (taskId: string, newStatus: Task['status']) => {
     try {
-      const [tasksRes, projectsRes, staffRes] = await Promise.all([
-        fetch('/api/tasks'),
-        fetch('/api/projects'),
-        fetch('/api/staff'),
-      ]);
-
-      if (!tasksRes.ok || !projectsRes.ok) {
-        throw new Error('Failed to fetch data');
-      }
-
-      const tasksData = await tasksRes.json();
-      const projectsData = await projectsRes.json();
-
-      setTasks(tasksData.tasks || []);
-      setProjects(projectsData.projects?.map((p: any) => ({
-        ...p,
-        status: p.status || 'ACTIVE'
-      })) || []);
-
-      if (staffRes.ok) {
-        const staffData = await staffRes.json();
-        setStaff(staffData.staff || []);
-      }
-    } catch (error) {
-      console.error('Error fetching data:', error);
-      toast.error('Failed to load data');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleUpdateStatus = async (taskId: string, newStatus: Task['status']) => {
-    try {
+      // Optimistic update could go here
       const response = await fetch(`/api/tasks/${taskId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -133,16 +118,14 @@ export default function PlanningPage() {
 
       if (!response.ok) throw new Error('Failed to update status');
 
-      setTasks(tasks.map((t) =>
-        t.id === taskId ? { ...t, status: newStatus } : t
-      ));
+      mutate('/api/tasks'); // Revalidate
       toast.success('Status updated');
     } catch (error) {
       toast.error('Failed to update status');
     }
-  };
+  }, []);
 
-  const handleUpdateTask = async (id: string, updates: any) => {
+  const handleUpdateTask = useCallback(async (id: string, updates: any) => {
     try {
       const response = await fetch(`/api/tasks/${id}`, {
         method: 'PUT',
@@ -152,15 +135,15 @@ export default function PlanningPage() {
 
       if (!response.ok) throw new Error('Failed to update task');
 
-      await fetchData();
+      mutate('/api/tasks');
     } catch (error) {
       console.error('Error updating task:', error);
       toast.error('Failed to update task');
       throw error;
     }
-  };
+  }, []);
 
-  const handleDeleteTask = async (taskId: string) => {
+  const handleDeleteTask = useCallback(async (taskId: string) => {
     try {
       const response = await fetch(`/api/tasks/${taskId}`, {
         method: 'DELETE',
@@ -168,25 +151,25 @@ export default function PlanningPage() {
 
       if (!response.ok) throw new Error('Failed to delete task');
 
-      setTasks(tasks.filter((t) => t.id !== taskId));
+      mutate('/api/tasks');
       toast.success('Task deleted');
     } catch (error) {
       toast.error('Failed to delete task');
     }
-  };
+  }, []);
 
-  const handleEditTask = (task: Task) => {
+  const handleEditTask = useCallback((task: Task) => {
     setEditingTask(task);
     setIsTaskModalOpen(true);
-  };
+  }, []);
 
-  const handleAddSubtask = (parentId: string) => {
+  const handleAddSubtask = useCallback((parentId: string) => {
     setParentTaskId(parentId);
     setIsTaskModalOpen(true);
-  };
+  }, []);
 
   // Compute sidebar projects with stats
-  const sidebarProjects = projects.map(p => {
+  const sidebarProjects = useMemo(() => projects.map(p => {
     const pTasks = tasks.filter(t => t.projectId === p.id);
     const completed = pTasks.filter(t => t.status === 'COMPLETED').length;
     return {
@@ -196,7 +179,7 @@ export default function PlanningPage() {
       progress: pTasks.length ? Math.round((completed / pTasks.length) * 100) : 0,
       status: p.status || 'ACTIVE'
     };
-  });
+  }), [projects, tasks]);
 
   const filteredTasks = useMemo(() => {
     let result = tasks.filter((task) => {
@@ -264,10 +247,10 @@ export default function PlanningPage() {
     return result;
   }, [tasks, selectedProjectId, searchQuery, filters, sort]);
 
-  if (loading) {
+  if (tasksError || projectsError) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600" />
+      <div className="flex items-center justify-center h-screen text-red-500">
+        Failed to load data. Please try refreshing the page.
       </div>
     );
   }
@@ -275,17 +258,29 @@ export default function PlanningPage() {
   return (
     <div className="flex h-screen bg-gray-50">
       {/* Sidebar */}
-      <ProjectSidebar
-        projects={sidebarProjects}
-        selectedProjectId={selectedProjectId === 'all' ? null : selectedProjectId}
-        onSelectProject={(id) => setSelectedProjectId(id || 'all')}
-        onCreateProject={() => setIsCreateProjectModalOpen(true)}
-        onEditProject={(project) => {
-          setEditingProject(project);
-          setIsEditProjectModalOpen(true);
-        }}
-        onDeleteProject={() => fetchData()}
-      />
+      {loading ? (
+        <div className="w-64 bg-white border-r border-gray-200 p-4 space-y-4">
+          <Skeleton className="h-8 w-3/4" />
+          <Skeleton className="h-10 w-full" />
+          <div className="space-y-2">
+            <Skeleton className="h-8 w-full" />
+            <Skeleton className="h-8 w-full" />
+            <Skeleton className="h-8 w-full" />
+          </div>
+        </div>
+      ) : (
+        <ProjectSidebar
+          projects={sidebarProjects}
+          selectedProjectId={selectedProjectId === 'all' ? null : selectedProjectId}
+          onSelectProject={(id) => setSelectedProjectId(id || 'all')}
+          onCreateProject={() => setIsCreateProjectModalOpen(true)}
+          onEditProject={(project) => {
+            setEditingProject(project);
+            setIsEditProjectModalOpen(true);
+          }}
+          onDeleteProject={() => mutate('/api/projects')}
+        />
+      )}
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
@@ -368,44 +363,85 @@ export default function PlanningPage() {
         </header>
 
         <main className="flex-1 overflow-y-auto p-6">
-          {activeView === 'board' && (
-            <TaskBoard
-              tasks={filteredTasks}
-              projects={projects}
-              selectedProjectId={selectedProjectId}
-              onUpdateStatus={handleUpdateStatus}
-              onUpdateTask={handleUpdateTask}
-              onEditTask={handleEditTask}
-              onDeleteTask={handleDeleteTask}
-              onAddSubtask={handleAddSubtask}
-              onRefresh={fetchData}
-            />
-          )}
+          <ErrorBoundary>
+            {loading ? (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="space-y-4">
+                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-32 w-full" />
+                  <Skeleton className="h-32 w-full" />
+                </div>
+                <div className="space-y-4">
+                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-32 w-full" />
+                </div>
+                <div className="space-y-4">
+                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-32 w-full" />
+                  <Skeleton className="h-32 w-full" />
+                </div>
+              </div>
+            ) : filteredTasks.length === 0 ? (
+              <EmptyState
+                title="No tasks found"
+                description={
+                  searchQuery || filters.assigneeId || filters.priority
+                    ? "Try adjusting your filters or search query to find what you're looking for."
+                    : "Get started by creating your first task for this project."
+                }
+                icon={ClipboardList}
+                action={
+                  !searchQuery && !filters.assigneeId && !filters.priority
+                    ? {
+                      label: "Create Task",
+                      onClick: () => setIsTaskModalOpen(true),
+                    }
+                    : undefined
+                }
+              />
+            ) : (
+              <>
+                {activeView === 'board' && (
+                  <TaskBoard
+                    tasks={filteredTasks}
+                    projects={projects}
+                    selectedProjectId={selectedProjectId}
+                    onUpdateStatus={handleUpdateStatus}
+                    onUpdateTask={handleUpdateTask}
+                    onEditTask={handleEditTask}
+                    onDeleteTask={handleDeleteTask}
+                    onAddSubtask={handleAddSubtask}
+                    onRefresh={refreshData}
+                  />
+                )}
 
-          {activeView === 'list' && (
-            <TaskListView
-              tasks={filteredTasks}
-              onEditTask={handleEditTask}
-              onDeleteTask={handleDeleteTask}
-              onAddSubtask={handleAddSubtask}
-              onUpdateStatus={handleUpdateStatus}
-              onRefresh={fetchData}
-            />
-          )}
+                {activeView === 'list' && (
+                  <TaskListView
+                    tasks={filteredTasks}
+                    onEditTask={handleEditTask}
+                    onDeleteTask={handleDeleteTask}
+                    onAddSubtask={handleAddSubtask}
+                    onUpdateStatus={handleUpdateStatus}
+                    onRefresh={refreshData}
+                  />
+                )}
 
-          {activeView === 'timeline' && (
-            <TaskTimeline
-              tasks={filteredTasks}
-              onEditTask={handleEditTask}
-            />
-          )}
+                {activeView === 'timeline' && (
+                  <TaskTimeline
+                    tasks={filteredTasks}
+                    onEditTask={handleEditTask}
+                  />
+                )}
 
-          {activeView === 'process' && (
-            <TaskProcess
-              tasks={filteredTasks}
-              onEditTask={handleEditTask}
-            />
-          )}
+                {activeView === 'process' && (
+                  <TaskProcess
+                    tasks={filteredTasks}
+                    onEditTask={handleEditTask}
+                  />
+                )}
+              </>
+            )}
+          </ErrorBoundary>
         </main>
       </div>
 
@@ -416,7 +452,7 @@ export default function PlanningPage() {
           setParentTaskId(null);
           setEditingTask(null);
         }}
-        onTaskSaved={fetchData}
+        onTaskSaved={refreshData}
         defaultProjectId={selectedProjectId === 'all' ? null : selectedProjectId}
         parentTaskId={parentTaskId}
         task={editingTask}
@@ -425,7 +461,7 @@ export default function PlanningPage() {
       <CreateProjectModal
         isOpen={isCreateProjectModalOpen}
         onClose={() => setIsCreateProjectModalOpen(false)}
-        onProjectCreated={fetchData}
+        onProjectCreated={refreshData}
       />
 
       <EditProjectModal
@@ -435,7 +471,7 @@ export default function PlanningPage() {
           setIsEditProjectModalOpen(false);
           setEditingProject(null);
         }}
-        onProjectUpdated={fetchData}
+        onProjectUpdated={refreshData}
       />
     </div>
   );

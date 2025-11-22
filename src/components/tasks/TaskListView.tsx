@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
     ChevronRight,
     ChevronDown,
@@ -11,8 +11,12 @@ import {
     User,
     MoreVertical,
     ArrowRight,
+    X,
+    Check,
+    Users,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import useSWR from 'swr';
 
 interface Task {
     id: string;
@@ -44,6 +48,7 @@ interface TaskListViewProps {
     onAddSubtask: (parentId: string) => void;
     onUpdateStatus: (id: string, status: Task['status']) => void;
     onRefresh: () => void;
+    defaultProjectId?: string | null;
 }
 
 const priorityColors = {
@@ -69,23 +74,64 @@ const statusOptions: { value: Task['status']; label: string }[] = [
     { value: 'CANCELLED', label: 'Cancelled' },
 ];
 
+const priorityOptions: { value: Task['priority']; label: string }[] = [
+    { value: 'LOW', label: 'Low' },
+    { value: 'MEDIUM', label: 'Medium' },
+    { value: 'HIGH', label: 'High' },
+    { value: 'URGENT', label: 'Urgent' },
+];
+
+const fetcher = (url: string) => fetch(url).then((res) => res.json());
+
 export default function TaskListView({
     tasks,
     onEditTask,
     onDeleteTask,
     onAddSubtask,
     onUpdateStatus,
+    onRefresh,
+    defaultProjectId,
 }: TaskListViewProps) {
     const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
     const [sortBy, setSortBy] = useState<'none' | 'priority' | 'dueDate' | 'status'>('none');
     const [activeMenu, setActiveMenu] = useState<string | null>(null);
     const [updatingProgress, setUpdatingProgress] = useState<string | null>(null);
+    
+    // Inline editing states
+    const [editingField, setEditingField] = useState<{ taskId: string; field: string } | null>(null);
+    const [editValues, setEditValues] = useState<Record<string, any>>({});
+    const [savingFields, setSavingFields] = useState<Set<string>>(new Set());
+    
+    // Debounced save for auto-save fields
+    const debouncedSave = useRef<Record<string, NodeJS.Timeout>>({});
+    
+    // Quick add states
+    const [showQuickAdd, setShowQuickAdd] = useState(false);
+    const [quickAddTask, setQuickAddTask] = useState({
+        title: '',
+        description: '',
+        priority: 'MEDIUM' as Task['priority'],
+        dueDate: '',
+        assignedStaff: [] as string[],
+    });
+    
+    // Staff data for assignment
+    const { data: staffData } = useSWR('/api/staff', fetcher);
+    const staff = useMemo(() => (
+        (Array.isArray(staffData)
+            ? staffData
+            : staffData?.data || staffData?.staff || []) as { id: string; firstName: string; lastName: string }[]
+    ), [staffData]);
+    
+    // Refs for inline editing
+    const titleInputRef = useRef<HTMLInputElement>(null);
+    const descriptionInputRef = useRef<HTMLTextAreaElement>(null);
 
     const handleProgressUpdate = async (taskId: string, newProgress: number) => {
         setUpdatingProgress(taskId);
         try {
-            const response = await fetch(`/api/tasks/${taskId}/progress`, {
-                method: 'PATCH',
+            const response = await fetch(`/api/tasks/${taskId}`, {
+                method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ progress: newProgress }),
             });
@@ -93,13 +139,166 @@ export default function TaskListView({
             if (!response.ok) throw new Error('Failed to update progress');
 
             toast.success('Progress updated');
-            // Trigger parent refresh
-            window.location.reload(); // Temporary - ideally use state management
+            onRefresh();
         } catch (error) {
             toast.error('Failed to update progress');
             console.error('Error updating progress:', error);
         } finally {
             setUpdatingProgress(null);
+        }
+    };
+    
+    const startEditing = (taskId: string, field: string, currentValue: any) => {
+        setEditingField({ taskId, field });
+        setEditValues({ ...editValues, [`${taskId}-${field}`]: currentValue });
+        
+        // Focus the appropriate input
+        setTimeout(() => {
+            if (field === 'title' && titleInputRef.current) {
+                titleInputRef.current.focus();
+                titleInputRef.current.select();
+            } else if (field === 'description' && descriptionInputRef.current) {
+                descriptionInputRef.current.focus();
+                descriptionInputRef.current.select();
+            }
+        }, 0);
+    };
+    
+    const cancelEditing = () => {
+        setEditingField(null);
+        setEditValues({});
+    };
+    
+    const saveField = async (taskId: string, field: string, value?: any) => {
+        const fieldValue = value !== undefined ? value : editValues[`${taskId}-${field}`];
+        const fieldKey = `${taskId}-${field}`;
+        
+        // Clear any existing debounce timer
+        if (debouncedSave.current[fieldKey]) {
+            clearTimeout(debouncedSave.current[fieldKey]);
+        }
+        
+        // For auto-save fields (priority, dueDate), use debouncing
+        const autoSaveFields = ['priority', 'dueDate'];
+        if (autoSaveFields.includes(field) && value !== undefined) {
+            debouncedSave.current[fieldKey] = setTimeout(async () => {
+                setSavingFields(prev => new Set(prev).add(fieldKey));
+                
+                try {
+                    const response = await fetch(`/api/tasks/${taskId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ [field]: fieldValue }),
+                    });
+
+                    if (!response.ok) throw new Error(`Failed to update ${field}`);
+
+                    toast.success(`${field.charAt(0).toUpperCase() + field.slice(1)} updated`);
+                    onRefresh();
+                } catch (error) {
+                    toast.error(`Failed to update ${field}`);
+                    console.error(`Error updating ${field}:`, error);
+                } finally {
+                    setSavingFields(prev => {
+                        const newSet = new Set(prev);
+                        newSet.delete(fieldKey);
+                        return newSet;
+                    });
+                }
+            }, 500);
+            return;
+        }
+        
+        // For manual save fields (title, description, assignedStaff)
+        setSavingFields(prev => new Set(prev).add(fieldKey));
+        
+        try {
+            const response = await fetch(`/api/tasks/${taskId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ [field]: fieldValue }),
+            });
+
+            if (!response.ok) throw new Error(`Failed to update ${field}`);
+
+            toast.success(`${field.charAt(0).toUpperCase() + field.slice(1)} updated`);
+            onRefresh();
+            cancelEditing();
+        } catch (error) {
+            toast.error(`Failed to update ${field}`);
+            console.error(`Error updating ${field}:`, error);
+        } finally {
+            setSavingFields(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(fieldKey);
+                return newSet;
+            });
+        }
+    };
+    
+    const handleQuickAdd = async () => {
+        if (!quickAddTask.title.trim()) {
+            toast.error('Task title is required');
+            return;
+        }
+        
+        try {
+            const response = await fetch('/api/tasks', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    title: quickAddTask.title.trim(),
+                    description: quickAddTask.description.trim() || undefined,
+                    priority: quickAddTask.priority,
+                    dueDate: quickAddTask.dueDate || undefined,
+                    projectId: defaultProjectId || undefined,
+                    assignedStaff: quickAddTask.assignedStaff,
+                }),
+            });
+
+            if (!response.ok) throw new Error('Failed to create task');
+
+            toast.success('Task created successfully!');
+            setQuickAddTask({
+                title: '',
+                description: '',
+                priority: 'MEDIUM',
+                dueDate: '',
+                assignedStaff: [],
+            });
+            setShowQuickAdd(false);
+            onRefresh();
+        } catch (error) {
+            toast.error('Failed to create task');
+            console.error('Error creating task:', error);
+        }
+    };
+    
+    const updateTaskAssignment = async (taskId: string, staffIds: string[]) => {
+        const fieldKey = `${taskId}-assignedStaff`;
+        setSavingFields(prev => new Set(prev).add(fieldKey));
+        
+        try {
+            const response = await fetch(`/api/tasks/${taskId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ assignedStaff: staffIds }),
+            });
+
+            if (!response.ok) throw new Error('Failed to update assignments');
+
+            toast.success('Assignments updated');
+            onRefresh();
+            cancelEditing();
+        } catch (error) {
+            toast.error('Failed to update assignments');
+            console.error('Error updating assignments:', error);
+        } finally {
+            setSavingFields(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(fieldKey);
+                return newSet;
+            });
         }
     };
 
@@ -148,12 +347,15 @@ export default function TaskListView({
         }).format(new Date(dateString));
     };
 
-    const renderTaskRow = (task: Task, depth: number = 0) => {
+    const renderTaskRow = useCallback((task: Task, depth: number = 0) => {
         const subtasks = task.subtasks || tasks.filter((t) => t.parentTaskId === task.id);
         const hasSubtasks = subtasks.length > 0;
         const isExpanded = expandedTasks.has(task.id);
         const completedSubtasks = subtasks.filter((t) => t.status === 'COMPLETED').length;
         const assignees = task.assignments?.map((a) => a.staff) || [];
+        const isEditingField = (field: string) => editingField?.taskId === task.id && editingField?.field === field;
+        const getEditValue = (field: string) => editValues[`${task.id}-${field}`] || task[field as keyof Task];
+        const isSavingField = (field: string) => savingFields.has(`${task.id}-${field}`);
 
         return (
             <div key={task.id}>
@@ -181,18 +383,104 @@ export default function TaskListView({
                             <div className="w-6 h-6" />
                         )}
                         <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
-                                <span className="text-gray-900 truncate font-medium">{task.title}</span>
-                                {hasSubtasks && (
-                                    <span className="text-xs px-1.5 py-0.5 rounded border border-gray-300 text-gray-600">
-                                        {completedSubtasks}/{subtasks.length}
+                            {isEditingField('title') ? (
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        ref={titleInputRef}
+                                        type="text"
+                                        value={getEditValue('title')}
+                                        onChange={(e) => setEditValues({ ...editValues, [`${task.id}-title`]: e.target.value })}
+                                        onBlur={() => saveField(task.id, 'title')}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter') saveField(task.id, 'title');
+                                            if (e.key === 'Escape') cancelEditing();
+                                        }}
+                                        disabled={isSavingField('title')}
+                                        className={`flex-1 px-2 py-1 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                                            isSavingField('title') 
+                                                ? 'border-gray-300 bg-gray-50 cursor-not-allowed' 
+                                                : 'border-blue-300'
+                                        }`}
+                                    />
+                                    <button
+                                        onClick={() => saveField(task.id, 'title')}
+                                        disabled={isSavingField('title')}
+                                        className={`p-1 rounded ${
+                                            isSavingField('title')
+                                                ? 'text-gray-400 cursor-not-allowed'
+                                                : 'text-green-600 hover:text-green-700'
+                                        }`}
+                                    >
+                                        {isSavingField('title') ? (
+                                            <div className="w-4 h-4 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin" />
+                                        ) : (
+                                            <Check className="w-4 h-4" />
+                                        )}
+                                    </button>
+                                    <button
+                                        onClick={cancelEditing}
+                                        disabled={isSavingField('title')}
+                                        className={`p-1 rounded ${
+                                            isSavingField('title')
+                                                ? 'text-gray-400 cursor-not-allowed'
+                                                : 'text-red-600 hover:text-red-700'
+                                        }`}
+                                    >
+                                        <X className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="flex items-center gap-2 mb-1">
+                                    <span 
+                                        onClick={() => startEditing(task.id, 'title', task.title)}
+                                        className="text-gray-900 truncate font-medium cursor-pointer hover:text-blue-600 hover:bg-blue-50 px-1 py-0.5 rounded transition-colors"
+                                    >
+                                        {task.title}
                                     </span>
-                                )}
-                            </div>
-                            {task.description && (
-                                <p className="text-xs text-gray-600 truncate">
-                                    {task.description}
-                                </p>
+                                    {hasSubtasks && (
+                                        <span className="text-xs px-1.5 py-0.5 rounded border border-gray-300 text-gray-600">
+                                            {completedSubtasks}/{subtasks.length}
+                                        </span>
+                                    )}
+                                </div>
+                            )}
+                            {isEditingField('description') ? (
+                                <div className="flex items-start gap-2 mt-1">
+                                    <textarea
+                                        ref={descriptionInputRef}
+                                        value={getEditValue('description') || ''}
+                                        onChange={(e) => setEditValues({ ...editValues, [`${task.id}-description`]: e.target.value })}
+                                        onBlur={() => saveField(task.id, 'description')}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Escape') cancelEditing();
+                                        }}
+                                        className="flex-1 px-2 py-1 text-xs border border-blue-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                                        rows={2}
+                                    />
+                                    <div className="flex gap-1">
+                                        <button
+                                            onClick={() => saveField(task.id, 'description')}
+                                            className="p-1 text-green-600 hover:bg-green-50 rounded"
+                                        >
+                                            <Check className="w-3 h-3" />
+                                        </button>
+                                        <button
+                                            onClick={cancelEditing}
+                                            className="p-1 text-red-600 hover:bg-red-50 rounded"
+                                        >
+                                            <X className="w-3 h-3" />
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : (
+                                task.description && (
+                                    <p 
+                                        onClick={() => startEditing(task.id, 'description', task.description)}
+                                        className="text-xs text-gray-600 truncate cursor-pointer hover:text-blue-600 hover:bg-blue-50 px-1 py-0.5 rounded transition-colors"
+                                    >
+                                        {task.description}
+                                    </p>
+                                )
                             )}
                         </div>
                     </div>
@@ -214,41 +502,130 @@ export default function TaskListView({
 
                     {/* Priority */}
                     <div className="col-span-1 flex items-center">
-                        <span className={`text-xs px-2 py-1 rounded-md border font-medium ${priorityColors[task.priority]}`}>
-                            {task.priority}
-                        </span>
+                        {isEditingField('priority') ? (
+                            <select
+                                value={getEditValue('priority')}
+                                onChange={(e) => {
+                                    setEditValues({ ...editValues, [`${task.id}-priority`]: e.target.value });
+                                    saveField(task.id, 'priority', e.target.value);
+                                }}
+                                disabled={isSavingField('priority')}
+                                className={`text-xs px-2 py-1 rounded-md border font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                                    isSavingField('priority')
+                                        ? 'border-gray-300 bg-gray-50 cursor-not-allowed'
+                                        : 'border-blue-300'
+                                }`}
+                            >
+                                {priorityOptions.map((option) => (
+                                    <option key={option.value} value={option.value}>
+                                        {option.label}
+                                    </option>
+                                ))}
+                            </select>
+                        ) : (
+                            <span 
+                                onClick={() => startEditing(task.id, 'priority', task.priority)}
+                                className={`text-xs px-2 py-1 rounded-md border font-medium cursor-pointer hover:opacity-80 transition-opacity ${priorityColors[task.priority]}`}
+                            >
+                                {task.priority}
+                            </span>
+                        )}
                     </div>
 
                     {/* Assignee */}
                     <div className="col-span-2 flex items-center gap-1.5 text-sm text-gray-700">
                         <User className="w-3.5 h-3.5 text-gray-500" />
-                        <div className="flex -space-x-2">
-                            {assignees.length > 0 ? (
-                                assignees.slice(0, 2).map((assignee) => (
-                                    <div
-                                        key={assignee.id}
-                                        className="w-6 h-6 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center border-2 border-white font-medium"
-                                        title={`${assignee.firstName} ${assignee.lastName}`}
-                                    >
-                                        {assignee.firstName.charAt(0)}
-                                        {assignee.lastName.charAt(0)}
-                                    </div>
-                                ))
-                            ) : (
-                                <span className="text-xs text-gray-400">Unassigned</span>
-                            )}
-                            {assignees.length > 2 && (
-                                <div className="w-6 h-6 rounded-full bg-gray-300 text-gray-700 text-xs flex items-center justify-center border-2 border-white font-medium">
-                                    +{assignees.length - 2}
-                                </div>
-                            )}
-                        </div>
+                        {isEditingField('assignedStaff') ? (
+                            <div className="flex-1">
+                                <select
+                                    multiple
+                                    value={getEditValue('assignedStaff') || []}
+                                    onChange={(e) => {
+                                        const selected = Array.from(e.target.selectedOptions, option => option.value);
+                                        setEditValues({ ...editValues, [`${task.id}-assignedStaff`]: selected });
+                                    }}
+                                    disabled={isSavingField('assignedStaff')}
+                                    className={`w-full text-xs px-2 py-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                                        isSavingField('assignedStaff')
+                                            ? 'border-gray-300 bg-gray-50 cursor-not-allowed'
+                                            : 'border-blue-300'
+                                    }`}
+                                    size={3}
+                                >
+                                    {staff.map((member) => (
+                                        <option key={member.id} value={member.id}>
+                                            {member.firstName} {member.lastName}
+                                        </option>
+                                    ))}
+                                </select>
+                                <button
+                                    onClick={() => updateTaskAssignment(task.id, getEditValue('assignedStaff') || [])}
+                                    disabled={isSavingField('assignedStaff')}
+                                    className={`mt-1 text-xs ${
+                                        isSavingField('assignedStaff')
+                                            ? 'text-gray-400 cursor-not-allowed'
+                                            : 'text-green-600 hover:text-green-700'
+                                    }`}
+                                >
+                                    {isSavingField('assignedStaff') ? 'Saving...' : 'Save assignments'}
+                                </button>
+                            </div>
+                        ) : (
+                            <div 
+                                onClick={() => startEditing(task.id, 'assignedStaff', assignees.map(a => a.id))}
+                                className="flex -space-x-2 cursor-pointer hover:opacity-80 transition-opacity"
+                            >
+                                {assignees.length > 0 ? (
+                                    <>
+                                        {assignees.slice(0, 2).map((assignee) => (
+                                            <div
+                                                key={assignee.id}
+                                                className="w-6 h-6 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center border-2 border-white font-medium"
+                                                title={`${assignee.firstName} ${assignee.lastName}`}
+                                            >
+                                                {assignee.firstName.charAt(0)}
+                                                {assignee.lastName.charAt(0)}
+                                            </div>
+                                        ))}
+                                        {assignees.length > 2 && (
+                                            <div className="w-6 h-6 rounded-full bg-gray-300 text-gray-700 text-xs flex items-center justify-center border-2 border-white font-medium">
+                                                +{assignees.length - 2}
+                                            </div>
+                                        )}
+                                    </>
+                                ) : (
+                                    <span className="text-xs text-gray-400 hover:text-blue-600">Click to assign</span>
+                                )}
+                            </div>
+                        )}
                     </div>
 
                     {/* Due Date */}
                     <div className="col-span-2 flex items-center gap-1.5 text-sm text-gray-700">
                         <Calendar className="w-3.5 h-3.5 text-gray-500" />
-                        <span className="truncate text-xs">{formatDate(task.dueDate)}</span>
+                        {isEditingField('dueDate') ? (
+                            <input
+                                type="date"
+                                value={getEditValue('dueDate') || ''}
+                                onChange={(e) => {
+                                    setEditValues({ ...editValues, [`${task.id}-dueDate`]: e.target.value });
+                                    saveField(task.id, 'dueDate', e.target.value);
+                                }}
+                                disabled={isSavingField('dueDate')}
+                                className={`text-xs px-2 py-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                                    isSavingField('dueDate')
+                                        ? 'border-gray-300 bg-gray-50 cursor-not-allowed'
+                                        : 'border-blue-300'
+                                }`}
+                            />
+                        ) : (
+                            <span 
+                                onClick={() => startEditing(task.id, 'dueDate', task.dueDate)}
+                                className="truncate text-xs cursor-pointer hover:text-blue-600 hover:bg-blue-50 px-1 py-0.5 rounded transition-colors"
+                            >
+                                {formatDate(task.dueDate)}
+                            </span>
+                        )}
                     </div>
 
                     {/* Progress */}
@@ -343,7 +720,7 @@ export default function TaskListView({
                     subtasks.map((subtask) => renderTaskRow(subtask, depth + 1))}
             </div>
         );
-    };
+    }, [tasks, editingField, editValues, savingFields, expandedTasks, onUpdateStatus, startEditing, saveField, updateTaskAssignment, cancelEditing]);
 
     return (
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
@@ -353,24 +730,132 @@ export default function TaskListView({
                     <div>
                         <h2 className="text-lg font-semibold text-gray-900">Task List</h2>
                         <p className="text-sm text-gray-600 mt-1">
-                            Detailed view with subtask management
+                            Detailed view with inline editing and quick task creation
                         </p>
                     </div>
-                    <div className="flex items-center gap-2">
-                        <span className="text-sm text-gray-600">Sort by:</span>
-                        <select
-                            value={sortBy}
-                            onChange={(e) => setSortBy(e.target.value as any)}
-                            className="text-sm border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={() => setShowQuickAdd(!showQuickAdd)}
+                            className="flex items-center gap-2 px-3 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
                         >
-                            <option value="none">Default</option>
-                            <option value="priority">Priority</option>
-                            <option value="dueDate">Due Date</option>
-                            <option value="status">Status</option>
-                        </select>
+                            <Plus className="w-4 h-4" />
+                            Quick Add Task
+                        </button>
+                        <div className="flex items-center gap-2">
+                            <span className="text-sm text-gray-600">Sort by:</span>
+                            <select
+                                value={sortBy}
+                                onChange={(e) => setSortBy(e.target.value as any)}
+                                className="text-sm border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                            >
+                                <option value="none">Default</option>
+                                <option value="priority">Priority</option>
+                                <option value="dueDate">Due Date</option>
+                                <option value="status">Status</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
             </div>
+
+            {/* Quick Add Row */}
+            {showQuickAdd && (
+                <div className="grid grid-cols-12 gap-4 p-4 bg-blue-50 border-b-2 border-blue-200">
+                    {/* Task Title */}
+                    <div className="col-span-4">
+                        <input
+                            type="text"
+                            placeholder="Task title..."
+                            value={quickAddTask.title}
+                            onChange={(e) => setQuickAddTask({ ...quickAddTask, title: e.target.value })}
+                            className="w-full px-3 py-2 text-sm border border-blue-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                    </div>
+
+                    {/* Status */}
+                    <div className="col-span-2">
+                        <select
+                            value="TODO"
+                            disabled
+                            className="w-full h-8 text-xs rounded border-0 px-2 py-1 font-medium bg-gray-100 text-gray-500 cursor-not-allowed"
+                        >
+                            <option value="TODO">To Do</option>
+                        </select>
+                    </div>
+
+                    {/* Priority */}
+                    <div className="col-span-1">
+                        <select
+                            value={quickAddTask.priority}
+                            onChange={(e) => setQuickAddTask({ ...quickAddTask, priority: e.target.value as Task['priority'] })}
+                            className="w-full text-xs px-2 py-1 rounded-md border font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                            {priorityOptions.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                    {option.label}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {/* Assignee */}
+                    <div className="col-span-2">
+                        <select
+                            multiple
+                            value={quickAddTask.assignedStaff}
+                            onChange={(e) => {
+                                const selected = Array.from(e.target.selectedOptions, option => option.value);
+                                setQuickAddTask({ ...quickAddTask, assignedStaff: selected });
+                            }}
+                            className="w-full text-xs px-2 py-1 border border-blue-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            size={2}
+                        >
+                            {staff.map((member) => (
+                                <option key={member.id} value={member.id}>
+                                    {member.firstName} {member.lastName}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {/* Due Date */}
+                    <div className="col-span-2">
+                        <input
+                            type="date"
+                            value={quickAddTask.dueDate}
+                            onChange={(e) => setQuickAddTask({ ...quickAddTask, dueDate: e.target.value })}
+                            className="w-full text-xs px-2 py-1 border border-blue-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                    </div>
+
+                    {/* Actions */}
+                    <div className="col-span-1 flex items-center justify-end gap-1">
+                        <button
+                            onClick={handleQuickAdd}
+                            className="p-1 text-green-600 hover:bg-green-50 rounded"
+                            title="Create task"
+                        >
+                            <Check className="w-4 h-4" />
+                        </button>
+                        <button
+                            onClick={() => {
+                                setShowQuickAdd(false);
+                                setQuickAddTask({
+                                    title: '',
+                                    description: '',
+                                    priority: 'MEDIUM',
+                                    dueDate: '',
+                                    assignedStaff: [],
+                                });
+                            }}
+                            className="p-1 text-red-600 hover:bg-red-50 rounded"
+                            title="Cancel"
+                        >
+                            <X className="w-4 h-4" />
+                        </button>
+                    </div>
+                </div>
+            )}
 
             {/* Column Headers */}
             <div className="grid grid-cols-12 gap-4 p-4 bg-gray-50 border-b border-gray-200">
